@@ -61,10 +61,10 @@ jobs:
         with:
           workspaces: ./src-tauri -> target
 
-      - name: Tauri CLI 설치
+      - name: 의존성 설치
         # cargo install tauri-cli 는 매 실행마다 소스에서 컴파일해 10분 넘게 걸린다.
-        # npm 배포판은 미리 빌드된 바이너리를 받는다.
-        run: npm install --no-save @tauri-apps/cli@^2
+        # npm 배포판(@tauri-apps/cli)은 미리 빌드된 바이너리를 받는다.
+        run: npm ci
 
       - name: NSIS 설치파일 빌드
         run: npx tauri build --bundles nsis
