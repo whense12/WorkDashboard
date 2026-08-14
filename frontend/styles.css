@@ -74,3 +74,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 /* 완료 상태 배지 — 초록은 여기서만 쓴다. */
 .detail-dday.done{background:var(--done-soft);color:var(--done)}
+
+/* 용어·항목 탭 */
+.terms-note{font-size:var(--fs-xs);color:var(--muted);margin-bottom:10px;line-height:1.5}
+.terms-preview{margin-top:12px;border:1px solid var(--accent-line, var(--line));background:var(--accent-soft);border-radius:10px;padding:11px 13px;display:grid;gap:4px}
+.terms-preview b{font-size:var(--fs-xs);color:var(--accent);letter-spacing:.02em}
+.terms-preview span{font-size:var(--fs-xs);color:var(--ink)}
+#vfList .proc-row{grid-template-columns:32px minmax(0,1fr) 116px 64px}
+#vfList select{height:var(--ctl-h-sm);border:1px solid var(--line);border-radius:7px;padding:0 6px;font-size:var(--fs-xs);background:#fff}

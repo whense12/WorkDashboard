@@ -11,18 +11,95 @@
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
   const uid=p=>`${p}-${Date.now()}-${Math.random().toString(16).slice(2,8)}`;
   const clone=x=>JSON.parse(JSON.stringify(x));
-  const STATE_VERSION=6;
+  const STATE_VERSION=7;
+
+  // ── 용어 ─────────────────────────────────────────────────────────────────
+  // 발주서 §1: 도메인 규칙을 하드코딩하지 말 것. 시드 절차명은 예시일 뿐 정책이 아니다.
+  // 그런데 '업체/업무/절차/일정' 이 화면 문자열에 박혀 있어 다른 업무에는 쓸 수 없었다.
+  const defaultTerms=()=>({app:'업체별 업무 일정',vendor:'업체',project:'업무',step:'절차',event:'일정'});
+
+  // 한국어 조사. 용어를 바꿀 수 있게 하면 "거래처을 선택" 같은 문장이 나온다.
+  // 한글 음절은 0xAC00 부터 종성 28개 주기를 가지므로 (코드-0xAC00)%28 이 0 이면 받침이 없다.
+  // 근사가 아니라 규칙이다.
+  function finalJamo(w){
+    const s=String(w??'');if(!s)return -1;
+    const c=s.charCodeAt(s.length-1);
+    if(c<0xac00||c>0xd7a3)return -1;      // 한글 음절이 아니면 판정하지 않는다
+    return (c-0xac00)%28;                  // 0 = 받침 없음, 8 = ㄹ
+  }
+  /** josa('업체',['을','를']) -> '업체를' · pair[0]=받침 있을 때, pair[1]=없을 때 */
+  function josa(word,pair){
+    const w=String(word??''),j=finalJamo(w);
+    if(pair[0]==='으로')return w+(j<0||j===0||j===8?'로':'으로');   // ㄹ 받침은 '로'
+    if(j<0)return w+pair[1];                                          // 한글이 아니면 받침 없는 쪽
+    return w+(j===0?pair[1]:pair[0]);
+  }
+
+  /** 화면 문자열 사전. 용어가 바뀌면 여기 한 곳만 다시 계산하면 된다. */
+  function labels(terms){
+    const T={...defaultTerms(),...(terms||{})};
+    const V=T.vendor,P=T.project,S=T.step,E=T.event,j=josa;
+    return {
+      app:T.app,
+      addProject:`${P} 추가`, addEvent:`${E} 추가`,
+      upcoming:`다가오는 ${E}`,
+      sideCaption:`${V}별 가장 가까운 ${j(E,['이','가'])} 날짜순으로 표시됩니다.`,
+      calHint:`빈 날짜를 클릭하면 ${E} 추가`,
+      eventModalTitle:`${E} 추가`, saveEvent:`${E} 저장`,
+      fVendor:V, fLinkedProject:`연결 ${P}`,
+      fLinkedNote:`${j(P,['과','와'])} 무관한 ${j(E,['은','는'])} ‘일반 ${E}’을 선택합니다.`,
+      fEventName:`${E}명`,
+      projectModalTitle:`${P} 추가`, saveProject:`${P} 등록`,
+      fVendorTemplate:`${V} 템플릿`, fWorkTemplate:`${P} 템플릿`,
+      fProjectName:`${P}명`, fFirstDate:`첫 ${E} 날짜`,
+      detailTitle:`${E} 상세`, deleteEvent:`${E} 삭제`,
+      stepsModalTitle:`${P} ${S} 편집`, addStep:'+ 단계 추가', saveSteps:`${S} 저장`,
+      genericEvent:`일반 ${E}`, noVendor:`${V} 미지정`,
+      laterCount:n=>`이후 ${E} ${n}건`,
+      emptyBlank:`등록된 ${j(P,['이','가'])} 없습니다.<br>위쪽 <b>${P} 추가</b>로 시작하거나,<br>설정에서 예시 데이터를 불러오세요.`,
+      emptyHorizon:`설정한 기준 안에 예정된 ${j(E,['이','가'])} 없습니다.`,
+      selectedStep:`선택 ${S}`, allSteps:`전체 ${P} ${S}`, editSteps:`${S} 편집`,
+      stepsSub:'완료된 단계와 아직 오지 않은 단계까지 모두 표시합니다.',
+      worklog:`${P} 내용 기록`,
+      vendorInfo:`${V} 정보`, vendorName:`${V}명`, newVendorTpl:`+ ${V} 템플릿`, saveVendor:`${V} 저장`,
+      workSteps:`${P} ${S}`, newWorkTpl:`+ ${P} 템플릿`,
+      needEventFields:`날짜, ${V}, ${E}명을 확인하세요.`,
+      needProjectFields:`${V}, 템플릿, ${P}명, 첫 날짜를 확인하세요.`,
+      savedEvent:`${j(E,['을','를'])} 추가했습니다.`,
+      savedProject:`${j(P,['을','를'])} 등록했습니다.`,
+      deletedEvent:`${j(E,['을','를'])} 삭제했습니다.`,
+      changedDate:`${E} 날짜를 변경했습니다.`,
+      savedSteps:`이 ${P}의 ${j(S,['을','를'])} 저장했습니다.`,
+      savedVendorTpl:`${V} 템플릿을 저장했습니다.`,
+      deletedVendorTpl:`${V} 템플릿을 삭제했습니다.`,
+      vendorInUse:`사용 중인 ${V} 템플릿은 삭제할 수 없습니다.`,
+      savedWorkTpl:`${P} 템플릿을 저장했습니다.`,
+      deletedWorkTpl:`${P} 템플릿을 삭제했습니다.`,
+      newVendorName:`신규 ${V}`, newWorkTplName:`신규 ${P} 템플릿`,
+      confirmDeleteEvent:`이 ${j(E,['을','를'])} 삭제할까요?`,
+      demoCopy:`기능을 둘러볼 수 있는 예시 ${P}·${j(E,['을','를'])} 넣거나 뺍니다. 실제 데이터는 건드리지 않습니다.`,
+    };
+  }
+
+  // 업체 마스터의 항목도 도메인마다 다르다. 고정 3개 대신 사용자 정의로 둔다.
+  const defaultVendorFields=()=>([
+    {id:'vf-person',label:'담당자',type:'text'},
+    {id:'vf-contact',label:'연락처',type:'tel'},
+    {id:'vf-memo',label:'메모',type:'multiline'},
+  ]);
   // 최초 실행 상태는 재사용 기준정보(업체/업무 템플릿)만 담는다.
   // 예시 공사·일정은 seed 에 넣지 않는다 — 넣으면 실사용자가 가짜 데이터를 손으로 지워야 한다.
   const seed={
     version:STATE_VERSION,
     settings:{horizon:'14',customHorizon:45,helperAlwaysOnTop:true,autostart:false},
     pendingSelection:null,
+    terms:{app:'업체별 업무 일정',vendor:'업체',project:'업무',step:'절차',event:'일정'},
+    vendorFields:[{id:'vf-person',label:'담당자',type:'text'},{id:'vf-contact',label:'연락처',type:'tel'},{id:'vf-memo',label:'메모',type:'multiline'}],
     vendorTemplates:[
-      {id:'v-daehan',name:'대한건설',person:'김OO',contact:'010-1111-1111',memo:''},
-      {id:'v-mirae',name:'미래토건',person:'박OO',contact:'010-2222-2222',memo:''},
-      {id:'v-dongsung',name:'동성건설',person:'이OO',contact:'010-3333-3333',memo:''},
-      {id:'v-goseong',name:'고성건설',person:'최OO',contact:'010-4444-4444',memo:''}
+      {id:'v-daehan',name:'대한건설',values:{'vf-person':'김OO','vf-contact':'010-1111-1111','vf-memo':''}},
+      {id:'v-mirae',name:'미래토건',values:{'vf-person':'박OO','vf-contact':'010-2222-2222','vf-memo':''}},
+      {id:'v-dongsung',name:'동성건설',values:{'vf-person':'이OO','vf-contact':'010-3333-3333','vf-memo':''}},
+      {id:'v-goseong',name:'고성건설',values:{'vf-person':'최OO','vf-contact':'010-4444-4444','vf-memo':''}}
     ],
     workTemplates:[
       {id:'wt-general',name:'일반 공사(예시)',steps:[
@@ -79,6 +156,20 @@
       if(!('pendingSelection' in s))s.pendingSelection=null;
       v=6;
     }
+    if(v<7){
+      // v6 -> v7: 용어 사전과 업체 커스텀 항목이 생긴다.
+      // 기존 담당자/연락처/메모 값을 기본 3개 항목으로 옮기되, 원본 키는 지우지 않는다(§21).
+      s.terms=s.terms||defaultTerms();
+      if(!Array.isArray(s.vendorFields)||!s.vendorFields.length){
+        s.vendorFields=defaultVendorFields();
+        (Array.isArray(s.vendorTemplates)?s.vendorTemplates:[]).forEach(x=>{
+          x.values=x.values||{};
+          const carry={'vf-person':x.person,'vf-contact':x.contact,'vf-memo':x.memo};
+          for(const [k,val] of Object.entries(carry))if(val!==undefined&&x.values[k]===undefined)x.values[k]=val;
+        });
+      }
+      v=7;
+    }
     s.version=v;
     return s;
   }
@@ -87,7 +178,10 @@
     const s=migrate(x&&typeof x==='object'?x:clone(seed));
     s.settings=s.settings||clone(seed.settings);
     s.pendingSelection=s.pendingSelection||null;
+    s.terms={...defaultTerms(),...(s.terms||{})};
+    s.vendorFields=Array.isArray(s.vendorFields)&&s.vendorFields.length?s.vendorFields:defaultVendorFields();
     s.vendorTemplates=Array.isArray(s.vendorTemplates)?s.vendorTemplates:[];
+    s.vendorTemplates.forEach(x=>{x.values=x.values&&typeof x.values==='object'?x.values:{}});
     s.workTemplates=Array.isArray(s.workTemplates)?s.workTemplates:[];
     s.projects=Array.isArray(s.projects)?s.projects:[];
     s.manualEvents=Array.isArray(s.manualEvents)?s.manualEvents:[];
@@ -358,7 +452,7 @@
     if(moved)await saveState(state);
     return moved;
   }
-  window.WorkCore={KEY,STATE_VERSION,seed,demoData,hasDemoData,clone,uid,todayISO,parse,iso,addDays,diffDays,pretty,esc,isTauri,nativeFiles,migrate,normalizeState,initStorage,saveState,watchState,readState,vendor,project,currentStep,eventRecords,dueCards,ddayLabel,ddayClass,horizonDays,horizonLabel,projectFromTemplate,completeEvent,reopenEvent,
+  window.WorkCore={KEY,STATE_VERSION,seed,defaultTerms,defaultVendorFields,labels,josa,demoData,hasDemoData,clone,uid,todayISO,parse,iso,addDays,diffDays,pretty,esc,isTauri,nativeFiles,migrate,normalizeState,initStorage,saveState,watchState,readState,vendor,project,currentStep,eventRecords,dueCards,ddayLabel,ddayClass,horizonDays,horizonLabel,projectFromTemplate,completeEvent,reopenEvent,
     putAttachment,readAttachment,deleteAttachment,attachmentsOf,purgeAttachments,revealAttachment,migrateAttachmentsToDisk,formatBytes,
     buildBackup,readBackup,restoreBackup,writeBackupFile,listBackups,readBackupFile,rotateBackups,revealBackups,maybeAutoBackup};
 })();

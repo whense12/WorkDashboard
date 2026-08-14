@@ -86,7 +86,7 @@ console.log('\n[1] 최초 실행 — 예시 데이터 없이 빈 상태');
   const state = await page.evaluate(() => window.WorkCore.readState().then((s) => ({ p: s.projects.length, m: s.manualEvents.length, v: s.vendorTemplates.length, w: s.workTemplates.length, ver: s.version })));
   check('가짜 공사/일정이 저장되지 않는다', state.p === 0 && state.m === 0, `projects=${state.p} events=${state.m}`);
   check('업체·업무 템플릿(기준정보)은 제공된다', state.v > 0 && state.w > 0);
-  check('상태 버전이 6으로 올라간다', state.ver === 6, `version=${state.ver}`);
+  check('상태 버전이 7로 올라간다', state.ver === 7, `version=${state.ver}`);
   check('빈 상태 안내가 보인다', (await page.innerText('#dueList')).includes('등록된 업무가 없습니다'));
   check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
   await ctx.close();
@@ -625,6 +625,139 @@ console.log('\n[21] CSP — tauri.conf.json 과 같은 정책 아래에서 화�
   const font = await page.evaluate(async () => { await document.fonts.ready; return [...document.fonts].some((f) => f.family.includes('Pretendard') && f.status === 'loaded'); });
   check('번들 폰트가 CSP 아래에서 로드된다', font);
   check('CSP 위반 0건', errors.filter((e) => e.startsWith('CSP:')).length === 0, errors.filter((e) => e.startsWith('CSP:')).join(' | '));
+  check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
+console.log('\n[22] 용어 설정화 — 다른 업무에도 쓸 수 있고, 조사가 맞는다 (발주서 §1)');
+{
+  const { ctx, page, errors } = await open();
+  const before = await page.evaluate(async () => (await window.WorkCore.readState()).projects.length);
+
+  await page.click('#templateBtn');
+  await page.click('[data-template-tab="terms"]');
+  await page.waitForSelector('#termsPane:not(.hidden) [data-term="vendor"]');
+
+  await page.fill('[data-term="app"]', '거래처별 계약 일정');
+  await page.fill('[data-term="vendor"]', '거래처');
+  await page.fill('[data-term="project"]', '계약건');
+  await page.fill('[data-term="step"]', '단계');
+  await page.waitForTimeout(150);
+
+  const preview = await page.innerText('#termsPreview');
+  check('미리보기가 조사를 맞춰 보여준다', preview.includes('거래처별 가장 가까운 일정이') && preview.includes('계약건과 무관한 일정은'), preview.replace(/\n/g, ' | '));
+  check('“거래처을” 같은 문장이 나오지 않는다', !/처을|건이 등록|무가 없/.test(preview), preview.replace(/\n/g, ' | '));
+
+  await page.click('#termsSave');
+  await page.waitForTimeout(400);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+
+  const ui = await page.evaluate(() => ({
+    title: document.title,
+    h1: document.querySelector('h1').textContent,
+    addProject: document.querySelector('#addWorkBtn .label').textContent,
+    addEvent: document.querySelector('#addScheduleBtn .label').textContent,
+    caption: document.querySelector('.side-caption').textContent,
+    upcoming: document.querySelector('.side-title').textContent,
+  }));
+  check('앱 이름이 바뀐다', ui.title === '거래처별 계약 일정' && ui.h1 === '거래처별 계약 일정', JSON.stringify(ui));
+  check('헤더 버튼이 바뀐다', ui.addProject === '계약건 추가' && ui.addEvent === '일정 추가', `${ui.addProject} / ${ui.addEvent}`);
+  check('좌 레일 문구의 조사가 맞는다', ui.caption === '거래처별 가장 가까운 일정이 날짜순으로 표시됩니다.', ui.caption);
+
+  await page.click('.due-card >> nth=0');
+  await page.waitForSelector('#detailBody .step');
+  const detail = await page.evaluate(() => ({
+    title: document.getElementById('detailTitle').textContent,
+    steps: document.querySelector('.steps-title').textContent,
+    edit: document.getElementById('editProjectSteps').textContent,
+  }));
+  check('상세 문구도 함께 바뀐다', detail.steps === '전체 계약건 단계' && detail.edit === '단계 편집', JSON.stringify(detail));
+
+  const after = await page.evaluate(async () => (await window.WorkCore.readState()).projects.length);
+  check('기존 데이터는 그대로 남는다', after === before, `${before} -> ${after}`);
+  check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
+console.log('\n[23] 업체 커스텀 항목 — 추가한 항목이 상세에 나타난다');
+{
+  const { ctx, page, errors } = await open();
+  await page.click('#templateBtn');
+  await page.click('[data-template-tab="terms"]');
+  await page.waitForSelector('#vfAdd');
+  await page.click('#vfAdd');
+  const rows = await page.$$('#vfList .proc-row');
+  await page.fill(`#vfList .proc-row:nth-child(${rows.length}) input`, '사업자번호');
+  await page.click('#termsSave');
+  await page.waitForTimeout(400);
+
+  // 새 항목에 값을 넣는다.
+  await page.click('[data-template-tab="vendor"]');
+  await page.waitForSelector('[data-vf]');
+  const last = await page.$$('[data-vf]');
+  await last[last.length - 1].fill('123-45-67890');
+  await page.click('#saveVendorTemplate');
+  await page.waitForTimeout(400);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+
+  const stored = await page.evaluate(async () => {
+    const s = await window.WorkCore.readState();
+    return { fields: s.vendorFields.map((f) => f.label), values: s.vendorTemplates[0].values };
+  });
+  check('항목이 추가된다', stored.fields.includes('사업자번호'), stored.fields.join(','));
+  check('값이 저장된다', Object.values(stored.values).includes('123-45-67890'), JSON.stringify(stored.values));
+
+  await page.click('.due-card:has-text("대한건설")');
+  await page.waitForSelector('#detailBody');
+  const info = await page.innerText('#detailBody');
+  check('상세에 새 항목이 나타난다', info.includes('사업자번호') && info.includes('123-45-67890'));
+  check('값이 빈 항목은 상세를 어지럽히지 않는다', !/사업자번호[\s\S]{0,3}$/.test(info));
+  check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
+console.log('\n[24] v6 -> v7 이관 — 담당자·연락처 값이 보존된다 (발주서 §21)');
+{
+  const { ctx, page, errors } = await open({ demo: false });
+  // 구버전 모양 상태를 직접 심는다.
+  await page.evaluate(() => {
+    localStorage.setItem('work-calendar-state-v5', JSON.stringify({
+      version: 6,
+      settings: { horizon: '14', customHorizon: 45, helperAlwaysOnTop: true, autostart: false },
+      vendorTemplates: [{ id: 'v-old', name: '옛업체', person: '홍길동', contact: '010-9999-8888', memo: '이관 확인용' }],
+      workTemplates: [{ id: 'wt-x', name: '옛 템플릿', steps: [{ name: '1단계', offset: 0 }] }],
+      projects: [{ id: 'p-old', vendorId: 'v-old', name: '옛 공사', templateId: 'wt-x', steps: [{ id: 'p-old-s1', name: '1단계', offset: 0, dueDate: '2026-08-20', completed: false, completedAt: null }] }],
+      manualEvents: [],
+    }));
+  });
+  await page.reload();
+  await page.waitForFunction(() => !!window.WorkCore);
+
+  const m = await page.evaluate(async () => {
+    const s = await window.WorkCore.readState();
+    const v = s.vendorTemplates[0];
+    return {
+      version: s.version,
+      fieldLabels: s.vendorFields.map((f) => f.label),
+      values: v.values,
+      legacyKept: { person: v.person, contact: v.contact, memo: v.memo },
+      projects: s.projects.length, steps: s.projects[0]?.steps.length,
+      terms: s.terms,
+    };
+  });
+  check('버전이 7로 올라간다', m.version === 7, `version=${m.version}`);
+  check('기본 항목 3개가 생긴다', JSON.stringify(m.fieldLabels) === JSON.stringify(['담당자', '연락처', '메모']), m.fieldLabels.join(','));
+  check('담당자 값이 옮겨진다', m.values['vf-person'] === '홍길동', JSON.stringify(m.values));
+  check('연락처 값이 옮겨진다', m.values['vf-contact'] === '010-9999-8888');
+  check('메모 값이 옮겨진다', m.values['vf-memo'] === '이관 확인용');
+  check('원본 키를 지우지 않는다 (되돌릴 수 있게)', m.legacyKept.person === '홍길동' && m.legacyKept.contact === '010-9999-8888', JSON.stringify(m.legacyKept));
+  check('업무와 절차가 온전하다', m.projects === 1 && m.steps === 1);
+  check('용어 기본값이 채워진다', m.terms.vendor === '업체' && m.terms.event === '일정', JSON.stringify(m.terms));
+
+  const shown = await page.innerText('#dueList');
+  check('이관된 데이터가 화면에 뜬다', shown.includes('옛업체'), shown.slice(0, 60));
   check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
   await ctx.close();
 }
