@@ -360,6 +360,77 @@ console.log('\n[13] 예시 데이터 넣기/빼기 — 실제 업무는 건드�
   await ctx.close();
 }
 
+console.log('\n[14] 타이포그래피 하한 — 화면의 모든 글자가 13px 이상 (발주서 §19.3 / KRDS PC 최소 본문)');
+{
+  // 이 프로젝트가 거부당한 핵심 이유가 마이크로텍스트였다. 회귀를 눈으로 잡을 수 없으니
+  // 실제 렌더된 글자 크기를 재서 고정한다.
+  const FLOOR = 13;
+  const measure = () => {
+    const bad = new Map();
+    for (const el of document.querySelectorAll('body *')) {
+      if (!el.offsetParent && el !== document.body) continue;      // 숨은 요소 제외
+      const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+      if (!own) continue;                                          // 자기 텍스트가 있는 요소만
+      const px = parseFloat(getComputedStyle(el).fontSize);
+      if (px < 13) {
+        const key = `${el.tagName.toLowerCase()}.${el.className || '(no class)'}`;
+        if (!bad.has(key)) bad.set(key, px);
+      }
+    }
+    return [...bad].map(([k, v]) => `${k} = ${v}px`);
+  };
+
+  const { ctx, page, errors } = await open();
+  const main = await page.evaluate(measure);
+  check(`메인 화면에 ${FLOOR}px 미만 텍스트가 없다`, main.length === 0, main.join(' | '));
+
+  await page.click('.due-card:has-text("대한건설")');
+  await page.waitForSelector('#detailBody .step');
+  const detail = await page.evaluate(measure);
+  check(`상세 모달에 ${FLOOR}px 미만 텍스트가 없다`, detail.length === 0, detail.join(' | '));
+
+  const calEvent = await page.$eval('.event', (e) => parseFloat(getComputedStyle(e).fontSize));
+  check('캘린더 이벤트가 13px 이상이다', calEvent >= FLOOR, `${calEvent}px`);
+  const vendor = await page.$eval('.due-vendor', (e) => parseFloat(getComputedStyle(e).fontSize));
+  const task = await page.$eval('.due-task', (e) => parseFloat(getComputedStyle(e).fontSize));
+  const sub = await page.$eval('.due-sub', (e) => parseFloat(getComputedStyle(e).fontSize));
+  check('정보 계층이 크기로 드러난다 (업체 > 일정명 > 부제)', vendor > task && task > sub, `${vendor}/${task}/${sub}`);
+
+  const helper = await ctx.newPage();
+  await helper.setViewportSize({ width: 330, height: 430 });
+  await helper.goto(BASE + '/helper.html');
+  await helper.waitForSelector('.helper-card');
+  const hp = await helper.evaluate(measure);
+  check(`도우미 창에 ${FLOOR}px 미만 텍스트가 없다`, hp.length === 0, hp.join(' | '));
+  check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
+console.log('\n[15] 레이아웃 — 좁은 화면에서도 가로 스크롤이 생기지 않는다');
+{
+  for (const vp of [{ width: 1920, height: 1080 }, { width: 1440, height: 900 }, { width: 1280, height: 720 }]) {
+    const { ctx, page } = await open({ viewport: vp });
+    const over = await page.evaluate(() => ({
+      doc: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      header: (() => { const t = document.querySelector('.topbar'); return t.scrollWidth - t.clientWidth; })(),
+    }));
+    check(`${vp.width}x${vp.height} 가로 넘침 없음`, over.doc <= 0, `문서 +${over.doc}px`);
+    check(`${vp.width}x${vp.height} 헤더 버튼이 넘치지 않음`, over.header <= 0, `헤더 +${over.header}px`);
+    // 발주서 §13: 캘린더는 하나의 세로 스크롤 컨테이너를 가지고, 주 행을 억지로 눌러
+    // 담지 않는다. 화면이 크면 한 달이 통째로 들어와 스크롤이 안 생기는 게 정상이다.
+    const cal = await page.$eval('.calendar-scroll', (e) => ({
+      overflowY: getComputedStyle(e).overflowY,
+      scrolls: e.scrollHeight > e.clientHeight + 4,
+    }));
+    check(`${vp.width}x${vp.height} 캘린더가 세로 스크롤 컨테이너다`, cal.overflowY === 'auto' || cal.overflowY === 'scroll', cal.overflowY);
+    if (vp.height <= 900) check(`${vp.width}x${vp.height} 넘치는 달이 실제로 스크롤된다`, cal.scrolls);
+    // 주 행 높이를 줄여 억지로 맞추지 않는다.
+    const rowH = await page.$eval('.day', (e) => e.getBoundingClientRect().height);
+    check(`${vp.width}x${vp.height} 날짜 칸이 눌리지 않는다 (>=146px)`, rowH >= 146, `${Math.round(rowH)}px`);
+    await ctx.close();
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 await browser.close();
 server.close();

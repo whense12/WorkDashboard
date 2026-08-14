@@ -28,7 +28,9 @@ const BANNER = `<!--
 /** <link rel=stylesheet> 와 <script src> 를 실제 내용으로 치환한다. */
 async function inline(htmlName, scripts) {
   let html = await read(htmlName);
-  const css = await read('styles.css');
+  // 폰트 파일은 2MB 라 data URI 로 심으면 생성물이 각각 3MB 가 된다. 경로만 저장소 루트
+  // 기준으로 고쳐 둔다. 이 HTML 은 저장소 안에서 열어 보는 미리보기 용도다.
+  const css = (await read('styles.css')).replace(/url\("fonts\//g, 'url("frontend/fonts/');
 
   html = html.replace(/<link rel="stylesheet" href="styles\.css">/, `<style>\n${css}\n</style>`);
   if (html.includes('styles.css')) throw new Error(`${htmlName}: styles.css 링크를 치환하지 못했습니다.`);
