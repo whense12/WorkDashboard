@@ -32,9 +32,23 @@
   async function refreshDetail(msg){const k=selectedRecord?.kind,id=selectedRecord?.id;await C.saveState(state);render();if(k&&id)openRecord(k,id);if(msg)toast(msg)}
   async function addWorkLog(){const entity=recordEntity(selectedRecord),text=q('#workLogText')?.value.trim();if(!entity||!text)return;entity.logs=Array.isArray(entity.logs)?entity.logs:[];entity.logs.push({id:C.uid('log'),time:new Date().toISOString(),text});await refreshDetail('업무 내용을 기록했습니다.')}
   async function deleteWorkLog(id){const entity=recordEntity(selectedRecord);if(!entity)return;entity.logs=(entity.logs||[]).filter(x=>x.id!==id);await refreshDetail('기록을 삭제했습니다.')}
-  async function addAttachments(e){const entity=recordEntity(selectedRecord),files=[...(e.target.files||[])];if(!entity||!files.length)return;entity.attachments=Array.isArray(entity.attachments)?entity.attachments:[];let saved=0;for(const file of files){if(file.size>50*1024*1024){toast(`${file.name}: 50MB 이하 파일만 첨부할 수 있습니다.`);continue}try{const meta=await C.putAttachment(file);entity.attachments.push(meta);saved++}catch(err){console.warn(err);toast('파일 저장을 지원하지 않는 환경입니다.')}}if(saved)await refreshDetail(`${saved}개 파일을 첨부했습니다.`)}
-  async function downloadAttachment(id){try{const row=await C.getAttachment(id);if(!row?.blob){toast('파일 데이터를 찾을 수 없습니다.');return}const url=URL.createObjectURL(row.blob),a=document.createElement('a');a.href=url;a.download=row.name||'attachment';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500)}catch(e){console.warn(e);toast('파일을 열지 못했습니다.')}}
-  async function deleteAttachment(id){const entity=recordEntity(selectedRecord);if(!entity)return;if(!confirm('이 첨부파일을 삭제할까요?'))return;entity.attachments=(entity.attachments||[]).filter(x=>x.id!==id);await C.removeAttachment(id);await refreshDetail('첨부파일을 삭제했습니다.')}
+  async function addAttachments(e){const entity=recordEntity(selectedRecord),files=[...(e.target.files||[])];if(!entity||!files.length)return;entity.attachments=Array.isArray(entity.attachments)?entity.attachments:[];let saved=0;for(const file of files){if(file.size>50*1024*1024){toast(`${file.name}: 50MB 이하 파일만 첨부할 수 있습니다.`);continue}try{const meta=await C.putAttachment(file,entity.id);entity.attachments.push(meta);saved++}catch(err){console.warn(err);toast('파일 저장을 지원하지 않는 환경입니다.')}}if(saved)await refreshDetail(`${saved}개 파일을 첨부했습니다.`)}
+  function attachmentMeta(id){return (recordEntity(selectedRecord)?.attachments||[]).find(x=>x.id===id)||null}
+  async function downloadAttachment(id){
+    const meta=attachmentMeta(id);if(!meta)return;
+    try{
+      if(await C.revealAttachment(meta))return;            // 데스크톱: OS 기본 프로그램으로 연다
+      const {bytes,name,type}=await C.readAttachment(meta); // 웹: 내려받는다
+      const url=URL.createObjectURL(new Blob([bytes],{type:type||'application/octet-stream'})),a=document.createElement('a');
+      a.href=url;a.download=name||'attachment';document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),1500);
+    }catch(e){
+      // 실물이 없다고 메타데이터를 지우지 않는다 — 파괴적이지 않게 알리기만 한다(인수조건 D).
+      console.warn(e);
+      toast(String(e?.message)==='ATTACHMENT_MISSING'?`${meta.name}: 저장된 파일을 찾을 수 없습니다. 목록에서 지우려면 삭제를 누르세요.`:'파일을 열지 못했습니다.');
+    }
+  }
+  async function deleteAttachment(id){const entity=recordEntity(selectedRecord),meta=attachmentMeta(id);if(!entity||!meta)return;if(!confirm('이 첨부파일을 삭제할까요?'))return;entity.attachments=(entity.attachments||[]).filter(x=>x.id!==id);await C.deleteAttachment(meta);await refreshDetail('첨부파일을 삭제했습니다.')}
   async function completeSelected(){if(!selectedRecord)return;const next=C.completeEvent(state,selectedRecord,C.todayISO());hide('detailModal');await persist(next?`완료 · 다음 일정 ${next.name} ${C.pretty(next.dueDate)}`:'완료 처리했습니다.')}
   // 날짜 변경은 네이티브 prompt() 대신 앱 안의 date 입력으로 받는다.
   function openDateModal(){if(!selectedRecord||selectedRecord.completed)return;$('dNewDate').value=selectedRecord.date;$('dateModalNote').textContent=`${C.esc(selectedRecord.name)} · 현재 ${C.pretty(selectedRecord.date)}`;show('dateModal');setTimeout(()=>$('dNewDate').focus(),0)}
@@ -48,7 +62,7 @@
     const r=C.reopenEvent(state,selectedRecord);if(!r)return;hide('detailModal');
     await persist(r.kept?`완료를 취소했습니다. 다음 단계 ${r.kept.name}의 날짜(${C.pretty(r.kept.dueDate)})는 그대로 두었습니다.`:'완료를 취소했습니다.');}
   async function deleteSelected(){if(!selectedRecord||selectedRecord.kind!=='manual')return;
-    const m=state.manualEvents.find(x=>x.id===selectedRecord.id);const files=C.attachmentIdsOf([m]);
+    const m=state.manualEvents.find(x=>x.id===selectedRecord.id);const files=C.attachmentsOf([m]);
     if(!confirm(files.length?`이 일정을 삭제할까요?\n첨부파일 ${files.length}개도 함께 삭제됩니다.`:'이 일정을 삭제할까요?'))return;
     state.manualEvents=state.manualEvents.filter(x=>x.id!==selectedRecord.id);
     await C.purgeAttachments(files); // 메타데이터만 지우면 IndexedDB 에 blob 이 영구히 남는다.
@@ -63,12 +77,63 @@
     const kept=new Set(projectStepsDraft.map(s=>s.id).filter(Boolean)),dropped=p.steps.filter(s=>!kept.has(s.id));
     p.steps=projectStepsDraft.map(s=>({...s,id:s.id||C.uid(`${p.id}s`),offset:Number(s.offset||0)}));
     hide('projectStepsModal');
-    if(dropped.length)await C.purgeAttachments(C.attachmentIdsOf(dropped));
+    if(dropped.length)await C.purgeAttachments(C.attachmentsOf(dropped));
     await persist('이 업무의 절차를 저장했습니다.')}
   function openTemplates(){templateTab='vendor';qa('[data-template-tab]').forEach(b=>b.classList.toggle('active',b.dataset.templateTab==='vendor'));$('vendorTemplatePane').classList.remove('hidden');$('workTemplatePane').classList.add('hidden');renderTemplatePanes();show('templateModal')}
   async function openHelper(){if(C.isTauri()){try{await window.__TAURI__.core.invoke('show_helper');toast('D-day 도우미를 열었습니다.');return}catch(e){console.warn(e)}}window.open('helper.html','dday-helper','width=330,height=430,resizable=yes')}
-  async function openSettings(){const tauri=C.isTauri();$('alwaysOnTop').checked=!!state.settings.helperAlwaysOnTop;$('autostart').checked=!!state.settings.autostart;if(tauri){try{$('autostart').checked=await window.__TAURI__.core.invoke('is_autostart_enabled');state.settings.autostart=$('autostart').checked}catch(e){}}renderDemoRow();show('settingsModal')}
+  async function openSettings(){const tauri=C.isTauri();$('alwaysOnTop').checked=!!state.settings.helperAlwaysOnTop;$('autostart').checked=!!state.settings.autostart;if(tauri){try{$('autostart').checked=await window.__TAURI__.core.invoke('is_autostart_enabled');state.settings.autostart=$('autostart').checked}catch(e){}}renderDemoRow();renderBackupRow();show('settingsModal')}
   function renderDemoRow(){const on=C.hasDemoData(state);$('demoToggleBtn').textContent=on?'예시 데이터 지우기':'예시 데이터 불러오기';$('demoToggleBtn').classList.toggle('danger',on)}
+
+  // ── 백업 ───────────────────────────────────────────────────────────────
+  // 데스크톱은 앱 폴더 안에서 목록으로 다루고, 웹은 내려받기/파일 선택으로 다룬다.
+  async function renderBackupRow(){
+    const native=C.nativeFiles();
+    $('backupFolderBtn').classList.toggle('hidden',!native);
+    $('backupPick').classList.toggle('hidden',!native);
+    $('restoreBtn').classList.toggle('hidden',!native);
+    $('restoreFileLabel').classList.toggle('hidden',native);
+    $('backupNowBtn').textContent=native?'지금 백업':'백업 내려받기';
+    if(native){
+      const list=await C.listBackups();
+      $('backupPick').innerHTML=list.length?list.map(n=>`<option value="${C.esc(n)}">${C.esc(n)}</option>`).join(''):'<option value="">백업 없음</option>';
+      $('restoreBtn').disabled=!list.length;
+      $('backupCopy').textContent=list.length
+        ?`하루 한 번 자동으로 남깁니다. 최근 ${list.length}개 보관 중 · 마지막 ${list[0].replace(/\.zip$/,'')}`
+        :'하루 한 번 자동으로 남깁니다. 아직 백업이 없습니다.';
+    }else{
+      $('backupCopy').textContent='첨부파일까지 함께 담은 ZIP 을 내려받습니다. 웹 미리보기에서는 자동 백업이 동작하지 않습니다.';
+    }
+  }
+  async function backupNow(){
+    try{
+      const {bytes,manifest}=await C.buildBackup(state);
+      const note=manifest.attachmentsMissing.length?` (실물 없는 첨부 ${manifest.attachmentsMissing.length}개 제외)`:'';
+      if(C.nativeFiles()){
+        await C.writeBackupFile(`backup-${C.todayISO()}.zip`,bytes);
+        await C.rotateBackups();await renderBackupRow();
+        toast(`백업했습니다. 첨부 ${manifest.attachmentsIncluded}개${note}`);
+      }else{
+        const url=URL.createObjectURL(new Blob([bytes],{type:'application/zip'})),a=document.createElement('a');
+        a.href=url;a.download=`work-calendar-backup-${C.todayISO()}.zip`;document.body.appendChild(a);a.click();a.remove();
+        setTimeout(()=>URL.revokeObjectURL(url),1500);
+        toast(`백업을 내려받았습니다. 첨부 ${manifest.attachmentsIncluded}개${note}`);
+      }
+    }catch(e){console.warn(e);toast(`백업 실패: ${e?.message||e}`)}
+  }
+  async function applyRestore(bytes){
+    if(!confirm('백업 시점으로 되돌립니다.\n지금 데이터는 복원 직전에 한 벌 자동으로 저장됩니다.\n계속할까요?'))return;
+    try{
+      if(C.nativeFiles()){
+        try{const cur=await C.buildBackup(state);await C.writeBackupFile(`before-restore-${C.todayISO()}.zip`,cur.bytes)}
+        catch(e){console.warn('복원 전 백업 실패',e)}
+      }
+      const {state:next,manifest}=await C.restoreBackup(bytes);
+      state=next;await C.saveState(state);render();await renderBackupRow();
+      toast(`복원했습니다. 첨부 ${manifest?.attachmentsIncluded??0}개`);
+    }catch(e){console.warn(e);toast(`복원 실패: ${e?.message||e}`)}
+  }
+  async function restoreFromList(){const name=$('backupPick').value;if(!name)return;try{await applyRestore(await C.readBackupFile(name))}catch(e){toast(`백업을 읽지 못했습니다: ${e?.message||e}`)}}
+  async function restoreFromFile(e){const f=e.target.files?.[0];e.target.value='';if(!f)return;await applyRestore(new Uint8Array(await f.arrayBuffer()))}
   // 예시 데이터는 demo- 접두 id 로만 식별한다. 사용자가 직접 만든 업무는 절대 건드리지 않는다.
   async function toggleDemo(){
     const isDemo=x=>String(x.id).startsWith('demo-');
@@ -76,7 +141,7 @@
       if(!confirm('예시 데이터를 지울까요?\n직접 등록한 업무·일정은 그대로 유지됩니다.'))return;
       const dropped=[...state.projects.filter(isDemo).flatMap(p=>p.steps),...state.manualEvents.filter(isDemo)];
       state.projects=state.projects.filter(p=>!isDemo(p));state.manualEvents=state.manualEvents.filter(m=>!isDemo(m));
-      await C.purgeAttachments(C.attachmentIdsOf(dropped));
+      await C.purgeAttachments(C.attachmentsOf(dropped));
       renderDemoRow();await persist('예시 데이터를 지웠습니다.');
     }else{
       const d=C.demoData();state.projects.push(...d.projects);state.manualEvents.push(...d.manualEvents);
@@ -91,8 +156,9 @@
   async function setAutostart(){const enabled=$('autostart').checked;state.settings.autostart=enabled;await C.saveState(state);if(C.isTauri())try{await window.__TAURI__.core.invoke('set_autostart',{enabled})}catch(e){toast('자동실행 설정을 적용하지 못했습니다.')}}
   $('horizonSelect').addEventListener('change',async e=>{state.settings.horizon=e.target.value;$('horizonCustom').classList.toggle('hidden',e.target.value!=='custom');await persist()});$('horizonCustom').addEventListener('change',async e=>{state.settings.customHorizon=Math.max(1,Number(e.target.value||1));await persist()});
   $('prevMonth').addEventListener('click',()=>{currentMonth=new Date(currentMonth.getFullYear(),currentMonth.getMonth()-1,1);renderCalendar()});$('nextMonth').addEventListener('click',()=>{currentMonth=new Date(currentMonth.getFullYear(),currentMonth.getMonth()+1,1);renderCalendar()});$('todayBtn').addEventListener('click',()=>{const d=C.parse(C.todayISO());currentMonth=new Date(d.getFullYear(),d.getMonth(),1);renderCalendar();setTimeout(()=>q('.day.today')?.scrollIntoView({block:'center',behavior:'smooth'}),10)});
-  $('addScheduleBtn').addEventListener('click',()=>openSchedule());$('saveScheduleBtn').addEventListener('click',saveSchedule);$('sVendor').addEventListener('change',updateProjectSelect);$('addWorkBtn').addEventListener('click',openWork);$('saveWorkBtn').addEventListener('click',saveWork);$('templateBtn').addEventListener('click',openTemplates);$('settingsBtn').addEventListener('click',openSettings);$('helperBtn').addEventListener('click',openHelper);$('settingsOpenHelper').addEventListener('click',openHelper);$('alwaysOnTop').addEventListener('change',setTop);$('autostart').addEventListener('change',setAutostart);$('completeBtn').addEventListener('click',completeSelected);$('changeDateBtn').addEventListener('click',openDateModal);$('saveDateBtn').addEventListener('click',saveSelectedDate);$('reopenBtn').addEventListener('click',reopenSelected);$('deleteEventBtn').addEventListener('click',deleteSelected);$('demoToggleBtn').addEventListener('click',toggleDemo);$('projectAddStep').addEventListener('click',()=>{projectStepsDraft.push({id:null,name:'새 단계',offset:1,dueDate:null,completed:false,completedAt:null});renderProjectSteps()});$('saveProjectSteps').addEventListener('click',saveProjectSteps);
+  $('addScheduleBtn').addEventListener('click',()=>openSchedule());$('saveScheduleBtn').addEventListener('click',saveSchedule);$('sVendor').addEventListener('change',updateProjectSelect);$('addWorkBtn').addEventListener('click',openWork);$('saveWorkBtn').addEventListener('click',saveWork);$('templateBtn').addEventListener('click',openTemplates);$('settingsBtn').addEventListener('click',openSettings);$('helperBtn').addEventListener('click',openHelper);$('settingsOpenHelper').addEventListener('click',openHelper);$('alwaysOnTop').addEventListener('change',setTop);$('autostart').addEventListener('change',setAutostart);$('completeBtn').addEventListener('click',completeSelected);$('changeDateBtn').addEventListener('click',openDateModal);$('saveDateBtn').addEventListener('click',saveSelectedDate);$('reopenBtn').addEventListener('click',reopenSelected);$('deleteEventBtn').addEventListener('click',deleteSelected);$('demoToggleBtn').addEventListener('click',toggleDemo);$('backupNowBtn').addEventListener('click',backupNow);$('backupFolderBtn').addEventListener('click',async()=>{if(!await C.revealBackups())toast('이 환경에서는 폴더를 열 수 없습니다.')});$('restoreBtn').addEventListener('click',restoreFromList);$('restoreFile').addEventListener('change',restoreFromFile);$('projectAddStep').addEventListener('click',()=>{projectStepsDraft.push({id:null,name:'새 단계',offset:1,dueDate:null,completed:false,completedAt:null});renderProjectSteps()});$('saveProjectSteps').addEventListener('click',saveProjectSteps);
   qa('[data-template-tab]').forEach(b=>b.addEventListener('click',()=>{templateTab=b.dataset.templateTab;qa('[data-template-tab]').forEach(x=>x.classList.toggle('active',x===b));$('vendorTemplatePane').classList.toggle('hidden',templateTab!=='vendor');$('workTemplatePane').classList.toggle('hidden',templateTab!=='work')}));qa('[data-close]').forEach(b=>b.addEventListener('click',()=>hide(b.dataset.close)));qa('.modal-bg').forEach(bg=>bg.addEventListener('mousedown',e=>{if(e.target===bg)hide(bg.id)}));document.addEventListener('keydown',e=>{if(e.key==='Escape'){const open=qa('.modal-bg.show').pop();if(open)hide(open.id)}});
   await C.watchState(v=>{state=v;render();consumePendingSelection()});
-  const d=C.parse(C.todayISO());currentMonth=new Date(d.getFullYear(),d.getMonth(),1);render();consumePendingSelection();setTimeout(()=>q('.day.today')?.scrollIntoView({block:'center'}),50);
+  const d=C.parse(C.todayISO());currentMonth=new Date(d.getFullYear(),d.getMonth(),1);render();consumePendingSelection();  // 사용자가 버튼을 눌러야 보호된다면 그건 또 하나의 업무다. 시작할 때 조용히 처리한다.
+  (async()=>{try{const moved=await C.migrateAttachmentsToDisk(state);if(moved)console.info('첨부 '+moved+'개를 앱 폴더로 옮겼습니다.');const ab=await C.maybeAutoBackup(state);if(ab&&ab.ok===false)toast('자동 백업에 실패했습니다: '+ab.error);}catch(e){console.warn(e)}})();setTimeout(()=>q('.day.today')?.scrollIntoView({block:'center'}),50);
 })();

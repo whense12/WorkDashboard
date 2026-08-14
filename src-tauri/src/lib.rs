@@ -62,6 +62,10 @@ pub fn run() {
             Some(vec!["--helper-only"]),
         ))
         .plugin(tauri_plugin_window_state::Builder::default().build())
+        // 첨부파일과 백업을 앱 전용 폴더에 실제 파일로 보관한다(발주서 §16.2).
+        // 권한은 capabilities/main.json 에서 앱 데이터 디렉터리로만 좁혀 둔다.
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             if std::env::args().any(|arg| arg == "--helper-only") {
                 if let Some(main) = app.get_webview_window("main") { let _ = main.hide(); }

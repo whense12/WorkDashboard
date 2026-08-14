@@ -47,7 +47,9 @@
   <div class="setting-row"><div class="setting-copy"><b>D-day 도우미 표시</b><span>작은 창으로 업체별 가까운 일정을 띄웁니다.</span></div><button class="btn" id="settingsOpenHelper">도우미 열기</button></div>
   <div class="setting-row"><div class="setting-copy"><b>항상 위에 표시</b><span>데스크톱 앱에서 다른 창 위에 유지합니다.</span></div><label class="switch"><input id="alwaysOnTop" type="checkbox"><span class="slider"></span></label></div>
   <div class="setting-row"><div class="setting-copy"><b>컴퓨터 시작 시 자동 실행</b><span>Tauri 데스크톱 앱에서 지원됩니다.</span></div><label class="switch"><input id="autostart" type="checkbox"><span class="slider"></span></label></div>
+  <div class="setting-row"><div class="setting-copy"><b>백업</b><span id="backupCopy"></span></div><div class="setting-actions"><button class="btn" id="backupNowBtn">지금 백업</button><button class="btn hidden" id="backupFolderBtn">폴더 열기</button></div></div>
+  <div class="setting-row"><div class="setting-copy"><b>백업에서 복원</b><span>복원 직전 현재 데이터를 한 벌 자동으로 남깁니다.</span></div><div class="setting-actions"><select id="backupPick" class="hidden" aria-label="복원할 백업 선택"></select><button class="btn hidden" id="restoreBtn">복원</button><label class="btn hidden" for="restoreFile" id="restoreFileLabel">백업 파일 선택</label><input id="restoreFile" type="file" accept=".zip,application/zip" hidden></div></div>
   <div class="setting-row"><div class="setting-copy"><b>예시 데이터</b><span id="demoCopy">기능을 둘러볼 수 있는 예시 공사·일정을 넣거나 뺍니다. 실제 업무 데이터는 건드리지 않습니다.</span></div><button class="btn" id="demoToggleBtn">예시 데이터 불러오기</button></div>
 </div><div class="modal-foot"><button class="btn" data-close="settingsModal">닫기</button></div></section></div>
 <div class="toast" id="toast"></div>
-<script src="core.js"></script><script src="app.js"></script></body></html>
+<script src="zip.js"></script><script src="core.js"></script><script src="app.js"></script></body></html>

@@ -98,11 +98,75 @@
     s.manualEvents.forEach(m=>{m.logs=Array.isArray(m.logs)?m.logs:[];m.attachments=Array.isArray(m.attachments)?m.attachments:[]});
     return s;
   }
+  // ── 첨부 저장 ────────────────────────────────────────────────────────────
+  // 데스크톱은 앱 전용 폴더에 실제 파일로, 웹은 IndexedDB Blob 으로 저장한다(§16.2).
+  //
+  // 권한 표면을 좁히려고 "사용자가 고른 임의 경로에 쓰기"를 아예 만들지 않았다.
+  // 백업 내보내기도 앱 폴더에 쓴 뒤 그 폴더를 탐색기로 열어 주는 방식이라,
+  // 앱은 자기 데이터 디렉터리 밖을 건드릴 수 없다(§26).
+  const ATTACH_DIR='attachments',BACKUP_DIR='backups',BACKUP_KEEP=7;
+  const SAFE_ID=/^[A-Za-z0-9_-]+$/;
+  const fsApi=()=>window.__TAURI__?.fs;
+  const pathApi=()=>window.__TAURI__?.path;
+  const openerApi=()=>window.__TAURI__?.opener;
+  const nativeFiles=()=>!!(window.__TAURI__?.core&&fsApi()?.writeFile);
+  const appDir=()=>fsApi().BaseDirectory.AppLocalData;
+  const extOf=n=>{const m=/\.([A-Za-z0-9]{1,12})$/.exec(String(n||''));return m?m[1].toLowerCase():'bin'};
+  function attachPath(entityId,attId,ext){
+    // 물리 파일명에 사용자 입력이 절대 들어가지 않게 한다. id 는 uid() 산출물이지만 한 번 더 막는다.
+    if(!SAFE_ID.test(String(entityId))||!SAFE_ID.test(String(attId)))throw new Error('첨부 경로에 쓸 수 없는 식별자입니다.');
+    return `${ATTACH_DIR}/${entityId}/${attId}.${SAFE_ID.test(ext)?ext:'bin'}`;
+  }
   const ATTACH_DB='work-calendar-attachments-v1',ATTACH_STORE='files';
   function openAttachmentDB(){return new Promise((resolve,reject)=>{if(!('indexedDB' in window)){reject(new Error('IndexedDB unavailable'));return}const req=indexedDB.open(ATTACH_DB,1);req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(ATTACH_STORE))db.createObjectStore(ATTACH_STORE,{keyPath:'id'})};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
-  async function putAttachment(file){const db=await openAttachmentDB();const id=uid('att');const row={id,name:file.name,type:file.type||'application/octet-stream',size:file.size,lastModified:file.lastModified||Date.now(),blob:file};await new Promise((resolve,reject)=>{const tx=db.transaction(ATTACH_STORE,'readwrite');tx.objectStore(ATTACH_STORE).put(row);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close();return{id,name:row.name,type:row.type,size:row.size,lastModified:row.lastModified}}
-  async function getAttachment(id){const db=await openAttachmentDB();const row=await new Promise((resolve,reject)=>{const req=db.transaction(ATTACH_STORE,'readonly').objectStore(ATTACH_STORE).get(id);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error)});db.close();return row}
-  async function removeAttachment(id){try{const db=await openAttachmentDB();await new Promise((resolve,reject)=>{const tx=db.transaction(ATTACH_STORE,'readwrite');tx.objectStore(ATTACH_STORE).delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close()}catch(e){console.warn('attachment delete failed',e)}}
+  async function idbPut(row){const db=await openAttachmentDB();await new Promise((resolve,reject)=>{const tx=db.transaction(ATTACH_STORE,'readwrite');tx.objectStore(ATTACH_STORE).put(row);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close()}
+  async function idbGet(id){const db=await openAttachmentDB();const row=await new Promise((resolve,reject)=>{const req=db.transaction(ATTACH_STORE,'readonly').objectStore(ATTACH_STORE).get(id);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error)});db.close();return row}
+  async function idbDelete(id){try{const db=await openAttachmentDB();await new Promise((resolve,reject)=>{const tx=db.transaction(ATTACH_STORE,'readwrite');tx.objectStore(ATTACH_STORE).delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close()}catch(e){console.warn('attachment delete failed',e)}}
+
+  // 발주서 §15 의 AttachmentMeta 형태로 돌려준다. backend 로 어디에 실물이 있는지 구분한다.
+  async function storeAttachmentBytes(entityId,meta,bytes){
+    if(nativeFiles()){
+      const rel=attachPath(entityId,meta.id,extOf(meta.name)),fs=fsApi();
+      await fs.mkdir(`${ATTACH_DIR}/${entityId}`,{baseDir:appDir(),recursive:true});
+      await fs.writeFile(rel,bytes,{baseDir:appDir()});
+      return {...meta,backend:'tauri-fs',relativePath:rel};
+    }
+    await idbPut({...meta,blob:new Blob([bytes],{type:meta.type||'application/octet-stream'})});
+    return {...meta,backend:'indexeddb',relativePath:undefined};
+  }
+  async function putAttachment(file,entityId){
+    const meta={id:uid('att'),name:file.name,type:file.type||'application/octet-stream',size:file.size,addedAt:new Date().toISOString()};
+    return storeAttachmentBytes(entityId,meta,new Uint8Array(await file.arrayBuffer()));
+  }
+  // 실물이 없으면 ATTACHMENT_MISSING 을 던진다. 호출부는 파괴적이지 않게 안내만 한다(인수조건 D).
+  async function readAttachment(meta){
+    if(meta?.backend==='tauri-fs'&&meta.relativePath){
+      if(!nativeFiles())throw new Error('ATTACHMENT_MISSING');
+      const fs=fsApi();
+      if(!await fs.exists(meta.relativePath,{baseDir:appDir()}))throw new Error('ATTACHMENT_MISSING');
+      return {bytes:await fs.readFile(meta.relativePath,{baseDir:appDir()}),name:meta.name,type:meta.type};
+    }
+    const row=await idbGet(meta.id);
+    if(!row?.blob)throw new Error('ATTACHMENT_MISSING');
+    return {bytes:new Uint8Array(await row.blob.arrayBuffer()),name:row.name||meta.name,type:row.type||meta.type};
+  }
+  async function deleteAttachment(meta){
+    if(!meta)return;
+    if(meta.backend==='tauri-fs'&&meta.relativePath&&nativeFiles()){
+      try{await fsApi().remove(meta.relativePath,{baseDir:appDir()})}catch(e){console.warn('첨부 파일 삭제 실패',e)}
+      return;
+    }
+    await idbDelete(meta.id);
+  }
+  function attachmentsOf(entities){return entities.flatMap(e=>Array.isArray(e?.attachments)?e.attachments:[])}
+  async function purgeAttachments(metas){for(const m of metas)await deleteAttachment(m)}
+  // 데스크톱에서 첨부를 OS 기본 프로그램으로 연다. 웹은 호출부가 Blob 다운로드로 처리한다.
+  async function revealAttachment(meta){
+    if(!(meta?.backend==='tauri-fs'&&meta.relativePath&&openerApi()&&pathApi()))return false;
+    const base=await pathApi().appLocalDataDir();
+    await openerApi().openPath(await pathApi().join(base,meta.relativePath));
+    return true;
+  }
   function formatBytes(n){n=Number(n||0);if(n<1024)return`${n} B`;if(n<1048576)return`${(n/1024).toFixed(n<10240?1:0)} KB`;return`${(n/1048576).toFixed(n<10485760?1:0)} MB`}
   let store=null;let memoryState=normalizeState(clone(seed));
   const isTauri=()=>!!(window.__TAURI__?.core);
@@ -173,9 +237,120 @@
     const later=p.steps.slice(i+1).find(x=>!x.completed&&x.dueDate);
     return {kept:later?{name:later.name,dueDate:later.dueDate}:null};
   }
-  // 엔티티(수동 일정 / 절차 단계)를 지울 때 첨부 blob 이 IndexedDB 에 남지 않게 한다.
-  function attachmentIdsOf(entities){return entities.flatMap(e=>(e?.attachments||[]).map(a=>a.id)).filter(Boolean)}
-  async function purgeAttachments(ids){for(const id of ids)await removeAttachment(id)}
   function horizonLabel(settings){if(settings.horizon==='all')return'무제한';if(settings.horizon==='custom')return`D-${settings.customHorizon}`;return`D-${settings.horizon}`}
-  window.WorkCore={KEY,STATE_VERSION,seed,demoData,hasDemoData,clone,uid,todayISO,parse,iso,addDays,diffDays,pretty,esc,isTauri,migrate,normalizeState,initStorage,saveState,watchState,readState,vendor,project,currentStep,eventRecords,dueCards,ddayLabel,ddayClass,horizonDays,horizonLabel,projectFromTemplate,completeEvent,reopenEvent,attachmentIdsOf,purgeAttachments,putAttachment,getAttachment,removeAttachment,formatBytes};
+
+  // ── 백업 / 복원 ──────────────────────────────────────────────────────────
+  // 발주서 §16.3. 상태 JSON 만 있는 백업은 첨부가 생기고 나면 백업이 아니다.
+  // 첨부 실물까지 한 ZIP 에 담고, manifest 로 무엇이 들어갔는지 남긴다.
+  const SAFE_BACKUP=/^[A-Za-z0-9_.-]+\.zip$/;
+  const encJson=o=>new TextEncoder().encode(JSON.stringify(o,null,1));
+  function allAttachmentMetas(state){
+    const out=[];
+    state.projects.forEach(p=>p.steps.forEach(s=>out.push(...(s.attachments||[]))));
+    state.manualEvents.forEach(m=>out.push(...(m.attachments||[])));
+    return out;
+  }
+  async function buildBackup(state){
+    if(!window.WorkZip?.supported())throw new Error('이 환경에서는 압축을 만들 수 없습니다.');
+    const metas=allAttachmentMetas(state),entries=[],missing=[];
+    for(const m of metas){
+      try{const {bytes}=await readAttachment(m);entries.push({name:`${ATTACH_DIR}/${m.id}.${extOf(m.name)}`,data:bytes})}
+      catch(e){missing.push(m.name)}
+    }
+    const manifest={format:'work-calendar-backup',formatVersion:1,stateVersion:state.version,
+      createdAt:new Date().toISOString(),attachmentsTotal:metas.length,
+      attachmentsIncluded:entries.length,attachmentsMissing:missing};
+    return {bytes:await window.WorkZip.create([{name:'manifest.json',data:encJson(manifest)},{name:'state.json',data:encJson(state)},...entries]),manifest};
+  }
+  async function readBackup(bytes){
+    const files=await window.WorkZip.read(bytes),st=files.get('state.json');
+    if(!st)throw new Error('백업 파일이 아닙니다. state.json 이 없습니다.');
+    const mf=files.get('manifest.json');
+    return {state:normalizeState(JSON.parse(new TextDecoder().decode(st))),
+            manifest:mf?JSON.parse(new TextDecoder().decode(mf)):null,files};
+  }
+  // 복원은 첨부 실물을 먼저 되살린 뒤 메타데이터의 경로를 새 위치로 맞춘다. id 는 그대로 둔다.
+  async function restoreBackup(bytes){
+    const {state,manifest,files}=await readBackup(bytes),byId=new Map();
+    for(const [name,data] of files){const m=/^attachments\/([A-Za-z0-9_-]+)\./.exec(name);if(m)byId.set(m[1],data)}
+    const revive=async entity=>{
+      const list=entity.attachments||[];
+      for(let i=0;i<list.length;i++){
+        const data=byId.get(list[i].id);if(!data)continue;
+        list[i]=await storeAttachmentBytes(entity.id,{...list[i],backend:undefined,relativePath:undefined},data);
+      }
+    };
+    for(const p of state.projects)for(const s of p.steps)await revive(s);
+    for(const ev of state.manualEvents)await revive(ev);
+    return {state,manifest};
+  }
+
+  // 백업 파일은 앱 폴더 안에서만 다룬다. 임의 경로 쓰기 권한을 만들지 않기 위해서다(§26).
+  async function writeBackupFile(name,bytes){
+    if(!SAFE_BACKUP.test(name))throw new Error('잘못된 백업 파일명입니다.');
+    const fs=fsApi();await fs.mkdir(BACKUP_DIR,{baseDir:appDir(),recursive:true});
+    await fs.writeFile(`${BACKUP_DIR}/${name}`,bytes,{baseDir:appDir()});
+  }
+  async function listBackups(){
+    if(!nativeFiles())return [];
+    try{
+      const fs=fsApi();
+      if(!await fs.exists(BACKUP_DIR,{baseDir:appDir()}))return [];
+      return (await fs.readDir(BACKUP_DIR,{baseDir:appDir()}))
+        .filter(r=>r.isFile&&SAFE_BACKUP.test(r.name)).map(r=>r.name).sort().reverse();
+    }catch(e){console.warn('백업 목록을 읽지 못했습니다.',e);return []}
+  }
+  async function readBackupFile(name){
+    if(!SAFE_BACKUP.test(name))throw new Error('잘못된 백업 파일명입니다.');
+    return fsApi().readFile(`${BACKUP_DIR}/${name}`,{baseDir:appDir()});
+  }
+  async function rotateBackups(keep=BACKUP_KEEP){
+    const all=await listBackups();
+    for(const n of all.slice(keep)){try{await fsApi().remove(`${BACKUP_DIR}/${n}`,{baseDir:appDir()})}catch(e){console.warn(e)}}
+  }
+  async function revealBackups(){
+    if(!(nativeFiles()&&openerApi()&&pathApi()))return false;
+    const fs=fsApi();await fs.mkdir(BACKUP_DIR,{baseDir:appDir(),recursive:true});
+    const full=await pathApi().join(await pathApi().appLocalDataDir(),BACKUP_DIR);
+    await openerApi().openPath(full);return true;
+  }
+  // 하루 한 번 조용히. 버튼을 눌러야만 백업된다면 사용자가 기억해야 하고, 그건 또 하나의 업무다.
+  // 성공은 알리지 않는다. 실패했을 때만 호출부가 알린다.
+  async function maybeAutoBackup(state){
+    if(!nativeFiles()||!window.WorkZip?.supported())return null;
+    const today=todayISO();
+    if(state.settings.lastAutoBackup===today)return null;
+    try{
+      const {bytes,manifest}=await buildBackup(state);
+      await writeBackupFile(`backup-${today}.zip`,bytes);
+      await rotateBackups();
+      state.settings.lastAutoBackup=today;await saveState(state);
+      return {ok:true,manifest};
+    }catch(e){console.warn('자동 백업 실패',e);return {ok:false,error:String(e?.message||e)}}
+  }
+  // 옛 첨부는 데스크톱에서도 IndexedDB 에 있다. 사용자가 "옮기기" 버튼을 눌러야 한다면
+  // 그것도 또 하나의 일이다. 시작할 때 조용히 옮기고, 옮긴 뒤에만 원본을 지운다(§21).
+  async function migrateAttachmentsToDisk(state){
+    if(!nativeFiles())return 0;
+    let moved=0;
+    const walk=async entity=>{
+      const list=entity.attachments||[];
+      for(let i=0;i<list.length;i++){
+        const meta=list[i];
+        if(meta.backend==='tauri-fs')continue;
+        try{
+          const row=await idbGet(meta.id);if(!row?.blob)continue;
+          list[i]=await storeAttachmentBytes(entity.id,{...meta,backend:undefined,relativePath:undefined},new Uint8Array(await row.blob.arrayBuffer()));
+          await idbDelete(meta.id);moved++;
+        }catch(e){console.warn('첨부 이관 실패',meta.name,e)}
+      }
+    };
+    for(const p of state.projects)for(const s of p.steps)await walk(s);
+    for(const ev of state.manualEvents)await walk(ev);
+    if(moved)await saveState(state);
+    return moved;
+  }
+  window.WorkCore={KEY,STATE_VERSION,seed,demoData,hasDemoData,clone,uid,todayISO,parse,iso,addDays,diffDays,pretty,esc,isTauri,nativeFiles,migrate,normalizeState,initStorage,saveState,watchState,readState,vendor,project,currentStep,eventRecords,dueCards,ddayLabel,ddayClass,horizonDays,horizonLabel,projectFromTemplate,completeEvent,reopenEvent,
+    putAttachment,readAttachment,deleteAttachment,attachmentsOf,purgeAttachments,revealAttachment,migrateAttachmentsToDisk,formatBytes,
+    buildBackup,readBackup,restoreBackup,writeBackupFile,listBackups,readBackupFile,rotateBackups,revealBackups,maybeAutoBackup};
 })();

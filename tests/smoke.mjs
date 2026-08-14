@@ -431,6 +431,142 @@ console.log('\n[15] 레이아웃 — 좁은 화면에서도 가로 스크롤이 
   }
 }
 
+console.log('\n[16] ZIP — 의존성 없는 읽기/쓰기가 왕복한다');
+{
+  const { ctx, page, errors } = await open({ demo: false });
+  const r = await page.evaluate(async () => {
+    const Z = window.WorkZip;
+    if (!Z.supported()) return { skipped: true };
+    const enc = new TextEncoder();
+    const big = enc.encode('가나다라마바사'.repeat(500));       // 압축이 이득인 크기
+    const tiny = enc.encode('짧음');                             // 저장 방식으로 남을 크기
+    const bin = new Uint8Array(1024).map((_, i) => (i * 7) % 256);
+    const zip = await Z.create([
+      { name: 'manifest.json', data: enc.encode('{"a":1}') },
+      { name: 'big.txt', data: big },
+      { name: 'tiny.txt', data: tiny },
+      { name: 'attachments/att-1.bin', data: bin },
+    ]);
+    const back = await Z.read(zip);
+    const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+    return {
+      zipSize: zip.length, names: [...back.keys()].sort(),
+      bigOk: same(back.get('big.txt'), big),
+      tinyOk: same(back.get('tiny.txt'), tiny),
+      binOk: same(back.get('attachments/att-1.bin'), bin),
+      compressed: zip.length < big.length,   // 실제로 압축이 걸렸는가
+    };
+  });
+  if (r.skipped) check('ZIP 지원 환경', false, 'CompressionStream 없음');
+  else {
+    check('네 항목이 모두 돌아온다', JSON.stringify(r.names) === JSON.stringify(['attachments/att-1.bin', 'big.txt', 'manifest.json', 'tiny.txt']), r.names.join(','));
+    check('압축된 텍스트가 그대로 복원된다', r.bigOk);
+    check('압축 안 한 짧은 항목도 복원된다', r.tinyOk);
+    check('이진 데이터가 손상되지 않는다', r.binOk);
+    check('실제로 압축이 적용된다', r.compressed, `${r.zipSize} bytes`);
+  }
+  check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
+console.log('\n[17] 백업/복원 — 첨부 실물까지 담기고 되살아난다 (발주서 §16.3)');
+{
+  const { ctx, page, errors } = await open();
+  await page.click('.due-card:has-text("대한건설")');
+  await page.waitForSelector('#detailFiles', { state: 'attached' }); // 파일 입력은 hidden 이다
+  await page.setInputFiles('#detailFiles', { name: '평가서.txt', mimeType: 'text/plain', buffer: Buffer.from('보완본 제출 확인용 첨부 내용', 'utf8') });
+  await page.waitForTimeout(400);
+  check('첨부가 목록에 나타난다', (await page.innerText('.attachment-list')).includes('평가서.txt'));
+
+  const r = await page.evaluate(async () => {
+    const C = window.WorkCore;
+    const before = await C.readState();
+    const { bytes, manifest } = await C.buildBackup(before);
+
+    // 전부 지운 상태를 만든다 — 복원이 실제로 되살리는지 보려면 비워야 한다.
+    const wiped = C.clone(before); wiped.projects = []; wiped.manualEvents = [];
+    await C.saveState(wiped);
+    const afterWipe = (await C.readState()).projects.length;
+
+    const { state: restored, manifest: mf } = await C.restoreBackup(bytes);
+    await C.saveState(restored);
+
+    const step = restored.projects.find((p) => p.id === 'demo-p1').steps.find((s) => s.attachments.length);
+    const meta = step.attachments[0];
+    const { bytes: fileBytes } = await C.readAttachment(meta);
+    return {
+      manifestTotal: manifest.attachmentsTotal, manifestIncluded: manifest.attachmentsIncluded,
+      manifestMissing: manifest.attachmentsMissing.length, format: manifest.format,
+      afterWipe, projects: restored.projects.length, events: restored.manualEvents.length,
+      logs: restored.projects.find((p) => p.id === 'demo-p1').steps.reduce((n, s) => n + s.logs.length, 0),
+      fileName: meta.name, backend: meta.backend,
+      fileText: new TextDecoder().decode(fileBytes),
+      restoredVersion: mf.stateVersion,
+    };
+  });
+
+  check('manifest 가 첨부 개수를 기록한다', r.manifestTotal === 1 && r.manifestIncluded === 1 && r.manifestMissing === 0, JSON.stringify(r));
+  check('백업 형식을 식별할 수 있다', r.format === 'work-calendar-backup');
+  check('복원 전에 실제로 비워졌다', r.afterWipe === 0);
+  check('업무가 되살아난다', r.projects === 4, `projects=${r.projects}`);
+  check('수동 일정도 되살아난다', r.events === 1);
+  check('첨부 메타데이터가 되살아난다', r.fileName === '평가서.txt', r.fileName);
+  check('첨부 실물 내용이 그대로다', r.fileText === '보완본 제출 확인용 첨부 내용', r.fileText);
+  check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
+console.log('\n[18] 첨부 삭제 — 메타데이터와 실물이 함께 사라진다 (인수조건 D-3)');
+{
+  const { ctx, page, errors } = await open();
+  await page.click('.due-card:has-text("대한건설")');
+  await page.waitForSelector('#detailFiles', { state: 'attached' }); // 파일 입력은 hidden 이다
+  await page.setInputFiles('#detailFiles', { name: '삭제대상.txt', mimeType: 'text/plain', buffer: Buffer.from('지워져야 함', 'utf8') });
+  await page.waitForTimeout(400);
+  const meta = await page.evaluate(async () => {
+    const s = await window.WorkCore.readState();
+    return s.projects.find((p) => p.id === 'demo-p1').steps.flatMap((x) => x.attachments)[0];
+  });
+  check('첨부 메타데이터에 backend 가 기록된다', !!meta.backend, JSON.stringify(meta));
+
+  await page.click('[data-delete-file]');
+  await page.waitForTimeout(400);
+  const after = await page.evaluate(async (m) => {
+    const C = window.WorkCore, s = await C.readState();
+    const left = s.projects.find((p) => p.id === 'demo-p1').steps.flatMap((x) => x.attachments).length;
+    let physical = 'gone';
+    try { await C.readAttachment(m); physical = 'still-there'; } catch (e) { physical = String(e.message); }
+    return { left, physical };
+  }, meta);
+  check('메타데이터가 사라진다', after.left === 0);
+  check('실물도 사라진다', after.physical === 'ATTACHMENT_MISSING', after.physical);
+  check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
+console.log('\n[19] 첨부 실물이 없을 때 — 파괴적이지 않게 알린다 (인수조건 D-4)');
+{
+  const { ctx, page, errors } = await open();
+  await page.click('.due-card:has-text("대한건설")');
+  await page.waitForSelector('#detailFiles', { state: 'attached' }); // 파일 입력은 hidden 이다
+  await page.setInputFiles('#detailFiles', { name: '유실.txt', mimeType: 'text/plain', buffer: Buffer.from('x', 'utf8') });
+  await page.waitForTimeout(400);
+  // 실물만 몰래 지워 "메타데이터는 있는데 파일이 없는" 상태를 만든다.
+  await page.evaluate(async () => {
+    const s = await window.WorkCore.readState();
+    const m = s.projects.find((p) => p.id === 'demo-p1').steps.flatMap((x) => x.attachments)[0];
+    await new Promise((res, rej) => { const r = indexedDB.open('work-calendar-attachments-v1', 1);
+      r.onsuccess = () => { const tx = r.result.transaction('files', 'readwrite'); tx.objectStore('files').delete(m.id); tx.oncomplete = () => { r.result.close(); res(); }; tx.onerror = () => rej(tx.error); }; r.onerror = () => rej(r.error); });
+  });
+  await page.click('[data-download-file]');
+  await page.waitForTimeout(400);
+  check('안내 문구가 뜬다', (await page.innerText('#toast')).includes('찾을 수 없습니다'), await page.innerText('#toast'));
+  const stillListed = await page.evaluate(async () => (await window.WorkCore.readState()).projects.find((p) => p.id === 'demo-p1').steps.flatMap((x) => x.attachments).length);
+  check('메타데이터를 멋대로 지우지 않는다', stillListed === 1, `남은 항목 ${stillListed}`);
+  check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 await browser.close();
 server.close();

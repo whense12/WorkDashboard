@@ -47,7 +47,7 @@ async function inline(htmlName, scripts) {
 }
 
 const targets = [
-  ['index.html', ['core.js', 'app.js'], 'web_standalone.html'],
+  ['index.html', ['zip.js', 'core.js', 'app.js'], 'web_standalone.html'],
   ['helper.html', ['core.js', 'helper.js'], 'helper_preview.html'],
 ];
 
