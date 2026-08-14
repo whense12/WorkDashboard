@@ -149,19 +149,41 @@ jobs:
       - name: Edge WebDriver 맞추기
         shell: pwsh
         run: |
-          # tauri-driver 는 WebView2 를 msedgedriver 로 붙잡는다. 버전이 어긋나면 세션이 안 열린다.
-          $v = (Get-Item "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe").VersionInfo.ProductVersion
-          Write-Host "Edge $v"
+          # tauri-driver 는 앱의 WebView2 를 msedgedriver 로 붙잡는다.
+          # 맞춰야 하는 것은 Edge 브라우저 버전이 아니라 **WebView2 런타임** 버전이다.
+          # 어긋나면 세션 생성이 "DevToolsActivePort file doesn't exist" 로 실패한다.
+          $clientKey = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          $v = $null
+          foreach ($root in @('HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients',
+                              'HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients',
+                              'HKCU:\SOFTWARE\Microsoft\EdgeUpdate\Clients')) {
+            $p = Join-Path $root $clientKey
+            if (Test-Path $p) { $v = (Get-ItemProperty $p -Name pv -ErrorAction SilentlyContinue).pv; if ($v) { break } }
+          }
+          if (-not $v) {
+            Write-Host "레지스트리에서 WebView2 런타임 버전을 찾지 못했습니다. 설치 폴더에서 찾습니다."
+            $d = Get-ChildItem 'C:\Program Files (x86)\Microsoft\EdgeWebView\Application' -Directory -ErrorAction SilentlyContinue |
+                 Where-Object { $_.Name -match '^\d+\.' } | Sort-Object Name -Descending | Select-Object -First 1
+            if ($d) { $v = $d.Name }
+          }
+          if (-not $v) { $v = (Get-Item "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe").VersionInfo.ProductVersion }
+          Write-Host "WebView2 런타임 버전: $v"
+
           $dest = "$env:RUNNER_TEMP\edgedriver"
-          try {
-            Invoke-WebRequest -Uri "https://msedgedriver.microsoft.com/$v/edgedriver_win64.zip" -OutFile edgedriver.zip -UseBasicParsing
-            Expand-Archive edgedriver.zip -DestinationPath $dest -Force
-          } catch {
-            Write-Host "정확한 버전을 받지 못했습니다 ($_). 러너에 설치된 드라이버로 대체합니다."
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          $ok = $false
+          foreach ($try in @($v, ($v -replace '\.\d+$', '.0'))) {
+            try {
+              Invoke-WebRequest -Uri "https://msedgedriver.microsoft.com/$try/edgedriver_win64.zip" -OutFile edgedriver.zip -UseBasicParsing
+              Expand-Archive edgedriver.zip -DestinationPath $dest -Force
+              Write-Host "msedgedriver $try 내려받음"; $ok = $true; break
+            } catch { Write-Host "msedgedriver $try 없음" }
+          }
+          if (-not $ok) {
             $pre = Get-ChildItem -Path 'C:\SeleniumWebDrivers\EdgeDriver' -Filter msedgedriver.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
             if (-not $pre) { throw "msedgedriver 를 찾을 수 없습니다." }
-            New-Item -ItemType Directory -Force -Path $dest | Out-Null
-            Copy-Item $pre.FullName $dest
+            Copy-Item $pre.FullName $dest -Force
+            Write-Host "러너에 설치된 드라이버로 대체합니다."
           }
           & "$dest\msedgedriver.exe" --version
           echo $dest | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append

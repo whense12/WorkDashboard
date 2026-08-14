@@ -82,11 +82,23 @@ async function wd(method, path, body) {
 }
 
 let sessionId = null;
-async function newSession() {
-  const v = await wd('POST', '/session', { capabilities: { alwaysMatch: { 'tauri:options': { application: APP } } } });
-  sessionId = v.sessionId || v.session_id;
-  await wd('POST', `/session/${sessionId}/timeouts`, { script: 30000 });
-  return sessionId;
+async function newSession(attempts = 3) {
+  let last;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      const v = await wd('POST', '/session', { capabilities: { alwaysMatch: { 'tauri:options': { application: APP } } } });
+      sessionId = v.sessionId || v.session_id;
+      await wd('POST', `/session/${sessionId}/timeouts`, { script: 30000 });
+      return sessionId;
+    } catch (e) {
+      last = e;
+      console.log(`  세션 생성 ${i}/${attempts} 실패: ${String(e.message).slice(0, 180)}`);
+      // 앱이 반쯤 떠 있으면 다음 시도를 방해한다. 정리하고 다시 시도한다.
+      psRaw(`Get-Process -Name '${PROC}' -ErrorAction SilentlyContinue | Stop-Process -Force`);
+      await sleep(4000);
+    }
+  }
+  throw last;
 }
 async function endSession() {
   if (!sessionId) return;
@@ -113,10 +125,12 @@ async function waitReady(timeoutMs = 30000) {
 // ── tauri-driver 기동 ────────────────────────────────────────────────────────
 console.log(`대상 실행파일: ${APP} (프로세스 ${PROC})`);
 console.log(`앱 데이터 폴더: ${APPDATA}`);
+psRaw(`Get-Process -Name '${PROC}' -ErrorAction SilentlyContinue | Stop-Process -Force`); // 남은 프로세스 정리
 psRaw(`if (Test-Path '${APPDATA}') { Remove-Item -Recurse -Force '${APPDATA}' }`); // 깨끗한 상태에서 시작
+console.log('msedgedriver:', psRaw('(Get-Command msedgedriver -ErrorAction SilentlyContinue).Source'));
 const driver = spawn('tauri-driver', [], { stdio: ['ignore', 'inherit', 'inherit'] });
 driver.on('error', (e) => { console.error('tauri-driver 실행 실패:', e.message); process.exit(1); });
-await sleep(2500);
+await sleep(4000);
 
 let exitCode = 0;
 try {
