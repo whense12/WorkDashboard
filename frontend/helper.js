@@ -1,0 +1,7 @@
+(async function(){
+ const C=window.WorkCore;let state=await C.initStorage();const $=id=>document.getElementById(id);
+ function render(){const cards=C.dueCards(state);$('helperHorizon').textContent=C.horizonLabel(state.settings);$('helperList').innerHTML=cards.length?cards.map(r=>{const v=C.vendor(state,r.vendorId),p=C.project(state,r.projectId);return `<button class="helper-card ${C.ddayClass(r.date)}" data-kind="${r.kind}" data-id="${r.id}"><span><span class="helper-vendor">${C.esc(v?.name||'업체')}</span><span class="helper-task">${C.esc(r.name)}</span><span class="helper-sub">${C.pretty(r.date)}${p?` · ${C.esc(p.name)}`:''}</span></span><span class="helper-dday">${C.ddayLabel(r.date)}</span></button>`}).join(''):'<div class="empty">다가오는 일정이 없습니다.</div>';$('helperUpdated').textContent=`${new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})} 갱신`;document.querySelectorAll('.helper-card').forEach(b=>b.addEventListener('click',openMain))}
+ async function invoke(cmd,args){if(C.isTauri())try{return await window.__TAURI__.core.invoke(cmd,args||{})}catch(e){console.warn(e)}}
+ async function openMain(){if(C.isTauri())await invoke('show_main');else if(window.opener)window.opener.focus()}
+ $('helperHide').addEventListener('click',async()=>{if(C.isTauri())await invoke('hide_helper');else window.close()});$('helperOpenMain').addEventListener('click',openMain);await C.watchState(v=>{state=v;render()});render();
+})();

@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Main dashboard and D-day helper permissions",
+  "windows": ["main", "helper"],
+  "permissions": [
+    "core:default",
+    "store:default",
+    "window-state:default"
+  ]
+}

@@ -1,0 +1,49 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>업체별 업무 일정 v5</title><link rel="stylesheet" href="styles.css"></head><body>
+<div class="app">
+<header class="topbar">
+  <div class="brand"><div class="brandmark"><svg viewBox="0 0 24 24"><path d="M4 6h16M6 3v6M18 3v6M5 10h14v10H5z"/><path d="M8 14h3M8 17h6"/></svg></div><div><h1>업체별 업무 일정</h1><p>다가오는 일정은 왼쪽, 전체 일정은 캘린더에서 확인</p></div></div>
+  <div class="top-actions">
+    <button class="btn" id="helperBtn"><svg viewBox="0 0 24 24"><path d="M5 5h14v14H5z"/><path d="M8 9h8M8 13h5"/></svg><span class="label">D-day 도우미</span></button>
+    <button class="btn" id="templateBtn"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span class="label">템플릿</span></button>
+    <button class="btn" id="settingsBtn"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.5 1A8 8 0 0 0 15 6l-.4-2.7h-4L10.2 6a8 8 0 0 0-1.4.8l-2.5-1-2 3.4 2 1.5a7 7 0 0 0 0 2.1l-2 1.5 2 3.4 2.5-1a8 8 0 0 0 1.4.8l.4 2.7h4l.4-2.7a8 8 0 0 0 1.4-.8l2.5 1 2-3.4-2-1.5c.1-.3.1-.7.1-1Z"/></svg><span class="label">설정</span></button>
+    <button class="btn" id="addWorkBtn"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span class="label">업무 추가</span></button>
+    <button class="btn primary" id="addScheduleBtn"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span class="label">일정 추가</span></button>
+  </div>
+</header>
+<main class="workspace">
+  <aside class="panel sidebar">
+    <div class="side-head"><div class="side-row"><div class="side-title">다가오는 일정</div><div class="horizon">기준 <select id="horizonSelect"><option value="3">D-3</option><option value="5">D-5</option><option value="7">D-7</option><option value="14">D-14</option><option value="30">D-30</option><option value="all">무제한</option><option value="custom">직접설정</option></select><input id="horizonCustom" type="number" min="1" max="3650" class="hidden" aria-label="직접 D-day 일수"></div></div><div class="side-caption">업체별 가장 가까운 일정이 날짜순으로 표시됩니다.</div></div>
+    <div class="due-list" id="dueList"></div>
+  </aside>
+  <section class="panel calendar-panel">
+    <div class="cal-toolbar"><button class="btn icon" id="prevMonth" aria-label="이전 달">‹</button><div class="month-title" id="monthTitle"></div><button class="btn icon" id="nextMonth" aria-label="다음 달">›</button><button class="btn" id="todayBtn">Today</button><div class="cal-spacer"></div><span class="hint">빈 날짜를 클릭하면 일정 추가</span></div>
+    <div class="calendar-scroll" id="calendarScroll"><div class="weekdays"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div><div class="month-grid" id="monthGrid"></div></div>
+  </section>
+</main></div>
+
+<div class="modal-bg" id="scheduleModal"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="scheduleTitle"><div class="modal-head"><h2 id="scheduleTitle">일정 추가</h2><button class="close" data-close="scheduleModal" aria-label="닫기">×</button></div><div class="modal-body"><div class="form-grid">
+  <div class="field"><label for="sDate">날짜</label><input id="sDate" type="date"></div><div class="field"><label for="sVendor">업체</label><select id="sVendor"></select></div>
+  <div class="field full"><label for="sProject">연결 업무</label><select id="sProject"></select><div class="field-note">업무와 무관한 일정이면 ‘일반 일정’을 선택합니다.</div></div>
+  <div class="field full"><label for="sName">일정명</label><input id="sName" placeholder="예: 현장확인, 서류제출, 계약의뢰…"></div>
+  <div class="field full"><label for="sMemo">메모</label><textarea id="sMemo" placeholder="필요한 내용만 간단히 기록"></textarea></div>
+</div></div><div class="modal-foot"><button class="btn" data-close="scheduleModal">취소</button><button class="btn primary" id="saveScheduleBtn">일정 저장</button></div></section></div>
+
+<div class="modal-bg" id="workModal"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="workTitle"><div class="modal-head"><h2 id="workTitle">업무 추가</h2><button class="close" data-close="workModal" aria-label="닫기">×</button></div><div class="modal-body"><div class="form-grid">
+  <div class="field"><label for="wVendor">업체 템플릿</label><select id="wVendor"></select></div><div class="field"><label for="wTemplate">업무 템플릿</label><select id="wTemplate"></select></div>
+  <div class="field full"><label for="wProject">업무명 / 공사명</label><input id="wProject" placeholder="예: ○○배수로 정비공사"></div>
+  <div class="field"><label for="wFirstDate">첫 일정 날짜</label><input id="wFirstDate" type="date"></div><div class="field"><label for="wMemo">메모</label><input id="wMemo" placeholder="선택"></div>
+</div></div><div class="modal-foot"><button class="btn" data-close="workModal">취소</button><button class="btn primary" id="saveWorkBtn">업무 등록</button></div></section></div>
+
+<div class="modal-bg" id="detailModal"><section class="modal detail-modal" role="dialog" aria-modal="true" aria-labelledby="detailTitle"><div class="modal-head"><h2 id="detailTitle">일정 상세</h2><button class="close" data-close="detailModal" aria-label="닫기">×</button></div><div class="modal-body" id="detailBody"></div><div class="modal-foot"><button class="btn danger hidden" id="deleteEventBtn">일정 삭제</button><button class="btn" id="changeDateBtn">날짜 변경</button><button class="btn primary" id="completeBtn">OK 완료</button></div></section></div>
+
+<div class="modal-bg" id="templateModal"><section class="modal wide" role="dialog" aria-modal="true" aria-labelledby="templateTitle"><div class="modal-head"><h2 id="templateTitle">템플릿 관리</h2><button class="close" data-close="templateModal" aria-label="닫기">×</button></div><div class="modal-body"><div class="tabs"><button class="tab active" data-template-tab="vendor">업체 템플릿</button><button class="tab" data-template-tab="work">업무 템플릿</button></div><div id="vendorTemplatePane"></div><div id="workTemplatePane" class="hidden"></div></div><div class="modal-foot"><button class="btn" data-close="templateModal">닫기</button></div></section></div>
+
+<div class="modal-bg" id="projectStepsModal"><section class="modal wide" role="dialog" aria-modal="true" aria-labelledby="projectStepsTitle"><div class="modal-head"><h2 id="projectStepsTitle">업무 절차 편집</h2><button class="close" data-close="projectStepsModal" aria-label="닫기">×</button></div><div class="modal-body"><div class="proc-list" id="projectStepsList"></div><button class="btn" id="projectAddStep" style="margin-top:8px">+ 단계 추가</button></div><div class="modal-foot"><button class="btn" data-close="projectStepsModal">취소</button><button class="btn primary" id="saveProjectSteps">절차 저장</button></div></section></div>
+
+<div class="modal-bg" id="settingsModal"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle"><div class="modal-head"><h2 id="settingsTitle">도우미 설정</h2><button class="close" data-close="settingsModal" aria-label="닫기">×</button></div><div class="modal-body">
+  <div class="setting-row"><div class="setting-copy"><b>D-day 도우미 표시</b><span>작은 창으로 업체별 가까운 일정을 띄웁니다.</span></div><button class="btn" id="settingsOpenHelper">도우미 열기</button></div>
+  <div class="setting-row"><div class="setting-copy"><b>항상 위에 표시</b><span>데스크톱 앱에서 다른 창 위에 유지합니다.</span></div><label class="switch"><input id="alwaysOnTop" type="checkbox"><span class="slider"></span></label></div>
+  <div class="setting-row"><div class="setting-copy"><b>컴퓨터 시작 시 자동 실행</b><span>Tauri 데스크톱 앱에서 지원됩니다.</span></div><label class="switch"><input id="autostart" type="checkbox"><span class="slider"></span></label></div>
+</div><div class="modal-foot"><button class="btn" data-close="settingsModal">닫기</button></div></section></div>
+<div class="toast" id="toast"></div>
+<script src="core.js"></script><script src="app.js"></script></body></html>

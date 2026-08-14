@@ -1,0 +1,183 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>D-day 도우미</title><style>
+:root{
+  --bg:#f4f5f4;--panel:#fff;--sub:#f8f9f8;--ink:#19201d;--muted:#6d756f;--line:#e2e5e2;
+  --line-strong:#cfd5d1;--accent:#285f4b;--accent-soft:#e9f1ed;--today:#dcece4;
+  --danger:#b54035;--danger-soft:#faecea;--warn:#9d681f;--warn-soft:#fff3db;--shadow:0 8px 24px rgba(24,38,31,.06);
+  --r:14px;--top:58px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif}
+body{font-size:14px;line-height:1.4}button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid rgba(40,95,75,.2);outline-offset:2px}
+.app{max-width:1540px;margin:0 auto;padding:14px}.topbar{height:58px;display:flex;align-items:center;gap:11px;padding:0 13px;background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);margin-bottom:10px}
+.brand{display:flex;align-items:center;gap:9px;min-width:0}.brandmark{width:34px;height:34px;border-radius:10px;background:var(--accent);color:#fff;display:grid;place-items:center}.brandmark svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}.brand h1{font-size:16px;margin:0;font-weight:850;letter-spacing:-.02em}.brand p{font-size:9.5px;color:var(--muted);margin:2px 0 0}.top-actions{margin-left:auto;display:flex;gap:6px;align-items:center}
+.btn{height:35px;border:1px solid var(--line-strong);background:#fff;border-radius:9px;padding:0 10px;font-size:10.5px;font-weight:750;display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}.btn:hover{background:#f7f8f7}.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.icon{width:35px;padding:0}.btn.danger{color:var(--danger)}.btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.workspace{display:grid;grid-template-columns:320px minmax(0,1fr);gap:10px;align-items:start}.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.sidebar{height:calc(100vh - 92px);min-height:560px;overflow:hidden;display:flex;flex-direction:column}.side-head{padding:11px 12px 9px;border-bottom:1px solid var(--line)}.side-row{display:flex;align-items:center;justify-content:space-between;gap:8px}.side-title{font-size:13px;font-weight:850}.horizon{display:flex;align-items:center;gap:5px;font-size:9.5px;color:var(--muted)}.horizon select,.horizon input{height:29px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:0 6px;font-size:10px;font-weight:750}.horizon input{width:54px}.side-caption{font-size:9.5px;color:var(--muted);margin-top:5px}.due-list{padding:8px;display:grid;gap:7px;overflow:auto;align-content:start}.due-card{border:1px solid var(--line);background:#fff;border-radius:11px;padding:10px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;text-align:left;width:100%}.due-card:hover{border-color:#c3cec8;background:#fbfcfb}.due-vendor{display:block;font-size:12.5px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.due-task{display:block;font-size:11px;font-weight:750;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.due-sub{display:block;font-size:9.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.due-dday{min-width:50px;height:38px;border-radius:9px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-size:11px;font-weight:900;font-variant-numeric:tabular-nums}.due-card.today .due-dday{background:var(--warn-soft);color:var(--warn)}.due-card.overdue .due-dday{background:var(--danger-soft);color:var(--danger)}.due-extra{font-size:9px;color:var(--muted);margin-top:5px}.empty{padding:30px 14px;text-align:center;color:var(--muted);font-size:10.5px}
+.calendar-panel{height:calc(100vh - 92px);min-height:560px;overflow:hidden;display:flex;flex-direction:column}.cal-toolbar{height:50px;flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:0 10px;border-bottom:1px solid var(--line)}.month-title{font-size:14px;font-weight:900;min-width:104px;text-align:center;letter-spacing:-.02em}.cal-spacer{flex:1}.hint{font-size:9px;color:var(--muted)}
+.calendar-scroll{flex:1;min-height:0;overflow:auto;scrollbar-gutter:stable}.weekdays{position:sticky;top:0;z-index:6;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:#fafbfa;border-bottom:1px solid var(--line)}.weekdays div{padding:8px 4px;text-align:center;font-size:10px;color:var(--muted);font-weight:800}.month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));align-items:stretch}.day{position:relative;min-height:160px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:6px;background:#fff;cursor:pointer}.day:nth-child(7n){border-right:0}.day:hover{background:#fcfdfc}.day.out{background:#fafafa;color:#c2c7c3;cursor:default}.day.today{background:var(--today);box-shadow:inset 0 0 0 2px var(--accent);z-index:1}.day.today:before{content:"";position:absolute;left:0;right:0;top:0;height:5px;background:var(--accent)}.day-head{height:24px;display:flex;align-items:center;justify-content:space-between;gap:4px}.day-num{width:23px;height:23px;border-radius:7px;display:grid;place-items:center;font-size:10px;font-weight:850;font-variant-numeric:tabular-nums}.weekend .day-num{color:var(--danger)}.today .day-num{background:var(--accent);color:#fff}.today-label{font-size:8px;font-weight:900;letter-spacing:.06em;color:var(--accent)}.events{display:grid;gap:3px;margin-top:4px}.event{width:100%;border:0;background:#f0f3f1;border-radius:6px;padding:4px 5px;font-size:9.5px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#26302b}.event:hover{background:#e4ede8}.event.done{color:#848b87;background:#f6f7f6;text-decoration:line-through}.event.overdue:not(.done){background:#fbefed;color:var(--danger)}.event.manual{border-left:3px solid #9caaa3}.add-hint{position:absolute;right:6px;bottom:5px;font-size:8px;color:#a0a7a2;opacity:0}.day:hover .add-hint{opacity:1}
+.modal-bg{position:fixed;inset:0;background:rgba(18,27,23,.43);display:none;align-items:center;justify-content:center;padding:15px;z-index:60}.modal-bg.show{display:flex}.modal{width:min(580px,100%);max-height:91vh;overflow:auto;background:#fff;border-radius:16px;border:1px solid var(--line);box-shadow:0 28px 80px rgba(0,0,0,.18)}.modal.wide{width:min(790px,100%)}.modal-head{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:9px}.modal-head h2{font-size:14px;margin:0}.close{width:31px;height:31px;border:1px solid var(--line);background:#fff;border-radius:8px}.modal-body{padding:14px}.modal-foot{padding:10px 14px;border-top:1px solid var(--line);background:#fafbfa;border-radius:0 0 16px 16px;display:flex;justify-content:flex-end;gap:6px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.field.full{grid-column:1/-1}.field label,.field .label{display:block;font-size:9px;color:var(--muted);font-weight:800;margin-bottom:4px}.field input,.field select,.field textarea{width:100%;border:1px solid #d6dad7;border-radius:8px;background:#fff;padding:8px 9px;font-size:11px}.field textarea{min-height:66px;resize:vertical}.field-note{font-size:8.5px;color:var(--muted);margin-top:4px}
+.detail-hero{display:grid;grid-template-columns:1fr auto;gap:10px}.detail-vendor{font-size:16px;font-weight:900}.detail-project{font-size:10.5px;color:var(--muted);margin-top:2px}.detail-dday{min-width:58px;height:46px;border-radius:10px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-size:13px;font-weight:900}.detail-dday.today{background:var(--warn-soft);color:var(--warn)}.detail-dday.overdue{background:var(--danger-soft);color:var(--danger)}.current-box{border:1px solid var(--line);border-radius:11px;padding:10px;margin-top:11px}.current-label{font-size:8.5px;color:var(--muted);font-weight:800}.current-title{font-size:14px;font-weight:850;margin-top:3px}.current-date{font-size:9.5px;color:var(--muted);margin-top:3px}.info-row{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}.info{border:1px solid var(--line);border-radius:9px;padding:8px}.info span{font-size:8.5px;color:var(--muted);display:block}.info b{font-size:10.5px;display:block;margin-top:2px}.steps{margin-top:12px}.steps-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}.steps-title{font-size:9px;color:var(--muted);font-weight:800}.link{border:0;background:transparent;color:var(--accent);font-size:9px;font-weight:850;padding:0}.step{display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:7px;align-items:center;min-height:33px;border-top:1px solid #eef0ee}.step:first-of-type{border-top:0}.step-mark{width:17px;height:17px;border-radius:6px;background:#eef1ef;color:#78817c;display:grid;place-items:center;font-size:8px;font-weight:900}.step.done .step-mark{background:var(--accent);color:#fff}.step.current .step-mark{background:#fff;border:2px solid var(--accent);color:var(--accent)}.step-name{font-size:10.5px;font-weight:700}.step.done .step-name{color:#929995;text-decoration:line-through}.step-date{font-size:8.5px;color:var(--muted)}
+.tabs{display:flex;gap:3px;padding:3px;background:#eef0ee;border-radius:9px;margin-bottom:10px;width:max-content}.tab{border:0;background:transparent;border-radius:7px;padding:6px 10px;font-size:10px;font-weight:800;color:var(--muted)}.tab.active{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}.template-layout{display:grid;grid-template-columns:210px minmax(0,1fr);gap:10px}.template-list{border:1px solid var(--line);border-radius:10px;overflow:hidden}.template-item{width:100%;border:0;border-bottom:1px solid var(--line);background:#fff;padding:9px 10px;text-align:left;font-size:10.5px;font-weight:750}.template-item:last-child{border-bottom:0}.template-item.active{background:var(--accent-soft);color:var(--accent)}.template-editor{border:1px solid var(--line);border-radius:10px;padding:10px}.editor-head{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:8px}.editor-title{font-size:11px;font-weight:850}.proc-list{display:grid;gap:5px}.proc-row{display:grid;grid-template-columns:28px minmax(0,1fr) 78px 56px;gap:5px;align-items:center}.proc-row input{width:100%;height:32px;border:1px solid var(--line);border-radius:7px;padding:0 6px;font-size:9.5px}.move{display:grid;grid-template-columns:1fr 1fr;gap:2px}.move button,.remove{height:28px;border:1px solid var(--line);background:#fff;border-radius:6px;font-size:9px}.remove{color:var(--danger)}
+.setting-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line)}.setting-row:first-child{border-top:0}.setting-copy b{display:block;font-size:11px}.setting-copy span{display:block;font-size:9px;color:var(--muted);margin-top:2px}.switch{position:relative;width:40px;height:23px}.switch input{opacity:0;width:0;height:0}.slider{position:absolute;inset:0;border-radius:999px;background:#d8ddda;transition:.18s}.slider:before{content:"";position:absolute;width:17px;height:17px;left:3px;top:3px;background:#fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.18);transition:.18s}.switch input:checked+.slider{background:var(--accent)}.switch input:checked+.slider:before{transform:translateX(17px)}
+.toast{position:fixed;right:16px;bottom:16px;z-index:100;background:#18211d;color:#fff;padding:9px 11px;border-radius:9px;font-size:10px;opacity:0;transform:translateY(6px);pointer-events:none;transition:.18s}.toast.show{opacity:1;transform:translateY(0)}
+.hidden{display:none!important}
+/* helper */
+.helper-body{background:#f3f5f4}.helper-shell{height:100vh;display:flex;flex-direction:column;background:#fff;border:1px solid #dfe3e0;overflow:hidden}.helper-bar{height:38px;display:flex;align-items:center;gap:7px;padding:0 8px;border-bottom:1px solid var(--line);background:#fafbfa;user-select:none}.helper-bar strong{font-size:11px;flex:1}.helper-bar span{font-size:8.5px;color:var(--muted)}.helper-close{width:26px;height:26px;border:0;background:transparent;border-radius:7px;font-size:15px}.helper-close:hover{background:#ecefec}.helper-list{padding:7px;display:grid;gap:6px;overflow:auto;align-content:start}.helper-card{border:1px solid var(--line);border-radius:10px;padding:8px;background:#fff;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;text-align:left}.helper-card:hover{background:#fbfcfb}.helper-vendor{display:block;font-size:11px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.helper-task{display:block;font-size:9.5px;font-weight:700;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.helper-sub{display:block;font-size:8.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.helper-dday{min-width:44px;height:32px;border-radius:8px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-size:10px;font-weight:900}.helper-card.today .helper-dday{background:var(--warn-soft);color:var(--warn)}.helper-card.overdue .helper-dday{background:var(--danger-soft);color:var(--danger)}.helper-footer{margin-top:auto;padding:6px 8px;border-top:1px solid var(--line);font-size:8.5px;color:var(--muted);display:flex;justify-content:space-between}
+@media(max-width:980px){.workspace{grid-template-columns:280px minmax(0,1fr)}.top-actions .label{display:none}.btn{padding:0 8px}}
+@media(max-width:760px){.app{padding:8px}.topbar{height:auto;min-height:54px;flex-wrap:wrap;padding:9px}.top-actions{width:100%;margin-left:0}.workspace{display:block}.sidebar{height:auto;min-height:0;max-height:330px;margin-bottom:8px}.calendar-panel{height:70vh;min-height:520px}.template-layout{grid-template-columns:1fr}.template-list{max-height:180px;overflow:auto}.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}}
+
+/* v5 detail: work logs, attachments, full procedure visibility */
+.detail-modal{width:min(720px,100%)}
+.section-headline{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px}.section-headline b{display:block;font-size:11px}.section-headline span{display:block;margin-top:2px;font-size:8.8px;color:var(--muted)}
+.worklog-section,.attachment-section{margin-top:12px;border-top:1px solid var(--line);padding-top:11px}.log-compose{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;align-items:stretch}.log-compose textarea{min-height:66px;border:1px solid #d6dad7;border-radius:9px;padding:8px 9px;font-size:10.5px;resize:vertical}.worklog-list{display:grid;gap:5px;margin-top:7px;max-height:190px;overflow:auto}.worklog-item{position:relative;border:1px solid var(--line);border-radius:9px;background:#fafbfa;padding:8px 58px 8px 9px}.worklog-time{font-size:8px;color:var(--muted);font-variant-numeric:tabular-nums}.worklog-text{font-size:10.5px;white-space:pre-wrap;margin-top:3px;line-height:1.45}.worklog-item .tiny-link{position:absolute;right:9px;top:9px}
+.section-empty{padding:10px;border:1px dashed var(--line);border-radius:9px;color:var(--muted);font-size:9px;text-align:center}.tiny-link{border:0;background:transparent;color:var(--accent);padding:2px 3px;font-size:8.5px;font-weight:800;cursor:pointer}.tiny-link.danger{color:var(--danger)}
+.file-btn{min-height:30px;height:30px;padding:0 8px;font-size:9px}.attachment-list{display:grid;gap:5px}.attachment-item{display:grid;grid-template-columns:20px minmax(0,1fr) auto auto;gap:6px;align-items:center;border:1px solid var(--line);border-radius:9px;padding:7px 8px}.file-icon{width:20px;height:20px;border-radius:6px;background:#eef2ef;color:var(--accent);display:grid;place-items:center;font-size:10px;font-weight:900}.attachment-main{min-width:0}.attachment-main b{display:block;font-size:9.8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.attachment-main small{display:block;margin-top:1px;color:var(--muted);font-size:8px}.attachment-note{font-size:8px;color:var(--muted);margin-top:6px;line-height:1.4}
+.steps-head>div:first-child{min-width:0}.steps-sub{font-size:8px;color:var(--muted);margin-top:2px}.step{grid-template-columns:20px minmax(0,1fr) auto}.step.done .step-name{text-decoration:none;color:#66706b}.step.future .step-name{color:#4e5753}.step-status{font-size:8.5px;white-space:nowrap;border-radius:999px;padding:3px 6px}.step-status.done{background:#eef2ef;color:#5d6762}.step-status.current{background:var(--accent-soft);color:var(--accent);font-weight:850}.step-status.future{background:#f5f6f5;color:#7d8581}.step.future .step-mark{background:#f5f6f5;color:#8c938f}.step.current{background:#fbfdfc}.step.current .step-name{font-weight:850}
+@media(max-width:620px){.log-compose{grid-template-columns:1fr}.attachment-item{grid-template-columns:20px minmax(0,1fr) auto}.attachment-item .tiny-link.danger{grid-column:3}.detail-modal{width:100%}}
+
+</style></head><body class="helper-body"><main class="helper-shell"><header class="helper-bar" data-tauri-drag-region><strong data-tauri-drag-region>다가오는 일정</strong><span id="helperHorizon" data-tauri-drag-region></span><button class="helper-close" id="helperHide" aria-label="도우미 숨기기">×</button></header><section class="helper-list" id="helperList"></section><footer class="helper-footer"><span id="helperUpdated"></span><button class="link" id="helperOpenMain">대시보드 열기</button></footer></main><script>
+(function(){
+  const KEY='work-calendar-state-v5';
+  const todayISO=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
+  const parse=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+  const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const addDays=(s,n)=>{const d=parse(s);d.setDate(d.getDate()+Number(n||0));return iso(d)};
+  const diffDays=(s,base=todayISO())=>Math.round((parse(s)-parse(base))/86400000);
+  const pretty=s=>{if(!s)return'';const d=parse(s);return `${d.getMonth()+1}.${d.getDate()}.`};
+  const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+  const uid=p=>`${p}-${Date.now()}-${Math.random().toString(16).slice(2,8)}`;
+  const clone=x=>JSON.parse(JSON.stringify(x));
+  const seed={
+    version:5,
+    settings:{horizon:'14',customHorizon:45,helperAlwaysOnTop:true,autostart:false},
+    vendorTemplates:[
+      {id:'v-daehan',name:'대한건설',person:'김OO',contact:'010-1111-1111',memo:''},
+      {id:'v-mirae',name:'미래토건',person:'박OO',contact:'010-2222-2222',memo:''},
+      {id:'v-dongsung',name:'동성건설',person:'이OO',contact:'010-3333-3333',memo:''},
+      {id:'v-goseong',name:'고성건설',person:'최OO',contact:'010-4444-4444',memo:''}
+    ],
+    workTemplates:[
+      {id:'wt-general',name:'일반 공사(예시)',steps:[
+        {name:'시행계획',offset:0},{name:'청렴이행서약',offset:2},{name:'안전보건수준평가',offset:2},{name:'계약의뢰',offset:2},{name:'계약',offset:3},{name:'착공계 확인',offset:2},{name:'준공계',offset:20},{name:'준공검사',offset:2}
+      ]},
+      {id:'wt-simple',name:'간소 절차(예시)',steps:[{name:'시행계획',offset:0},{name:'계약의뢰',offset:2},{name:'계약',offset:3},{name:'착공',offset:2},{name:'준공',offset:20}]}
+    ],
+    projects:[
+      {id:'p1',vendorId:'v-daehan',name:'배수로 정비공사',memo:'',templateId:'wt-general',steps:[
+        {id:'p1s1',name:'시행계획',offset:0,dueDate:'2026-08-07',completed:true,completedAt:'2026-08-07'},
+        {id:'p1s2',name:'청렴이행서약',offset:2,dueDate:'2026-08-09',completed:true,completedAt:'2026-08-09'},
+        {id:'p1s3',name:'안전보건수준평가',offset:2,dueDate:'2026-08-14',completed:false,completedAt:null},
+        {id:'p1s4',name:'계약의뢰',offset:2,dueDate:null,completed:false,completedAt:null},
+        {id:'p1s5',name:'계약',offset:3,dueDate:null,completed:false,completedAt:null}
+      ]},
+      {id:'p2',vendorId:'v-mirae',name:'농로 보수공사',memo:'',templateId:'wt-simple',steps:[
+        {id:'p2s1',name:'시행계획',offset:0,dueDate:'2026-08-08',completed:true,completedAt:'2026-08-08'},
+        {id:'p2s2',name:'계약의뢰',offset:2,dueDate:'2026-08-12',completed:false,completedAt:null},
+        {id:'p2s3',name:'계약',offset:3,dueDate:null,completed:false,completedAt:null},
+        {id:'p2s4',name:'착공',offset:2,dueDate:null,completed:false,completedAt:null}
+      ]},
+      {id:'p3',vendorId:'v-dongsung',name:'도로 정비공사',memo:'',templateId:'wt-general',steps:[
+        {id:'p3s1',name:'시행계획',offset:0,dueDate:'2026-08-06',completed:true,completedAt:'2026-08-06'},
+        {id:'p3s2',name:'청렴이행서약',offset:2,dueDate:'2026-08-10',completed:false,completedAt:null},
+        {id:'p3s3',name:'안전보건수준평가',offset:2,dueDate:null,completed:false,completedAt:null}
+      ]},
+      {id:'p4',vendorId:'v-goseong',name:'시설 보수공사',memo:'',templateId:'wt-general',steps:[
+        {id:'p4s1',name:'시행계획',offset:0,dueDate:'2026-08-18',completed:false,completedAt:null},
+        {id:'p4s2',name:'계약의뢰',offset:2,dueDate:null,completed:false,completedAt:null}
+      ]}
+    ],
+    manualEvents:[
+      {id:'m1',vendorId:'v-daehan',projectId:'p1',date:'2026-08-20',name:'현장 확인',memo:'현장 일정 확인',completed:false,completedAt:null}
+    ]
+  };
+
+  function normalizeState(x){
+    const s=x&&typeof x==='object'?x:clone(seed);
+    s.version=5;
+    s.settings=s.settings||clone(seed.settings);
+    s.vendorTemplates=Array.isArray(s.vendorTemplates)?s.vendorTemplates:[];
+    s.workTemplates=Array.isArray(s.workTemplates)?s.workTemplates:[];
+    s.projects=Array.isArray(s.projects)?s.projects:[];
+    s.manualEvents=Array.isArray(s.manualEvents)?s.manualEvents:[];
+    s.projects.forEach(p=>{
+      p.steps=Array.isArray(p.steps)?p.steps:[];
+      p.steps.forEach(st=>{st.logs=Array.isArray(st.logs)?st.logs:[];st.attachments=Array.isArray(st.attachments)?st.attachments:[];st.memo=st.memo||''});
+    });
+    s.manualEvents.forEach(m=>{m.logs=Array.isArray(m.logs)?m.logs:[];m.attachments=Array.isArray(m.attachments)?m.attachments:[]});
+    return s;
+  }
+  const ATTACH_DB='work-calendar-attachments-v1',ATTACH_STORE='files';
+  function openAttachmentDB(){return new Promise((resolve,reject)=>{if(!('indexedDB' in window)){reject(new Error('IndexedDB unavailable'));return}const req=indexedDB.open(ATTACH_DB,1);req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(ATTACH_STORE))db.createObjectStore(ATTACH_STORE,{keyPath:'id'})};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
+  async function putAttachment(file){const db=await openAttachmentDB();const id=uid('att');const row={id,name:file.name,type:file.type||'application/octet-stream',size:file.size,lastModified:file.lastModified||Date.now(),blob:file};await new Promise((resolve,reject)=>{const tx=db.transaction(ATTACH_STORE,'readwrite');tx.objectStore(ATTACH_STORE).put(row);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close();return{id,name:row.name,type:row.type,size:row.size,lastModified:row.lastModified}}
+  async function getAttachment(id){const db=await openAttachmentDB();const row=await new Promise((resolve,reject)=>{const req=db.transaction(ATTACH_STORE,'readonly').objectStore(ATTACH_STORE).get(id);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error)});db.close();return row}
+  async function removeAttachment(id){try{const db=await openAttachmentDB();await new Promise((resolve,reject)=>{const tx=db.transaction(ATTACH_STORE,'readwrite');tx.objectStore(ATTACH_STORE).delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close()}catch(e){console.warn('attachment delete failed',e)}}
+  function formatBytes(n){n=Number(n||0);if(n<1024)return`${n} B`;if(n<1048576)return`${(n/1024).toFixed(n<10240?1:0)} KB`;return`${(n/1048576).toFixed(n<10485760?1:0)} MB`}
+  let store=null;let memoryState=normalizeState(clone(seed));
+  const isTauri=()=>!!(window.__TAURI__?.core);
+  async function initStorage(){
+    if(isTauri() && window.__TAURI__?.store?.load){
+      try{
+        store=await window.__TAURI__.store.load('work-calendar.json',{autoSave:150});
+        const value=await store.get('state');
+        if(value) return normalizeState(value);
+        await store.set('state',clone(seed));await store.save();return normalizeState(clone(seed));
+      }catch(e){console.warn('Tauri store fallback',e)}
+    }
+    try{const raw=localStorage.getItem(KEY);if(raw)return normalizeState(JSON.parse(raw))}catch(e){}
+    try{localStorage.setItem(KEY,JSON.stringify(seed));}catch(e){} memoryState=normalizeState(clone(seed));return clone(memoryState);
+  }
+  async function saveState(state){state=normalizeState(state);
+    if(store){await store.set('state',state);await store.save();}
+    else {try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){memoryState=clone(state)}}
+    try{new BroadcastChannel(KEY).postMessage({type:'state'});}catch(e){}
+  }
+  async function watchState(cb){
+    if(store?.onKeyChange){try{return await store.onKeyChange('state',v=>v&&cb(v));}catch(e){}}
+    window.addEventListener('storage',e=>{if(e.key===KEY&&e.newValue){try{cb(JSON.parse(e.newValue))}catch(_){}}});
+    try{const bc=new BroadcastChannel(KEY);bc.onmessage=async()=>{cb(await readState())};}catch(e){}
+  }
+  async function readState(){if(store){return normalizeState((await store.get('state'))||clone(seed))}try{return normalizeState(JSON.parse(localStorage.getItem(KEY)||'null')||clone(memoryState))}catch(e){return clone(memoryState)}}
+  function vendor(state,id){return state.vendorTemplates.find(v=>v.id===id)}
+  function project(state,id){return state.projects.find(p=>p.id===id)}
+  function currentStep(p){return p?.steps?.find(s=>!s.completed)||null}
+  function eventRecords(state){
+    const rows=[];
+    state.projects.forEach(p=>p.steps.forEach(s=>{if(s.dueDate)rows.push({kind:'step',id:s.id,date:s.dueDate,name:s.name,completed:!!s.completed,vendorId:p.vendorId,projectId:p.id,memo:s.memo||p.memo||'',step:s})}));
+    state.manualEvents.forEach(m=>rows.push({kind:'manual',id:m.id,date:m.date,name:m.name,completed:!!m.completed,vendorId:m.vendorId,projectId:m.projectId||null,memo:m.memo||'',manual:m}));
+    return rows;
+  }
+  function horizonDays(settings){if(settings.horizon==='all')return Infinity;if(settings.horizon==='custom')return Math.max(1,Number(settings.customHorizon||1));return Number(settings.horizon||14)}
+  function dueCards(state){
+    const max=horizonDays(state.settings),future=eventRecords(state).filter(e=>!e.completed&&e.date);
+    const groups=new Map();
+    future.forEach(e=>{const arr=groups.get(e.vendorId)||[];arr.push(e);groups.set(e.vendorId,arr)});
+    const cards=[];
+    groups.forEach((arr,vendorId)=>{arr.sort((a,b)=>a.date.localeCompare(b.date));const first=arr[0],d=diffDays(first.date);if(d<=max||d<0||max===Infinity)cards.push({...first,extra:arr.length-1,dday:d})});
+    return cards.sort((a,b)=>a.date.localeCompare(b.date));
+  }
+  function ddayLabel(date){const n=diffDays(date);if(n===0)return'D-DAY';return n>0?`D-${n}`:`D+${Math.abs(n)}`}
+  function ddayClass(date){const n=diffDays(date);return n<0?'overdue':n===0?'today':''}
+  function projectFromTemplate(template,vendorId,name,firstDate,memo=''){
+    const id=uid('p');return {id,vendorId,name,memo,templateId:template.id,steps:template.steps.map((s,i)=>({id:uid(`${id}s`),name:s.name,offset:Number(s.offset||0),dueDate:i===0?firstDate:null,completed:false,completedAt:null,memo:'',logs:[],attachments:[]}))};
+  }
+  function completeEvent(state,record,date=todayISO()){
+    if(record.kind==='manual'){
+      const m=state.manualEvents.find(x=>x.id===record.id);if(m){m.completed=true;m.completedAt=date}return null;
+    }
+    const p=project(state,record.projectId);if(!p)return null;const s=p.steps.find(x=>x.id===record.id);if(!s)return null;s.completed=true;s.completedAt=date;const next=currentStep(p);if(next&&!next.dueDate)next.dueDate=addDays(date,next.offset||0);return next;
+  }
+  function horizonLabel(settings){if(settings.horizon==='all')return'무제한';if(settings.horizon==='custom')return`D-${settings.customHorizon}`;return`D-${settings.horizon}`}
+  window.WorkCore={KEY,seed,clone,uid,todayISO,parse,iso,addDays,diffDays,pretty,esc,isTauri,normalizeState,initStorage,saveState,watchState,readState,vendor,project,currentStep,eventRecords,dueCards,ddayLabel,ddayClass,horizonDays,horizonLabel,projectFromTemplate,completeEvent,putAttachment,getAttachment,removeAttachment,formatBytes};
+})();
+
+</script><script>
+(async function(){
+ const C=window.WorkCore;let state=await C.initStorage();const $=id=>document.getElementById(id);
+ function render(){const cards=C.dueCards(state);$('helperHorizon').textContent=C.horizonLabel(state.settings);$('helperList').innerHTML=cards.length?cards.map(r=>{const v=C.vendor(state,r.vendorId),p=C.project(state,r.projectId);return `<button class="helper-card ${C.ddayClass(r.date)}" data-kind="${r.kind}" data-id="${r.id}"><span><span class="helper-vendor">${C.esc(v?.name||'업체')}</span><span class="helper-task">${C.esc(r.name)}</span><span class="helper-sub">${C.pretty(r.date)}${p?` · ${C.esc(p.name)}`:''}</span></span><span class="helper-dday">${C.ddayLabel(r.date)}</span></button>`}).join(''):'<div class="empty">다가오는 일정이 없습니다.</div>';$('helperUpdated').textContent=`${new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})} 갱신`;document.querySelectorAll('.helper-card').forEach(b=>b.addEventListener('click',openMain))}
+ async function invoke(cmd,args){if(C.isTauri())try{return await window.__TAURI__.core.invoke(cmd,args||{})}catch(e){console.warn(e)}}
+ async function openMain(){if(C.isTauri())await invoke('show_main');else if(window.opener)window.opener.focus()}
+ $('helperHide').addEventListener('click',async()=>{if(C.isTauri())await invoke('hide_helper');else window.close()});$('helperOpenMain').addEventListener('click',openMain);await C.watchState(v=>{state=v;render()});render();
+})();
+
+</script></body></html>

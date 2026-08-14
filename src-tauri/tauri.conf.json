@@ -1,0 +1,54 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "업체별 업무 일정",
+  "version": "0.2.0",
+  "identifier": "kr.go.goseong.work-calendar-helper",
+  "build": {
+    "frontendDist": "../frontend"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "업체별 업무 일정",
+        "url": "index.html",
+        "width": 1380,
+        "height": 900,
+        "minWidth": 980,
+        "minHeight": 650,
+        "center": true,
+        "resizable": true
+      },
+      {
+        "label": "helper",
+        "title": "D-day 도우미",
+        "url": "helper.html",
+        "width": 330,
+        "height": 430,
+        "minWidth": 280,
+        "minHeight": 280,
+        "visible": false,
+        "resizable": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": true
+      }
+    ],
+    "security": {
+      "csp": null,
+      "capabilities": [
+        "default"
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "category": "Productivity",
+    "shortDescription": "업체별 일정과 D-day를 한눈에 관리"
+  }
+}

@@ -1,0 +1,13 @@
+Open this repository and implement the product described in AGENTS.md and CODEX_IMPLEMENTATION_BRIEF.md.
+
+Important: assume you have no prior conversation context beyond those files. Read both completely before editing code.
+
+Start by auditing the current v5 implementation and current screenshots. Do not immediately redesign the UI from scratch. Identify what can be reused, then implement the brief in the documented phase order.
+
+The user is highly sensitive to UI clutter. Do not add KPI cards, progress percentages, analytics, arbitrary status filters, vendor color coding, or dashboard widgets that are not explicitly required.
+
+The required main UI is left-side upcoming vendor D-day cards plus a large vertically-scrollable monthly calendar. Calendar events show actual vendor + task names. Today is obvious. Blank date click creates a schedule. Details appear in a modal. The modal must support work logs, file attachments, and the full completed/current/future procedure list. OK completes the current step and activates/calculates the next step. D-day horizon must include unlimited and custom. Vendor/work templates must be editable. The Tauri helper window must be minimal and deep-link back to the matching detail.
+
+Desktop attachment persistence should use Tauri native app-local filesystem storage, with browser IndexedDB fallback. Preserve/migrate v5 data.
+
+Before finishing, run the required browser/Rust/Windows checks defined in the brief. If Windows CI is available, do not stop at code changes: get the NSIS Windows build green and report the exact artifact. If a requirement is ambiguous enough to change visible UI or data semantics, ask instead of inventing another feature.
