@@ -1,4 +1,6 @@
 (function(){
+  // 저장 키는 v5 그대로 둔다. 키를 올리면 기존 사용자의 v5 데이터가 통째로 고아가 된다.
+  // 스키마 버전은 상태 안의 version 필드와 migrate() 가 관리한다.
   const KEY='work-calendar-state-v5';
   const todayISO=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
   const parse=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
@@ -9,9 +11,13 @@
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
   const uid=p=>`${p}-${Date.now()}-${Math.random().toString(16).slice(2,8)}`;
   const clone=x=>JSON.parse(JSON.stringify(x));
+  const STATE_VERSION=6;
+  // 최초 실행 상태는 재사용 기준정보(업체/업무 템플릿)만 담는다.
+  // 예시 공사·일정은 seed 에 넣지 않는다 — 넣으면 실사용자가 가짜 데이터를 손으로 지워야 한다.
   const seed={
-    version:5,
+    version:STATE_VERSION,
     settings:{horizon:'14',customHorizon:45,helperAlwaysOnTop:true,autostart:false},
+    pendingSelection:null,
     vendorTemplates:[
       {id:'v-daehan',name:'대한건설',person:'김OO',contact:'010-1111-1111',memo:''},
       {id:'v-mirae',name:'미래토건',person:'박OO',contact:'010-2222-2222',memo:''},
@@ -24,39 +30,63 @@
       ]},
       {id:'wt-simple',name:'간소 절차(예시)',steps:[{name:'시행계획',offset:0},{name:'계약의뢰',offset:2},{name:'계약',offset:3},{name:'착공',offset:2},{name:'준공',offset:20}]}
     ],
-    projects:[
-      {id:'p1',vendorId:'v-daehan',name:'배수로 정비공사',memo:'',templateId:'wt-general',steps:[
-        {id:'p1s1',name:'시행계획',offset:0,dueDate:'2026-08-07',completed:true,completedAt:'2026-08-07'},
-        {id:'p1s2',name:'청렴이행서약',offset:2,dueDate:'2026-08-09',completed:true,completedAt:'2026-08-09'},
-        {id:'p1s3',name:'안전보건수준평가',offset:2,dueDate:'2026-08-14',completed:false,completedAt:null},
-        {id:'p1s4',name:'계약의뢰',offset:2,dueDate:null,completed:false,completedAt:null},
-        {id:'p1s5',name:'계약',offset:3,dueDate:null,completed:false,completedAt:null}
-      ]},
-      {id:'p2',vendorId:'v-mirae',name:'농로 보수공사',memo:'',templateId:'wt-simple',steps:[
-        {id:'p2s1',name:'시행계획',offset:0,dueDate:'2026-08-08',completed:true,completedAt:'2026-08-08'},
-        {id:'p2s2',name:'계약의뢰',offset:2,dueDate:'2026-08-12',completed:false,completedAt:null},
-        {id:'p2s3',name:'계약',offset:3,dueDate:null,completed:false,completedAt:null},
-        {id:'p2s4',name:'착공',offset:2,dueDate:null,completed:false,completedAt:null}
-      ]},
-      {id:'p3',vendorId:'v-dongsung',name:'도로 정비공사',memo:'',templateId:'wt-general',steps:[
-        {id:'p3s1',name:'시행계획',offset:0,dueDate:'2026-08-06',completed:true,completedAt:'2026-08-06'},
-        {id:'p3s2',name:'청렴이행서약',offset:2,dueDate:'2026-08-10',completed:false,completedAt:null},
-        {id:'p3s3',name:'안전보건수준평가',offset:2,dueDate:null,completed:false,completedAt:null}
-      ]},
-      {id:'p4',vendorId:'v-goseong',name:'시설 보수공사',memo:'',templateId:'wt-general',steps:[
-        {id:'p4s1',name:'시행계획',offset:0,dueDate:'2026-08-18',completed:false,completedAt:null},
-        {id:'p4s2',name:'계약의뢰',offset:2,dueDate:null,completed:false,completedAt:null}
-      ]}
-    ],
-    manualEvents:[
-      {id:'m1',vendorId:'v-daehan',projectId:'p1',date:'2026-08-20',name:'현장 확인',memo:'현장 일정 확인',completed:false,completedAt:null}
-    ]
+    projects:[],
+    manualEvents:[]
   };
 
+  // 예시 데이터는 설정에서 명시적으로 불러올 때만 들어간다.
+  // 날짜를 고정하지 않고 오늘 기준 상대일로 만든다 — 고정하면 시간이 지나 전부 지연 건이 된다.
+  function demoData(base=todayISO()){
+    const d=n=>addDays(base,n);
+    return {
+      projects:[
+        {id:'demo-p1',vendorId:'v-daehan',name:'배수로 정비공사',memo:'',templateId:'wt-general',steps:[
+          {id:'demo-p1s1',name:'시행계획',offset:0,dueDate:d(-6),completed:true,completedAt:d(-6)},
+          {id:'demo-p1s2',name:'청렴이행서약',offset:2,dueDate:d(-4),completed:true,completedAt:d(-4)},
+          {id:'demo-p1s3',name:'안전보건수준평가',offset:2,dueDate:d(1),completed:false,completedAt:null},
+          {id:'demo-p1s4',name:'계약의뢰',offset:2,dueDate:null,completed:false,completedAt:null},
+          {id:'demo-p1s5',name:'계약',offset:3,dueDate:null,completed:false,completedAt:null}
+        ]},
+        {id:'demo-p2',vendorId:'v-mirae',name:'농로 보수공사',memo:'',templateId:'wt-simple',steps:[
+          {id:'demo-p2s1',name:'시행계획',offset:0,dueDate:d(-5),completed:true,completedAt:d(-5)},
+          {id:'demo-p2s2',name:'계약의뢰',offset:2,dueDate:d(-1),completed:false,completedAt:null},
+          {id:'demo-p2s3',name:'계약',offset:3,dueDate:null,completed:false,completedAt:null},
+          {id:'demo-p2s4',name:'착공',offset:2,dueDate:null,completed:false,completedAt:null}
+        ]},
+        {id:'demo-p3',vendorId:'v-dongsung',name:'도로 정비공사',memo:'',templateId:'wt-general',steps:[
+          {id:'demo-p3s1',name:'시행계획',offset:0,dueDate:d(-7),completed:true,completedAt:d(-7)},
+          {id:'demo-p3s2',name:'청렴이행서약',offset:2,dueDate:d(-3),completed:false,completedAt:null},
+          {id:'demo-p3s3',name:'안전보건수준평가',offset:2,dueDate:null,completed:false,completedAt:null}
+        ]},
+        {id:'demo-p4',vendorId:'v-goseong',name:'시설 보수공사',memo:'',templateId:'wt-general',steps:[
+          {id:'demo-p4s1',name:'시행계획',offset:0,dueDate:d(5),completed:false,completedAt:null},
+          {id:'demo-p4s2',name:'계약의뢰',offset:2,dueDate:null,completed:false,completedAt:null}
+        ]}
+      ],
+      manualEvents:[
+        {id:'demo-m1',vendorId:'v-daehan',projectId:'demo-p1',date:d(7),name:'현장 확인',memo:'현장 일정 확인',completed:false,completedAt:null}
+      ]
+    };
+  }
+  function hasDemoData(s){return s.projects.some(p=>String(p.id).startsWith('demo-'))||s.manualEvents.some(m=>String(m.id).startsWith('demo-'))}
+
+  // 저장된 상태를 현재 스키마로 올린다. 버전을 무조건 덮어쓰지 않고 단계별로 통과시켜야
+  // 다음 스키마 변경 때 기존 데이터를 안전하게 이관할 수 있다.
+  function migrate(s){
+    let v=Number(s.version||0);
+    if(v<6){
+      // v5 -> v6: 필드 구조 변경 없음. pendingSelection(창 간 딥링크)만 새로 쓰인다.
+      if(!('pendingSelection' in s))s.pendingSelection=null;
+      v=6;
+    }
+    s.version=v;
+    return s;
+  }
+
   function normalizeState(x){
-    const s=x&&typeof x==='object'?x:clone(seed);
-    s.version=5;
+    const s=migrate(x&&typeof x==='object'?x:clone(seed));
     s.settings=s.settings||clone(seed.settings);
+    s.pendingSelection=s.pendingSelection||null;
     s.vendorTemplates=Array.isArray(s.vendorTemplates)?s.vendorTemplates:[];
     s.workTemplates=Array.isArray(s.workTemplates)?s.workTemplates:[];
     s.projects=Array.isArray(s.projects)?s.projects:[];
@@ -128,6 +158,24 @@
     }
     const p=project(state,record.projectId);if(!p)return null;const s=p.steps.find(x=>x.id===record.id);if(!s)return null;s.completed=true;s.completedAt=date;const next=currentStep(p);if(next&&!next.dueDate)next.dueDate=addDays(date,next.offset||0);return next;
   }
+  // 완료 취소. 잘못 누른 `OK 완료` 를 되돌리는 유일한 경로다.
+  // 뒤 단계에 이미 날짜가 잡혀 있어도 지우지 않는다 — 사용자가 직접 넣은 날짜인지
+  // 자동 계산된 날짜인지 구분할 방법이 없으므로 임의 삭제는 데이터 손실이다.
+  // 대신 어떤 날짜가 남았는지 호출부에 돌려주어 사용자에게 알린다.
+  function reopenEvent(state,record){
+    if(record.kind==='manual'){
+      const m=state.manualEvents.find(x=>x.id===record.id);if(!m)return null;
+      m.completed=false;m.completedAt=null;return {kept:null};
+    }
+    const p=project(state,record.projectId);if(!p)return null;
+    const i=p.steps.findIndex(x=>x.id===record.id);if(i<0)return null;
+    p.steps[i].completed=false;p.steps[i].completedAt=null;
+    const later=p.steps.slice(i+1).find(x=>!x.completed&&x.dueDate);
+    return {kept:later?{name:later.name,dueDate:later.dueDate}:null};
+  }
+  // 엔티티(수동 일정 / 절차 단계)를 지울 때 첨부 blob 이 IndexedDB 에 남지 않게 한다.
+  function attachmentIdsOf(entities){return entities.flatMap(e=>(e?.attachments||[]).map(a=>a.id)).filter(Boolean)}
+  async function purgeAttachments(ids){for(const id of ids)await removeAttachment(id)}
   function horizonLabel(settings){if(settings.horizon==='all')return'무제한';if(settings.horizon==='custom')return`D-${settings.customHorizon}`;return`D-${settings.horizon}`}
-  window.WorkCore={KEY,seed,clone,uid,todayISO,parse,iso,addDays,diffDays,pretty,esc,isTauri,normalizeState,initStorage,saveState,watchState,readState,vendor,project,currentStep,eventRecords,dueCards,ddayLabel,ddayClass,horizonDays,horizonLabel,projectFromTemplate,completeEvent,putAttachment,getAttachment,removeAttachment,formatBytes};
+  window.WorkCore={KEY,STATE_VERSION,seed,demoData,hasDemoData,clone,uid,todayISO,parse,iso,addDays,diffDays,pretty,esc,isTauri,migrate,normalizeState,initStorage,saveState,watchState,readState,vendor,project,currentStep,eventRecords,dueCards,ddayLabel,ddayClass,horizonDays,horizonLabel,projectFromTemplate,completeEvent,reopenEvent,attachmentIdsOf,purgeAttachments,putAttachment,getAttachment,removeAttachment,formatBytes};
 })();

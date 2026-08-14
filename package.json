@@ -1,0 +1,15 @@
+{
+  "name": "work-calendar-helper",
+  "version": "0.2.0",
+  "private": true,
+  "description": "업체별 업무 일정 · D-day 도우미 — 프론트엔드 검증/빌드 도구",
+  "type": "module",
+  "scripts": {
+    "check": "node --check frontend/core.js && node --check frontend/app.js && node --check frontend/helper.js",
+    "build:standalone": "node tools/build-standalone.mjs",
+    "test": "node tests/smoke.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.56.1"
+  }
+}
