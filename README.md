@@ -19,6 +19,10 @@
 | 상세 모달 | 지금까지 뭘 했고 다음은 뭔가 | 업무 기록, 첨부, 절차 전단계 |
 | D-day 도우미 창 | (앱을 안 열어도) 놓친 게 있나 | 업체·일정·날짜·D-day 만 |
 
+`업체 / 업무 / 절차 / 일정`이라는 이름은 고정이 아닙니다. `템플릿 → 용어·항목`에서
+바꾸면 화면 전체에 반영되고, 한국어 조사(은/는, 이/가, 을/를, 과/와, 으로/로)도
+받침에 맞춰 자동으로 골라집니다. 기존 데이터는 그대로 유지됩니다.
+
 색은 시간 긴급도에만 씁니다 — 파랑(예정) → 주황(오늘) → 빨강(지남).
 초록은 완료에만 씁니다.
 
@@ -42,6 +46,13 @@ npx tauri dev
 
 ### Windows 설치파일 빌드
 
+설치파일은 **관리자 권한(UAC)을 요구하지 않습니다.** `installMode: currentUser`로
+`%LOCALAPPDATA%`에만 설치됩니다 — 관리 대상 관공서 PC에서 이게 결정적입니다.
+WebView2가 없는 PC를 위해 부트스트래퍼를 설치파일에 담았습니다(+1.8MB).
+인터넷이 아예 없는 망에 배포해야 하면 `tauri.conf.json`의 `webviewInstallMode`를
+`offlineInstaller`로 바꾸세요(+127MB).
+
+
 ```powershell
 .\build_windows.ps1
 ```
@@ -58,8 +69,17 @@ GitHub Actions(`.github/workflows/windows-build.yml`)에서도 같은 빌드를 
 npm ci                      # 의존성 (Playwright만)
 npm run check               # JavaScript 구문 검사
 npm run build:standalone    # frontend/ -> web_standalone.html, helper_preview.html
-npm test                    # 브라우저 스모크 테스트
+npm test                    # 브라우저 스모크 테스트 (147건)
+npm run test:e2e            # Windows 실동작 E2E (Windows + tauri-driver 필요)
 ```
+
+`npm test`는 Chromium으로 화면을 실제로 조작합니다. `tauri.conf.json`과 같은 CSP를
+응답 헤더로 실어 보내고, 렌더된 모든 글자 크기를 실측해 13px 하한을 지킵니다.
+
+`npm run test:e2e`는 **빌드된 실물 앱을 띄워 조작**합니다. 브라우저로는 확인할 수 없는
+것들 — 앱 폴더에 파일이 실제로 생기는지, 껐다 켜도 첨부가 남는지, 자동 실행이
+레지스트리에 들어가는지, 도우미 창에 `WS_EX_TOPMOST`가 걸리는지, 창 위치가 복원되는지,
+실제 WebView2에서 CSP 위반이 없는지 — 를 확인합니다. CI의 `windows-e2e` 잡이 돌립니다.
 
 ### 소스 구조
 
@@ -72,9 +92,14 @@ frontend/            단일 원본. 여기만 고칩니다.
   helper.js          도우미 UI
   styles.css         디자인 토큰 + 전체 스타일
   fonts/             Pretendard Variable (동봉)
+  zip.js             의존성 없는 ZIP 읽기/쓰기 (백업용)
 src-tauri/           Tauri 2 네이티브 셸, 아이콘, NSIS 설정
+  capabilities/      default.json(공통) + main.json(파일 권한, 본 화면만)
 tools/               build-standalone.mjs, make-icons.mjs
-tests/smoke.mjs      브라우저 스모크 테스트
+tests/
+  smoke.mjs          브라우저 스모크 테스트
+  e2e.mjs            Windows 실동작 E2E (tauri-driver 직접 호출)
+  win32.ps1          창 속성·레지스트리 확인 (Win32 직접 호출)
 assets/app-icon.svg  앱 아이콘 원본
 ```
 
@@ -111,20 +136,43 @@ NSIS 번들러는 `src-tauri/icons/icon.ico`를 요구하므로 이 파일이 �
 
 ## 데이터
 
-- 상태는 데스크톱에서 Tauri Store, 웹에서 localStorage에 저장됩니다.
-- 첨부파일은 **현재 두 환경 모두 브라우저 IndexedDB**에 Blob으로 들어갑니다.
+데스크톱에서는 전부 앱 전용 폴더 안에 있습니다.
+
+```
+%LOCALAPPDATA%\kr.go.goseong.work-calendar-helper\
+  work-calendar.json          상태 (Tauri Store)
+  attachments\<엔티티id>\      첨부파일 실물
+  backups\backup-YYYY-MM-DD.zip   자동 백업 (최근 7개)
+```
+
+- 첨부는 **실제 파일**로 저장됩니다. 물리 파일명에는 생성된 id만 쓰고 사용자 파일명은
+  메타데이터로만 둡니다. 웹 미리보기에서는 IndexedDB로 대체됩니다.
+- 앱은 **자기 데이터 디렉터리 밖을 쓸 수 없습니다.** "사용자가 고른 임의 경로에 쓰기"를
+  아예 만들지 않았습니다. 백업 내보내기도 앱 폴더에 쓴 뒤 그 폴더를 탐색기로 열어 줍니다.
 - 스키마 버전은 상태의 `version` 필드와 `core.js`의 `migrate()`가 관리합니다.
   저장 키(`work-calendar-state-v5`)는 기존 데이터가 고아가 되지 않도록 고정입니다.
 - 최초 실행 시에는 업체·업무 템플릿만 들어갑니다. 예시 공사·일정은
-  `설정 → 예시 데이터 불러오기`로 넣고 뺄 수 있고, 실제 업무 데이터는 건드리지 않습니다.
+  `설정 → 예시 데이터 불러오기`로 넣고 뺄 수 있고, 실제 데이터는 건드리지 않습니다.
+
+### 백업
+
+**하루 한 번 자동으로 만들어집니다.** 버튼을 눌러야만 백업된다면 사용자가 기억해야 하고,
+그러면 잊는 순간 보호가 사라집니다. 앱을 켤 때 마지막 백업이 하루 이상 지났으면 조용히
+한 벌 남기고 최근 7개만 보관합니다. **성공은 알리지 않고 실패했을 때만 알립니다.**
+
+ZIP 안에는 상태 JSON과 **첨부파일 실물**이 함께 들어갑니다. `manifest.json`에 첨부를
+몇 개 담았고 몇 개가 실물 없이 빠졌는지 기록하므로, 첨부 빠진 백업을 전체 백업으로
+착각할 일이 없습니다.
+
+`설정 → 백업`에서 지금 백업 / 폴더 열기 / 목록에서 복원을 할 수 있습니다.
+복원은 덮어쓰기 확인을 받고, 복원 직전 현재 데이터를 한 벌 자동으로 남깁니다.
+다른 PC에서 가져온 ZIP은 백업 폴더에 넣으면 목록에 나타납니다.
 
 ### 알려진 한계
 
-- **첨부파일은 백업되지 않습니다.** 상태 JSON만 옮기면 첨부 Blob은 따라가지 않습니다.
-  PC를 교체하면 첨부가 사라집니다. 데스크톱 네이티브 파일 저장(발주서 §16.2)과
-  첨부 포함 백업(§16.3)은 아직 구현하지 않았습니다.
-- 모달에 포커스 트랩이 없습니다(§17.2-4).
-- `tauri.conf.json`의 CSP가 `null`입니다(§26).
+- 웹 미리보기(`web_standalone.html`)에서는 자동 백업이 동작하지 않습니다.
+  브라우저는 사용자 몰래 디스크에 쓸 수 없기 때문입니다. 수동 내려받기만 가능합니다.
+- 첨부 1개당 50MB 상한이 있습니다.
 
 ## 라이선스 / 서드파티
 
