@@ -762,6 +762,95 @@ console.log('\n[24] v6 -> v7 이관 — 담당자·연락처 값이 보존된다
   await ctx.close();
 }
 
+console.log('\n[25] 도우미 — 창이 아니라 악세사리로 보이고, 거기서 바로 일정을 적을 수 있다');
+{
+  const { ctx, page, errors } = await open();
+  const helper = await ctx.newPage();
+  await helper.setViewportSize({ width: 318, height: 460 });
+  await helper.goto(BASE + '/helper.html');
+  await helper.waitForSelector('.helper-card');
+
+  // 모양 — 창처럼 보이게 하던 것들이 없어야 한다.
+  const look = await helper.evaluate(() => {
+    const cs = (sel) => getComputedStyle(document.querySelector(sel));
+    const shell = cs('.helper-shell');
+    return {
+      html: getComputedStyle(document.documentElement).backgroundColor,
+      body: cs('body').backgroundColor,
+      radius: parseFloat(shell.borderTopLeftRadius),
+      shadow: shell.boxShadow,
+      pad: parseFloat(cs('body').paddingTop),
+      hasTitleBar: !!document.querySelector('.helper-bar'),
+    };
+  });
+  const transparent = (c) => /rgba\(0, 0, 0, 0\)|transparent/.test(c);
+  check('창 배경이 투명하다 (검은 사각형이 남지 않는다)', transparent(look.html) && transparent(look.body), `${look.html} / ${look.body}`);
+  check('모서리가 둥글다', look.radius >= 12, `${look.radius}px`);
+  check('그림자가 그려진다', look.shadow !== 'none' && look.shadow.length > 0);
+  check('그림자가 그려질 여백이 있다', look.pad >= 8, `${look.pad}px`);
+  check('제목표시줄 모양의 헤더가 없다', look.hasTitleBar === false);
+
+  // 끌기 — data-tauri-drag-region 은 mousedown 대상 요소 자신에 있어야 동작한다.
+  const drag = await helper.evaluate(() => {
+    const need = ['.helper-shell', '.helper-grip', '.helper-grip strong', '.helper-list', '.helper-footer'];
+    return need.filter((s) => !document.querySelector(s)?.hasAttribute('data-tauri-drag-region'));
+  });
+  check('바탕 어디를 잡아도 끌 수 있다', drag.length === 0, drag.join(', '));
+  const noDrag = await helper.evaluate(() =>
+    ['.helper-card', '#helperQuick', '#helperHide', '#helperOpenMain']
+      .filter((s) => document.querySelector(s)?.hasAttribute('data-tauri-drag-region')));
+  check('누를 것들은 끌기 영역이 아니다', noDrag.length === 0, noDrag.join(', '));
+
+  // 빠른 추가
+  const before = await helper.$$eval('.helper-card', (e) => e.length);
+  // hidden 속성만 보면 안 된다. .helper-quick 에 display 를 지정한 순간
+  // UA 의 [hidden]{display:none} 을 이겨 폼이 늘 펼쳐진 채로 남는다.
+  check('빠른 추가 폼은 처음엔 접혀 있다',
+    await helper.$eval('#helperQuickForm', (e) => e.hidden && getComputedStyle(e).display === 'none'));
+  await helper.click('#helperQuick');
+  check('+ 를 누르면 펼쳐진다',
+    await helper.$eval('#helperQuickForm', (e) => !e.hidden && getComputedStyle(e).display !== 'none'));
+  const vendorOpts = await helper.$$eval('#qVendor option', (e) => e.length);
+  check('업체 목록이 채워진다 (미지정 포함)', vendorOpts === 5, `${vendorOpts}`);
+  check('날짜가 오늘로 미리 채워진다', await helper.$eval('#qDate', (e) => !!e.value));
+
+  await helper.click('button[type="submit"].q-save');
+  check('이름 없이 저장하면 막고 알린다', (await helper.innerText('#qMsg')).length > 0);
+  check('막혔을 때 폼이 닫히지 않는다', await helper.$eval('#helperQuickForm', (e) => !e.hidden));
+
+  await helper.fill('#qName', '비료 수급 확인');
+  await helper.selectOption('#qVendor', { index: 1 });
+  await helper.fill('#qDate', new Date().toISOString().slice(0, 10));
+  await helper.click('button[type="submit"].q-save');
+  await helper.waitForFunction(() => document.getElementById('helperQuickForm').hidden);
+  check('저장하면 폼이 닫힌다', true);
+  const after = await helper.$$eval('.helper-card', (e) => e.length);
+  check('도우미 목록에 곧바로 반영된다', after >= before, `${before} -> ${after}`);
+
+  const saved = await helper.evaluate(async () => {
+    const s = await window.WorkCore.readState();
+    const m = s.manualEvents.find((x) => x.name === '비료 수급 확인');
+    return m ? { name: m.name, vendorId: m.vendorId, date: m.date, completed: m.completed, logs: Array.isArray(m.logs) } : null;
+  });
+  check('일정이 상태에 저장된다', !!saved, JSON.stringify(saved));
+  if (saved) {
+    check('선택한 업체가 함께 저장된다', !!saved.vendorId, saved.vendorId);
+    check('완료되지 않은 상태로 들어간다', saved.completed === false && saved.logs === true);
+  }
+
+  await page.waitForTimeout(600);
+  const inMain = await page.innerText('#dueList');
+  check('본체 목록에도 나타난다', inMain.includes('비료 수급 확인'), inMain.slice(0, 80));
+
+  // Escape 는 도우미를 치우는 게 아니라 폼만 닫는다.
+  await helper.click('#helperQuick');
+  await helper.keyboard.press('Escape');
+  check('Escape 가 폼만 닫는다', await helper.$eval('#helperQuickForm', (e) => e.hidden));
+
+  check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 await browser.close();
 server.close();

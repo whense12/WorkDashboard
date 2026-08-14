@@ -2,7 +2,7 @@
   이 파일은 tools/build-standalone.mjs 가 frontend/ 에서 생성한 결과물입니다.
   직접 수정하지 마세요. frontend/ 를 고친 뒤 npm run build:standalone 을 실행하세요.
 -->
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>D-day 도우미</title><style>
+<!doctype html><html lang="ko" class="helper"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>D-day 도우미</title><style>
 /* 본문 폰트는 앱에 동봉한다. Pretendard 를 지정만 하고 번들하지 않으면 Windows 에서는
    맑은고딕으로 조용히 폴백되어, 의도한 조판이 사용자 화면에 한 번도 나타나지 않는다.
    Pretendard / SIL Open Font License 1.1 — frontend/fonts/LICENSE.txt */
@@ -57,8 +57,36 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .setting-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line)}.setting-actions{display:flex;align-items:center;gap:6px;flex:0 0 auto}.setting-actions select{height:var(--ctl-h-sm);border:1px solid var(--line-strong);border-radius:8px;background:#fff;padding:0 8px;font-size:var(--fs-xs);max-width:15rem}.setting-actions .btn:disabled{opacity:.5;cursor:default}.setting-row:first-child{border-top:0}.setting-copy b{display:block;font-size:var(--fs-sm)}.setting-copy span{display:block;font-size:var(--fs-xs);color:var(--muted);margin-top:2px}.switch{position:relative;width:40px;height:23px}.switch input{opacity:0;width:0;height:0}.slider{position:absolute;inset:0;border-radius:999px;background:#d8ddda;transition:.18s}.slider:before{content:"";position:absolute;width:17px;height:17px;left:3px;top:3px;background:#fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.18);transition:.18s}.switch input:checked+.slider{background:var(--accent)}.switch input:checked+.slider:before{transform:translateX(17px)}
 .toast{position:fixed;right:16px;bottom:16px;z-index:100;background:#1e2124;color:#fff;padding:9px 11px;border-radius:9px;font-size:var(--fs-sm);opacity:0;transform:translateY(6px);pointer-events:none;transition:.18s}.toast.show{opacity:1;transform:translateY(0)}
 .hidden{display:none!important}
-/* helper */
-.helper-body{background:#f4f5f6}.helper-shell{height:100vh;display:flex;flex-direction:column;background:#fff;border:1px solid #e6e8ea;overflow:hidden}.helper-bar{height:42px;display:flex;align-items:center;gap:7px;padding:0 8px;border-bottom:1px solid var(--line);background:#f7f8f9;user-select:none}.helper-bar strong{font-size:var(--fs-sm);flex:1}.helper-bar span{font-size:var(--fs-xs);color:var(--muted)}.helper-close{width:30px;height:30px;border:0;background:transparent;border-radius:7px;font-size:20px;line-height:1}.helper-close:hover{background:#e6e8ea}.helper-list{padding:7px;display:grid;gap:6px;overflow:auto;align-content:start}.helper-card{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;text-align:left}.helper-card:hover{background:#fafbfc}.helper-vendor{display:block;font-size:var(--fs-sm);font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.helper-task{display:block;font-size:var(--fs-xs);font-weight:700;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.helper-sub{display:block;font-size:var(--fs-xs);color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.helper-dday{min-width:56px;height:42px;border-radius:8px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-size:var(--fs-sm);font-weight:900}.helper-card.today .helper-dday{background:var(--warn-soft);color:var(--warn)}.helper-card.overdue .helper-dday{background:var(--danger-soft);color:var(--danger)}.helper-footer{margin-top:auto;padding:6px 8px;border-top:1px solid var(--line);font-size:var(--fs-xs);color:var(--muted);display:flex;justify-content:space-between}
+/* helper — 창이 아니라 바탕화면 악세사리다.
+   네이티브 창은 투명·무장식으로 두고(transparent, decorations:false, shadow:false)
+   둥근 모서리와 그림자를 CSS 로 그린다. 제목표시줄처럼 보이는 요소를 두지 않는다:
+   구분선이 그어진 회색 헤더 하나가 "이건 창이다"로 읽히게 만든다.
+   바깥 여백은 그림자가 그려질 자리이자 실제로 투명한 영역이다. */
+html.helper,body.helper-body{background:transparent}
+.helper-body{padding:11px;overflow:hidden;-webkit-user-select:none;user-select:none;cursor:default}
+.helper-shell{height:calc(100vh - 22px);display:flex;flex-direction:column;
+  background:rgba(255,255,255,.96);border:1px solid rgba(30,33,36,.10);border-radius:18px;
+  box-shadow:0 16px 38px rgba(19,20,22,.30),0 2px 6px rgba(19,20,22,.16);overflow:hidden}
+.helper-grip{display:flex;align-items:center;gap:6px;padding:9px 8px 6px 10px;flex:0 0 auto}
+/* 잡는 자리라는 것만 알려 주는 표시. 창틀이 아니다. */
+.helper-handle{width:4px;height:16px;border-radius:2px;background:rgba(30,33,36,.16);flex:0 0 auto}
+.helper-grip strong{font-size:var(--fs-sm);font-weight:850;letter-spacing:-.01em;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.helper-chip{font-size:var(--fs-xs);font-weight:800;color:var(--muted);background:rgba(30,33,36,.06);border-radius:999px;padding:2px 8px;flex:0 0 auto}
+.helper-icon{width:27px;height:27px;border:0;border-radius:999px;background:transparent;color:var(--muted);font-size:17px;line-height:1;display:grid;place-items:center;flex:0 0 auto;padding:0}
+.helper-icon:hover{background:rgba(30,33,36,.09);color:var(--ink)}
+.helper-icon.add{color:var(--accent);font-size:20px;font-weight:700}
+.helper-icon.add:hover{background:var(--accent-soft)}
+/* 빠른 추가 — 이름과 날짜만. 나머지는 본체에서 채운다. */
+.helper-quick{margin:2px 9px 6px;padding:8px;border-radius:12px;background:var(--accent-soft);display:grid;gap:6px;flex:0 0 auto}
+/* display 를 지정하면 UA 의 [hidden]{display:none} 을 이겨 폼이 늘 펼쳐진 채로 남는다. */
+.helper-quick[hidden]{display:none}
+.helper-quick input,.helper-quick select{width:100%;height:var(--ctl-h-sm);border:1px solid #cdd1d5;border-radius:8px;background:#fff;padding:0 8px;font-size:var(--fs-xs)}
+.helper-quick .q-row{display:grid;grid-template-columns:minmax(0,1fr) 118px;gap:6px}
+.helper-quick .q-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px}
+.helper-quick .q-msg{flex:1;font-size:var(--fs-xs);color:var(--danger);font-weight:750}
+.helper-quick .q-save{height:var(--ctl-h-sm);border:0;border-radius:8px;background:var(--accent);color:#fff;font-size:var(--fs-xs);font-weight:850;padding:0 14px}
+.helper-quick .q-save:hover{background:#083891}
+.helper-list{padding:0 9px 8px;display:grid;gap:6px;overflow:auto;align-content:start}.helper-card{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;text-align:left}.helper-card:hover{background:#fafbfc}.helper-vendor{display:block;font-size:var(--fs-sm);font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.helper-task{display:block;font-size:var(--fs-xs);font-weight:700;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.helper-sub{display:block;font-size:var(--fs-xs);color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.helper-dday{min-width:56px;height:42px;border-radius:8px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-size:var(--fs-sm);font-weight:900}.helper-card.today .helper-dday{background:var(--warn-soft);color:var(--warn)}.helper-card.overdue .helper-dday{background:var(--danger-soft);color:var(--danger)}.helper-footer{margin-top:auto;flex:0 0 auto;padding:7px 12px 9px;font-size:var(--fs-xs);color:var(--muted);display:flex;align-items:center;justify-content:space-between;gap:8px}
 @media(max-width:980px){.workspace{grid-template-columns:300px minmax(0,1fr)}.top-actions .label{display:none}.btn{padding:0 8px}}
 @media(max-width:760px){.app{padding:8px;height:auto}.topbar{height:auto;min-height:54px;flex-wrap:wrap;padding:9px}.top-actions{width:100%;margin-left:0}.workspace{display:block}.sidebar{height:auto;min-height:0;max-height:330px;margin-bottom:8px}.calendar-panel{height:70vh;min-height:520px}.template-layout{grid-template-columns:1fr}.template-list{max-height:180px;overflow:auto}.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}}
 
@@ -88,7 +116,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 #vfList .proc-row{grid-template-columns:58px minmax(0,1fr) 116px 64px}
 #vfList select{height:var(--ctl-h-sm);border:1px solid var(--line);border-radius:7px;padding:0 6px;font-size:var(--fs-xs);background:#fff}
 
-</style></head><body class="helper-body"><main class="helper-shell"><header class="helper-bar" data-tauri-drag-region><strong id="helperTitle" data-tauri-drag-region></strong><span id="helperHorizon" data-tauri-drag-region></span><button class="helper-close" id="helperHide" aria-label="도우미 숨기기">×</button></header><section class="helper-list" id="helperList"></section><footer class="helper-footer"><span id="helperUpdated"></span><button class="link" id="helperOpenMain">대시보드 열기</button></footer></main><script>
+</style></head><body class="helper-body"><main class="helper-shell" data-tauri-drag-region><header class="helper-grip" data-tauri-drag-region><span class="helper-handle" data-tauri-drag-region aria-hidden="true"></span><strong id="helperTitle" data-tauri-drag-region></strong><span class="helper-chip" id="helperHorizon" data-tauri-drag-region></span><button class="helper-icon add" id="helperQuick" title="빠른 일정 추가" aria-label="빠른 일정 추가" aria-expanded="false">+</button><button class="helper-icon" id="helperHide" title="치우기" aria-label="도우미 치우기">×</button></header><form class="helper-quick" id="helperQuickForm" hidden><input class="q-name" id="qName" type="text" autocomplete="off" maxlength="60"><div class="q-row"><select class="q-vendor" id="qVendor"></select><input class="q-date" id="qDate" type="date"></div><div class="q-row q-actions"><span class="q-msg" id="qMsg" role="status"></span><button class="link" id="qCancel" type="button">취소</button><button class="q-save" type="submit">추가</button></div></form><section class="helper-list" id="helperList" data-tauri-drag-region></section><footer class="helper-footer" data-tauri-drag-region><span id="helperUpdated" data-tauri-drag-region></span><button class="link" id="helperOpenMain">대시보드 열기</button></footer></main><script>
 (function(){
   // 저장 키는 v5 그대로 둔다. 키를 올리면 기존 사용자의 v5 데이터가 통째로 고아가 된다.
   // 스키마 버전은 상태 안의 version 필드와 migrate() 가 관리한다.
@@ -551,13 +579,42 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 </script><script>
 (async function(){
  const C=window.WorkCore;let state=await C.initStorage();const $=id=>document.getElementById(id);
- function render(){const cards=C.dueCards(state),L=C.labels(state.terms);document.title=L.upcoming;$('helperTitle').textContent=L.upcoming;$('helperHorizon').textContent=C.horizonLabel(state.settings);$('helperList').innerHTML=cards.length?cards.map(r=>{const v=C.vendor(state,r.vendorId),p=C.project(state,r.projectId);return `<button class="helper-card ${C.ddayClass(r.date)}" data-kind="${r.kind}" data-id="${r.id}"><span><span class="helper-vendor">${C.esc(v?.name||L.noVendor)}</span><span class="helper-task">${C.esc(r.name)}</span><span class="helper-sub">${C.pretty(r.date)}${p?` · ${C.esc(p.name)}`:''}</span></span><span class="helper-dday">${C.ddayLabel(r.date)}</span></button>`}).join(''):`<div class="empty">${C.esc(L.upcoming)}이 없습니다.</div>`;$('helperUpdated').textContent=`${new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})} 갱신`;document.querySelectorAll('.helper-card').forEach(b=>b.addEventListener('click',()=>openInMain(b.dataset.kind,b.dataset.id)))}
+ let L=C.labels(state.terms);
+ function render(){const cards=C.dueCards(state);L=C.labels(state.terms);document.title=L.upcoming;$('helperTitle').textContent=L.upcoming;$('helperHorizon').textContent=C.horizonLabel(state.settings);$('helperList').innerHTML=cards.length?cards.map(r=>{const v=C.vendor(state,r.vendorId),p=C.project(state,r.projectId);return `<button class="helper-card ${C.ddayClass(r.date)}" data-kind="${r.kind}" data-id="${r.id}"><span><span class="helper-vendor">${C.esc(v?.name||L.noVendor)}</span><span class="helper-task">${C.esc(r.name)}</span><span class="helper-sub">${C.pretty(r.date)}${p?` · ${C.esc(p.name)}`:''}</span></span><span class="helper-dday">${C.ddayLabel(r.date)}</span></button>`}).join(''):`<div class="empty" data-tauri-drag-region>${C.esc(L.upcoming)}이 없습니다.<br>위 <b>+</b> 로 바로 추가할 수 있습니다.</div>`;$('helperUpdated').textContent=`${new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})} 갱신`;document.querySelectorAll('.helper-card').forEach(b=>b.addEventListener('click',()=>openInMain(b.dataset.kind,b.dataset.id)))}
  async function invoke(cmd,args){if(C.isTauri())try{return await window.__TAURI__.core.invoke(cmd,args||{})}catch(e){console.warn(e)}}
  async function openMain(){if(C.isTauri())await invoke('show_main');else if(window.opener)window.opener.focus()}
  // 카드 클릭은 본체를 띄우는 데서 끝나면 안 된다. 어떤 일정인지 공유 상태에 적어두면
  // 본체가 그것을 소비해 해당 상세를 연다. 창 간 IPC 채널을 새로 만들 필요가 없다.
  async function openInMain(kind,id){if(!kind||!id){await openMain();return}state.pendingSelection={kind,id};await C.saveState(state);await openMain()}
- $('helperHide').addEventListener('click',async()=>{if(C.isTauri())await invoke('hide_helper');else window.close()});$('helperOpenMain').addEventListener('click',openMain);await C.watchState(v=>{state=v;render()});render();
+
+ // ── 빠른 일정 추가 ────────────────────────────────────────────────────────
+ // 도우미에서 본체를 열고 모달을 찾아 채우는 것은 "일정 하나 적어두기"에 비해 너무 먼 길이다.
+ // 악세사리 자리에서 이름·날짜만으로 끝낼 수 있어야 한다. 나머지는 본체에서 채우면 된다.
+ const quick=$('helperQuickForm');
+ function fillQuick(){
+   $('qName').placeholder=L.fEventName;
+   $('qName').setAttribute('aria-label',L.fEventName);
+   $('qDate').setAttribute('aria-label',`${state.terms.event} 날짜`);
+   $('qVendor').setAttribute('aria-label',L.fVendor);
+   $('qVendor').innerHTML=`<option value="">${C.esc(L.noVendor)}</option>`+
+     state.vendorTemplates.map(v=>`<option value="${C.esc(v.id)}">${C.esc(v.name)}</option>`).join('');
+ }
+ function openQuick(){fillQuick();$('qMsg').textContent='';$('qName').value='';$('qDate').value=C.todayISO();quick.hidden=false;$('helperQuick').setAttribute('aria-expanded','true');$('qName').focus()}
+ function closeQuick(){quick.hidden=true;$('helperQuick').setAttribute('aria-expanded','false')}
+ $('helperQuick').addEventListener('click',()=>{quick.hidden?openQuick():closeQuick()});
+ $('qCancel').addEventListener('click',closeQuick);
+ quick.addEventListener('submit',async e=>{
+   e.preventDefault();
+   const name=$('qName').value.trim(),date=$('qDate').value;
+   if(!name||!date){$('qMsg').textContent=`${L.fEventName}과 날짜를 확인하세요.`;return}
+   state.manualEvents.push({id:C.uid('m'),vendorId:$('qVendor').value||null,projectId:null,date,name,memo:'',completed:false,completedAt:null,logs:[],attachments:[]});
+   await C.saveState(state);
+   closeQuick();render();
+ });
+ // 폼이 열려 있을 때 Escape 는 도우미를 치우는 게 아니라 폼만 닫는다.
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!quick.hidden){e.preventDefault();closeQuick()}});
+
+ $('helperHide').addEventListener('click',async()=>{if(C.isTauri())await invoke('hide_helper');else window.close()});$('helperOpenMain').addEventListener('click',openMain);await C.watchState(v=>{state=v;render();if(!quick.hidden)fillQuick()});render();
 })();
 
 </script></body></html>

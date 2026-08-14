@@ -19,22 +19,25 @@
         "minWidth": 980,
         "minHeight": 650,
         "center": true,
-        "resizable": true
+        "resizable": true,
+        "visible": false
       },
       {
         "label": "helper",
         "title": "D-day 도우미",
         "url": "helper.html",
-        "width": 330,
-        "height": 430,
-        "minWidth": 280,
-        "minHeight": 280,
+        "width": 318,
+        "height": 460,
+        "minWidth": 260,
+        "minHeight": 220,
         "visible": false,
         "resizable": true,
+        "maximizable": false,
         "decorations": false,
+        "transparent": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,
-        "shadow": true
+        "shadow": false
       }
     ],
     "security": {

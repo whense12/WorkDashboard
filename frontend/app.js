@@ -271,4 +271,7 @@
   await C.watchState(v=>{state=v;render();consumePendingSelection()});
   const d=C.parse(C.todayISO());currentMonth=new Date(d.getFullYear(),d.getMonth(),1);render();consumePendingSelection();  // 사용자가 버튼을 눌러야 보호된다면 그건 또 하나의 업무다. 시작할 때 조용히 처리한다.
   (async()=>{try{const moved=await C.migrateAttachmentsToDisk(state);if(moved)console.info('첨부 '+moved+'개를 앱 폴더로 옮겼습니다.');const ab=await C.maybeAutoBackup(state);if(ab&&ab.ok===false)toast('자동 백업에 실패했습니다: '+ab.error);}catch(e){console.warn(e)}})();setTimeout(()=>q('.day.today')?.scrollIntoView({block:'center'}),50);
+  // 본체 창은 visible:false 로 만들어 두고 여기서 띄운다. 먼저 띄우면 아직 아무것도 그리지 않은
+  // WebView2 가 검은 사각형으로 잠깐(느린 PC 에서는 오래) 남는다.
+  if(C.isTauri())requestAnimationFrame(()=>{try{window.__TAURI__.core.invoke('main_ready')}catch(e){console.warn(e)}});
 })();
