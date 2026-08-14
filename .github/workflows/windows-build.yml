@@ -1,49 +1,75 @@
-name: Windows build
+name: Build
 
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [ main, 'claude/**' ]
   pull_request:
     branches: [ main ]
 
 jobs:
-  build-windows:
+  # 프론트엔드 검증은 리눅스에서 돌린다. Windows 러너는 느리고 비싸므로
+  # Tauri 네이티브 빌드에만 쓴다.
+  web:
+    name: 프론트엔드 검증
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: JavaScript 구문 검사
+        run: npm run check
+
+      - name: 단독 실행 HTML 드리프트 검사
+        # web_standalone.html / helper_preview.html 은 frontend/ 에서 생성된 결과물이다.
+        # 손으로 고쳐 원본과 어긋나면 여기서 잡는다.
+        run: |
+          npm run build:standalone
+          git diff --exit-code -- web_standalone.html helper_preview.html \
+            || { echo "::error::생성물이 frontend/ 와 어긋납니다. npm run build:standalone 후 커밋하세요."; exit 1; }
+
+      - name: 브라우저 스모크 테스트
+        run: |
+          npx playwright install --with-deps chromium
+          npm test
+
+  windows:
+    name: Windows NSIS 설치파일
     runs-on: windows-latest
     permissions:
       contents: read
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
 
-      - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ./src-tauri -> target
 
-      - name: Setup Node.js for JS syntax checks
-        uses: actions/setup-node@v6
-        with:
-          node-version: lts/*
+      - name: Tauri CLI 설치
+        # cargo install tauri-cli 는 매 실행마다 소스에서 컴파일해 10분 넘게 걸린다.
+        # npm 배포판은 미리 빌드된 바이너리를 받는다.
+        run: npm install --no-save @tauri-apps/cli@^2
 
-      - name: Validate frontend JavaScript
-        shell: bash
-        run: |
-          node --check frontend/core.js
-          node --check frontend/app.js
-          node --check frontend/helper.js
+      - name: NSIS 설치파일 빌드
+        run: npx tauri build --bundles nsis
 
-      - name: Install Tauri CLI
-        run: cargo install tauri-cli --version "^2" --locked
-
-      - name: Build Windows NSIS installer
-        working-directory: src-tauri
-        run: cargo tauri build --bundles nsis
-
-      - name: Upload installer
+      - name: 설치파일 업로드
         uses: actions/upload-artifact@v4
         with:
           name: work-calendar-helper-windows-x64
