@@ -107,10 +107,13 @@ jobs:
 
       - name: 실행파일을 E2E 로 넘기기
         # E2E 잡이 같은 걸 다시 컴파일하면 20분이 그냥 날아간다.
+        # tauri CLI 가 mainBinaryName 으로 리네임하는지에 기대지 않고 두 이름을 모두 받는다.
         uses: actions/upload-artifact@v4
         with:
           name: app-exe
-          path: src-tauri/target/release/work-calendar-helper.exe
+          path: |
+            src-tauri/target/release/work-calendar-helper.exe
+            src-tauri/target/release/work_calendar_helper.exe
           retention-days: 1
           if-no-files-found: error
 
