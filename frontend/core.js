@@ -182,15 +182,23 @@
     try{const raw=localStorage.getItem(KEY);if(raw)return normalizeState(JSON.parse(raw))}catch(e){}
     try{localStorage.setItem(KEY,JSON.stringify(seed));}catch(e){} memoryState=normalizeState(clone(seed));return clone(memoryState);
   }
+  // Tauri Store 의 onKeyChange 는 "내가 방금 쓴 값"에도 발화한다. 그대로 두면 저장할 때마다
+  // 상태 객체가 통째로 교체되어, 템플릿 편집기처럼 배열을 직접 참조하는 화면에서 입력이 유실된다.
+  // _rev 로 자기가 쓴 변경인지 구분해 걸러낸다.
+  let lastRev=0;
   async function saveState(state){state=normalizeState(state);
+    state._rev=lastRev=(Number(state._rev)||0)+1;
     if(store){await store.set('state',state);await store.save();}
     else {try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){memoryState=clone(state)}}
     try{new BroadcastChannel(KEY).postMessage({type:'state'});}catch(e){}
   }
   async function watchState(cb){
-    if(store?.onKeyChange){try{return await store.onKeyChange('state',v=>v&&cb(v));}catch(e){}}
-    window.addEventListener('storage',e=>{if(e.key===KEY&&e.newValue){try{cb(JSON.parse(e.newValue))}catch(_){}}});
-    try{const bc=new BroadcastChannel(KEY);bc.onmessage=async()=>{cb(await readState())};}catch(e){}
+    // 콜백에는 항상 정규화된 상태를 넘긴다. 이전에는 store 경로에서 원본을 그대로 넘겨
+    // 정규화되지 않은 객체가 화면으로 들어갔다.
+    const relay=v=>{if(!v)return;const s=normalizeState(v);if(s._rev&&s._rev===lastRev)return;cb(s)};
+    if(store?.onKeyChange){try{return await store.onKeyChange('state',relay);}catch(e){}}
+    window.addEventListener('storage',e=>{if(e.key===KEY&&e.newValue){try{relay(JSON.parse(e.newValue))}catch(_){}}});
+    try{const bc=new BroadcastChannel(KEY);bc.onmessage=async()=>{relay(await readState())};}catch(e){}
   }
   async function readState(){if(store){return normalizeState((await store.get('state'))||clone(seed))}try{return normalizeState(JSON.parse(localStorage.getItem(KEY)||'null')||clone(memoryState))}catch(e){return clone(memoryState)}}
   function vendor(state,id){return state.vendorTemplates.find(v=>v.id===id)}

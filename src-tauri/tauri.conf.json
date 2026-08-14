@@ -38,9 +38,18 @@
       }
     ],
     "security": {
-      "csp": null,
+      "_comment": "style-src 의 unsafe-inline 은 app.js 가 만들어내는 인라인 style= 속성 때문이다. 폰트·아이콘·스크립트는 전부 번들되어 있어 'self' 로 충분하다.",
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self'",
+        "style-src": "'self' 'unsafe-inline'",
+        "font-src": "'self'",
+        "img-src": "'self' data: blob:",
+        "connect-src": "'self' ipc: http://ipc.localhost"
+      },
       "capabilities": [
-        "default"
+        "default",
+        "main-files"
       ]
     }
   },

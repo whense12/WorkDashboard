@@ -19,6 +19,12 @@ import { chromium } from 'playwright';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const webRoot = join(root, 'frontend');
+// tauri.conf.json 의 CSP 를 그대로 실어 보낸다. Tauri 를 여기서 띄울 수 없으니
+// 최소한 같은 정책 아래에서 화면이 깨지지 않는지 확인한다(실물 확인은 Windows E2E 에서).
+const CSP = [
+  "default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline'",
+  "font-src 'self'", "img-src 'self' data: blob:", "connect-src 'self'",
+].join('; ');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.svg': 'image/svg+xml', '.png': 'image/png' };
 
 const server = createServer(async (req, res) => {
@@ -27,7 +33,7 @@ const server = createServer(async (req, res) => {
     const file = join(webRoot, rel === '/' ? 'index.html' : rel);
     if (!file.startsWith(webRoot)) { res.writeHead(403).end(); return; }
     const body = await readFile(file);
-    res.writeHead(200, { 'content-type': MIME[extname(file)] || 'application/octet-stream' }).end(body);
+    res.writeHead(200, { 'content-type': MIME[extname(file)] || 'application/octet-stream', 'content-security-policy': CSP }).end(body);
   } catch { res.writeHead(404).end('not found'); }
 });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -50,6 +56,7 @@ async function open({ demo = true, viewport = { width: 1440, height: 900 }, conf
   const dialogs = [];
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
+  page.on('console', (m) => { if (/Content Security Policy/i.test(m.text())) errors.push(`CSP: ${m.text()}`); });
   // 대화상자는 여기 한 곳에서만 처리한다. 테스트마다 따로 붙이면 이중 처리로 터진다.
   // 네이티브 prompt 는 쓰면 안 되는 API 다. 호출되면 즉시 잡아낸다.
   page.on('dialog', async (d) => {
@@ -563,6 +570,61 @@ console.log('\n[19] 첨부 실물이 없을 때 — 파괴적이지 않게 알�
   check('안내 문구가 뜬다', (await page.innerText('#toast')).includes('찾을 수 없습니다'), await page.innerText('#toast'));
   const stillListed = await page.evaluate(async () => (await window.WorkCore.readState()).projects.find((p) => p.id === 'demo-p1').steps.flatMap((x) => x.attachments).length);
   check('메타데이터를 멋대로 지우지 않는다', stillListed === 1, `남은 항목 ${stillListed}`);
+  check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
+console.log('\n[20] 모달 접근성 — 포커스가 들어가고, 갇히고, 돌아온다 (발주서 §17.2-4)');
+{
+  const { ctx, page, errors } = await open();
+  const inside = (sel) => page.evaluate((s) => !!document.activeElement?.closest(s), sel);
+
+  await page.click('.due-card:has-text("대한건설")');
+  await page.waitForSelector('#detailBody .step');
+  check('열면 포커스가 모달 안으로 들어간다', await inside('#detailModal'));
+
+  // Tab 을 충분히 눌러도 모달 밖으로 새지 않는다.
+  let leaked = false;
+  for (let i = 0; i < 40; i++) { await page.keyboard.press('Tab'); if (!(await inside('#detailModal'))) { leaked = true; break; } }
+  check('Tab 이 모달 안에 갇힌다 (40회)', !leaked);
+  await page.keyboard.down('Shift');
+  for (let i = 0; i < 10; i++) { await page.keyboard.press('Tab'); if (!(await inside('#detailModal'))) { leaked = true; break; } }
+  await page.keyboard.up('Shift');
+  check('Shift+Tab 도 갇힌다', !leaked);
+
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+  check('Escape 로 닫힌다', !(await page.$eval('#detailModal', (e) => e.classList.contains('show'))));
+  check('닫으면 포커스가 눌렀던 카드로 돌아간다', await inside('.due-card'), await page.evaluate(() => document.activeElement?.className || '(none)'));
+
+  // 상세 위에 날짜 모달을 겹쳐 띄우고 Escape — 나중에 연 쪽이 닫혀야 한다.
+  await page.click('.due-card:has-text("고성건설")');
+  await page.waitForSelector('#changeDateBtn:not(.hidden)');
+  await page.click('#changeDateBtn');
+  await page.waitForTimeout(200);
+  check('겹쳐 열면 위쪽 모달로 포커스가 간다', await inside('#dateModal'));
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+  const st = await page.evaluate(() => ({ date: document.getElementById('dateModal').classList.contains('show'), detail: document.getElementById('detailModal').classList.contains('show') }));
+  check('Escape 가 나중에 연 모달만 닫는다', st.date === false && st.detail === true, JSON.stringify(st));
+  check('아래 모달로 포커스가 돌아온다', await inside('#detailModal'));
+  check('콘솔/페이지/CSP 위반 없음', errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
+console.log('\n[21] CSP — tauri.conf.json 과 같은 정책 아래에서 화면이 깨지지 않는다 (§26)');
+{
+  // 서버가 실제 CSP 헤더를 실어 보낸다. 위반은 open() 의 콘솔 수집에서 errors 로 들어온다.
+  const { ctx, page, errors } = await open();
+  check('설정한 CSP 가 실제로 적용된다', (await page.evaluate(() => performance.getEntriesByType('navigation').length >= 0)) === true);
+  await page.click('.due-card:has-text("대한건설")');
+  await page.waitForSelector('#detailBody .step');
+  await page.click('#settingsBtn').catch(() => {});
+  await page.waitForTimeout(300);
+  await page.keyboard.press('Escape');
+  const font = await page.evaluate(async () => { await document.fonts.ready; return [...document.fonts].some((f) => f.family.includes('Pretendard') && f.status === 'loaded'); });
+  check('번들 폰트가 CSP 아래에서 로드된다', font);
+  check('CSP 위반 0건', errors.filter((e) => e.startsWith('CSP:')).length === 0, errors.filter((e) => e.startsWith('CSP:')).join(' | '));
   check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
   await ctx.close();
 }

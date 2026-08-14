@@ -104,28 +104,28 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   </section>
 </main></div>
 
-<div class="modal-bg" id="scheduleModal"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="scheduleTitle"><div class="modal-head"><h2 id="scheduleTitle">일정 추가</h2><button class="close" data-close="scheduleModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body"><div class="form-grid">
+<div class="modal-bg" id="scheduleModal"><section class="modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="scheduleTitle"><div class="modal-head"><h2 id="scheduleTitle">일정 추가</h2><button class="close" data-close="scheduleModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body"><div class="form-grid">
   <div class="field"><label for="sDate">날짜</label><input id="sDate" type="date"></div><div class="field"><label for="sVendor">업체</label><select id="sVendor"></select></div>
   <div class="field full"><label for="sProject">연결 업무</label><select id="sProject"></select><div class="field-note">업무와 무관한 일정이면 ‘일반 일정’을 선택합니다.</div></div>
   <div class="field full"><label for="sName">일정명</label><input id="sName" placeholder="예: 현장확인, 서류제출, 계약의뢰…"></div>
   <div class="field full"><label for="sMemo">메모</label><textarea id="sMemo" placeholder="필요한 내용만 간단히 기록"></textarea></div>
 </div></div><div class="modal-foot"><button class="btn" data-close="scheduleModal">취소</button><button class="btn primary" id="saveScheduleBtn">일정 저장</button></div></section></div>
 
-<div class="modal-bg" id="workModal"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="workTitle"><div class="modal-head"><h2 id="workTitle">업무 추가</h2><button class="close" data-close="workModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body"><div class="form-grid">
+<div class="modal-bg" id="workModal"><section class="modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="workTitle"><div class="modal-head"><h2 id="workTitle">업무 추가</h2><button class="close" data-close="workModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body"><div class="form-grid">
   <div class="field"><label for="wVendor">업체 템플릿</label><select id="wVendor"></select></div><div class="field"><label for="wTemplate">업무 템플릿</label><select id="wTemplate"></select></div>
   <div class="field full"><label for="wProject">업무명 / 공사명</label><input id="wProject" placeholder="예: ○○배수로 정비공사"></div>
   <div class="field"><label for="wFirstDate">첫 일정 날짜</label><input id="wFirstDate" type="date"></div><div class="field"><label for="wMemo">메모</label><input id="wMemo" placeholder="선택"></div>
 </div></div><div class="modal-foot"><button class="btn" data-close="workModal">취소</button><button class="btn primary" id="saveWorkBtn">업무 등록</button></div></section></div>
 
-<div class="modal-bg" id="detailModal"><section class="modal detail-modal" role="dialog" aria-modal="true" aria-labelledby="detailTitle"><div class="modal-head"><h2 id="detailTitle">일정 상세</h2><button class="close" data-close="detailModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body" id="detailBody"></div><div class="modal-foot"><button class="btn danger hidden" id="deleteEventBtn">일정 삭제</button><button class="btn hidden" id="reopenBtn">완료 취소</button><button class="btn" id="changeDateBtn">날짜 변경</button><button class="btn primary" id="completeBtn">OK 완료</button></div></section></div>
+<div class="modal-bg" id="detailModal"><section class="modal detail-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="detailTitle"><div class="modal-head"><h2 id="detailTitle">일정 상세</h2><button class="close" data-close="detailModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body" id="detailBody"></div><div class="modal-foot"><button class="btn danger hidden" id="deleteEventBtn">일정 삭제</button><button class="btn hidden" id="reopenBtn">완료 취소</button><button class="btn" id="changeDateBtn">날짜 변경</button><button class="btn primary" id="completeBtn">OK 완료</button></div></section></div>
 
-<div class="modal-bg" id="dateModal"><section class="modal narrow" role="dialog" aria-modal="true" aria-labelledby="dateTitle"><div class="modal-head"><h2 id="dateTitle">날짜 변경</h2><button class="close" data-close="dateModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body"><div class="field full"><label for="dNewDate">새 날짜</label><input id="dNewDate" type="date"></div><div class="field-note" id="dateModalNote"></div></div><div class="modal-foot"><button class="btn" data-close="dateModal">취소</button><button class="btn primary" id="saveDateBtn">날짜 저장</button></div></section></div>
+<div class="modal-bg" id="dateModal"><section class="modal narrow" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="dateTitle"><div class="modal-head"><h2 id="dateTitle">날짜 변경</h2><button class="close" data-close="dateModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body"><div class="field full"><label for="dNewDate">새 날짜</label><input id="dNewDate" type="date"></div><div class="field-note" id="dateModalNote"></div></div><div class="modal-foot"><button class="btn" data-close="dateModal">취소</button><button class="btn primary" id="saveDateBtn">날짜 저장</button></div></section></div>
 
-<div class="modal-bg" id="templateModal"><section class="modal wide" role="dialog" aria-modal="true" aria-labelledby="templateTitle"><div class="modal-head"><h2 id="templateTitle">템플릿 관리</h2><button class="close" data-close="templateModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body"><div class="tabs"><button class="tab active" data-template-tab="vendor">업체 템플릿</button><button class="tab" data-template-tab="work">업무 템플릿</button></div><div id="vendorTemplatePane"></div><div id="workTemplatePane" class="hidden"></div></div><div class="modal-foot"><button class="btn" data-close="templateModal">닫기</button></div></section></div>
+<div class="modal-bg" id="templateModal"><section class="modal wide" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="templateTitle"><div class="modal-head"><h2 id="templateTitle">템플릿 관리</h2><button class="close" data-close="templateModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body"><div class="tabs"><button class="tab active" data-template-tab="vendor">업체 템플릿</button><button class="tab" data-template-tab="work">업무 템플릿</button></div><div id="vendorTemplatePane"></div><div id="workTemplatePane" class="hidden"></div></div><div class="modal-foot"><button class="btn" data-close="templateModal">닫기</button></div></section></div>
 
-<div class="modal-bg" id="projectStepsModal"><section class="modal wide" role="dialog" aria-modal="true" aria-labelledby="projectStepsTitle"><div class="modal-head"><h2 id="projectStepsTitle">업무 절차 편집</h2><button class="close" data-close="projectStepsModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body"><div class="proc-list" id="projectStepsList"></div><button class="btn" id="projectAddStep" style="margin-top:8px">+ 단계 추가</button></div><div class="modal-foot"><button class="btn" data-close="projectStepsModal">취소</button><button class="btn primary" id="saveProjectSteps">절차 저장</button></div></section></div>
+<div class="modal-bg" id="projectStepsModal"><section class="modal wide" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="projectStepsTitle"><div class="modal-head"><h2 id="projectStepsTitle">업무 절차 편집</h2><button class="close" data-close="projectStepsModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body"><div class="proc-list" id="projectStepsList"></div><button class="btn" id="projectAddStep" style="margin-top:8px">+ 단계 추가</button></div><div class="modal-foot"><button class="btn" data-close="projectStepsModal">취소</button><button class="btn primary" id="saveProjectSteps">절차 저장</button></div></section></div>
 
-<div class="modal-bg" id="settingsModal"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle"><div class="modal-head"><h2 id="settingsTitle">도우미 설정</h2><button class="close" data-close="settingsModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body">
+<div class="modal-bg" id="settingsModal"><section class="modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="settingsTitle"><div class="modal-head"><h2 id="settingsTitle">도우미 설정</h2><button class="close" data-close="settingsModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body">
   <div class="setting-row"><div class="setting-copy"><b>D-day 도우미 표시</b><span>작은 창으로 업체별 가까운 일정을 띄웁니다.</span></div><button class="btn" id="settingsOpenHelper">도우미 열기</button></div>
   <div class="setting-row"><div class="setting-copy"><b>항상 위에 표시</b><span>데스크톱 앱에서 다른 창 위에 유지합니다.</span></div><label class="switch"><input id="alwaysOnTop" type="checkbox"><span class="slider"></span></label></div>
   <div class="setting-row"><div class="setting-copy"><b>컴퓨터 시작 시 자동 실행</b><span>Tauri 데스크톱 앱에서 지원됩니다.</span></div><label class="switch"><input id="autostart" type="checkbox"><span class="slider"></span></label></div>
@@ -500,15 +500,23 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     try{const raw=localStorage.getItem(KEY);if(raw)return normalizeState(JSON.parse(raw))}catch(e){}
     try{localStorage.setItem(KEY,JSON.stringify(seed));}catch(e){} memoryState=normalizeState(clone(seed));return clone(memoryState);
   }
+  // Tauri Store 의 onKeyChange 는 "내가 방금 쓴 값"에도 발화한다. 그대로 두면 저장할 때마다
+  // 상태 객체가 통째로 교체되어, 템플릿 편집기처럼 배열을 직접 참조하는 화면에서 입력이 유실된다.
+  // _rev 로 자기가 쓴 변경인지 구분해 걸러낸다.
+  let lastRev=0;
   async function saveState(state){state=normalizeState(state);
+    state._rev=lastRev=(Number(state._rev)||0)+1;
     if(store){await store.set('state',state);await store.save();}
     else {try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){memoryState=clone(state)}}
     try{new BroadcastChannel(KEY).postMessage({type:'state'});}catch(e){}
   }
   async function watchState(cb){
-    if(store?.onKeyChange){try{return await store.onKeyChange('state',v=>v&&cb(v));}catch(e){}}
-    window.addEventListener('storage',e=>{if(e.key===KEY&&e.newValue){try{cb(JSON.parse(e.newValue))}catch(_){}}});
-    try{const bc=new BroadcastChannel(KEY);bc.onmessage=async()=>{cb(await readState())};}catch(e){}
+    // 콜백에는 항상 정규화된 상태를 넘긴다. 이전에는 store 경로에서 원본을 그대로 넘겨
+    // 정규화되지 않은 객체가 화면으로 들어갔다.
+    const relay=v=>{if(!v)return;const s=normalizeState(v);if(s._rev&&s._rev===lastRev)return;cb(s)};
+    if(store?.onKeyChange){try{return await store.onKeyChange('state',relay);}catch(e){}}
+    window.addEventListener('storage',e=>{if(e.key===KEY&&e.newValue){try{relay(JSON.parse(e.newValue))}catch(_){}}});
+    try{const bc=new BroadcastChannel(KEY);bc.onmessage=async()=>{relay(await readState())};}catch(e){}
   }
   async function readState(){if(store){return normalizeState((await store.get('state'))||clone(seed))}try{return normalizeState(JSON.parse(localStorage.getItem(KEY)||'null')||clone(memoryState))}catch(e){return clone(memoryState)}}
   function vendor(state,id){return state.vendorTemplates.find(v=>v.id===id)}
@@ -678,7 +686,34 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   const C=window.WorkCore;let state=await C.initStorage();let currentMonth=new Date(2026,7,1);let selectedRecord=null;let selectedProjectId=null;let templateTab='vendor';let selectedVendorTemplateId=null;let selectedWorkTemplateId=null;let projectStepsDraft=[];
   const $=id=>document.getElementById(id);const q=(s,r=document)=>r.querySelector(s);const qa=(s,r=document)=>[...r.querySelectorAll(s)];
   function toast(t){const el=$('toast');el.textContent=t;el.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),1700)}
-  function show(id){$(id).classList.add('show')}function hide(id){$(id).classList.remove('show')}
+  // ── 모달 포커스 관리 (발주서 §17.2-4) ────────────────────────────────────
+  // 열린 순서를 스택으로 들고 있어야 한다. 이전에는 Escape 가 DOM 순서상 마지막 모달을
+  // 닫아서, 상세 위에 다른 모달이 떠 있으면 엉뚱한 창이 닫혔다.
+  const modalStack=[];
+  const FOCUSABLE='a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+  const focusables=root=>[...root.querySelectorAll(FOCUSABLE)].filter(el=>el.offsetWidth||el.offsetHeight||el.getClientRects().length);
+  function show(id){
+    const bg=$(id);if(bg.classList.contains('show'))return;
+    modalStack.push({id,returnTo:document.activeElement});
+    bg.classList.add('show');
+    (focusables(bg)[0]||bg.querySelector('.modal'))?.focus?.();
+  }
+  function hide(id){
+    const bg=$(id);if(!bg.classList.contains('show'))return;
+    bg.classList.remove('show');
+    const i=modalStack.findIndex(m=>m.id===id);
+    const entry=i>=0?modalStack.splice(i,1)[0]:null;
+    if(entry?.returnTo?.isConnected)entry.returnTo.focus?.();
+  }
+  // Tab 이 모달 밖으로 새어 나가지 않게 가둔다.
+  document.addEventListener('keydown',e=>{
+    if(e.key!=='Tab'||!modalStack.length)return;
+    const f=focusables($(modalStack[modalStack.length-1].id));
+    if(!f.length){e.preventDefault();return}
+    const first=f[0],last=f[f.length-1];
+    if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}
+    else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+  });
   async function persist(msg){await C.saveState(state);render();if(msg)toast(msg)}
   function render(){renderHorizon();renderDue();renderCalendar();fillSelects();renderTemplatePanes();}
   function renderHorizon(){const s=state.settings;$('horizonSelect').value=s.horizon;$('horizonCustom').value=s.customHorizon;$('horizonCustom').classList.toggle('hidden',s.horizon!=='custom')}
@@ -833,7 +868,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   $('horizonSelect').addEventListener('change',async e=>{state.settings.horizon=e.target.value;$('horizonCustom').classList.toggle('hidden',e.target.value!=='custom');await persist()});$('horizonCustom').addEventListener('change',async e=>{state.settings.customHorizon=Math.max(1,Number(e.target.value||1));await persist()});
   $('prevMonth').addEventListener('click',()=>{currentMonth=new Date(currentMonth.getFullYear(),currentMonth.getMonth()-1,1);renderCalendar()});$('nextMonth').addEventListener('click',()=>{currentMonth=new Date(currentMonth.getFullYear(),currentMonth.getMonth()+1,1);renderCalendar()});$('todayBtn').addEventListener('click',()=>{const d=C.parse(C.todayISO());currentMonth=new Date(d.getFullYear(),d.getMonth(),1);renderCalendar();setTimeout(()=>q('.day.today')?.scrollIntoView({block:'center',behavior:'smooth'}),10)});
   $('addScheduleBtn').addEventListener('click',()=>openSchedule());$('saveScheduleBtn').addEventListener('click',saveSchedule);$('sVendor').addEventListener('change',updateProjectSelect);$('addWorkBtn').addEventListener('click',openWork);$('saveWorkBtn').addEventListener('click',saveWork);$('templateBtn').addEventListener('click',openTemplates);$('settingsBtn').addEventListener('click',openSettings);$('helperBtn').addEventListener('click',openHelper);$('settingsOpenHelper').addEventListener('click',openHelper);$('alwaysOnTop').addEventListener('change',setTop);$('autostart').addEventListener('change',setAutostart);$('completeBtn').addEventListener('click',completeSelected);$('changeDateBtn').addEventListener('click',openDateModal);$('saveDateBtn').addEventListener('click',saveSelectedDate);$('reopenBtn').addEventListener('click',reopenSelected);$('deleteEventBtn').addEventListener('click',deleteSelected);$('demoToggleBtn').addEventListener('click',toggleDemo);$('backupNowBtn').addEventListener('click',backupNow);$('backupFolderBtn').addEventListener('click',async()=>{if(!await C.revealBackups())toast('이 환경에서는 폴더를 열 수 없습니다.')});$('restoreBtn').addEventListener('click',restoreFromList);$('restoreFile').addEventListener('change',restoreFromFile);$('projectAddStep').addEventListener('click',()=>{projectStepsDraft.push({id:null,name:'새 단계',offset:1,dueDate:null,completed:false,completedAt:null});renderProjectSteps()});$('saveProjectSteps').addEventListener('click',saveProjectSteps);
-  qa('[data-template-tab]').forEach(b=>b.addEventListener('click',()=>{templateTab=b.dataset.templateTab;qa('[data-template-tab]').forEach(x=>x.classList.toggle('active',x===b));$('vendorTemplatePane').classList.toggle('hidden',templateTab!=='vendor');$('workTemplatePane').classList.toggle('hidden',templateTab!=='work')}));qa('[data-close]').forEach(b=>b.addEventListener('click',()=>hide(b.dataset.close)));qa('.modal-bg').forEach(bg=>bg.addEventListener('mousedown',e=>{if(e.target===bg)hide(bg.id)}));document.addEventListener('keydown',e=>{if(e.key==='Escape'){const open=qa('.modal-bg.show').pop();if(open)hide(open.id)}});
+  qa('[data-template-tab]').forEach(b=>b.addEventListener('click',()=>{templateTab=b.dataset.templateTab;qa('[data-template-tab]').forEach(x=>x.classList.toggle('active',x===b));$('vendorTemplatePane').classList.toggle('hidden',templateTab!=='vendor');$('workTemplatePane').classList.toggle('hidden',templateTab!=='work')}));qa('[data-close]').forEach(b=>b.addEventListener('click',()=>hide(b.dataset.close)));qa('.modal-bg').forEach(bg=>bg.addEventListener('mousedown',e=>{if(e.target===bg)hide(bg.id)}));document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modalStack.length)hide(modalStack[modalStack.length-1].id)});
   await C.watchState(v=>{state=v;render();consumePendingSelection()});
   const d=C.parse(C.todayISO());currentMonth=new Date(d.getFullYear(),d.getMonth(),1);render();consumePendingSelection();  // 사용자가 버튼을 눌러야 보호된다면 그건 또 하나의 업무다. 시작할 때 조용히 처리한다.
   (async()=>{try{const moved=await C.migrateAttachmentsToDisk(state);if(moved)console.info('첨부 '+moved+'개를 앱 폴더로 옮겼습니다.');const ab=await C.maybeAutoBackup(state);if(ab&&ab.ok===false)toast('자동 백업에 실패했습니다: '+ab.error);}catch(e){console.warn(e)}})();setTimeout(()=>q('.day.today')?.scrollIntoView({block:'center'}),50);
