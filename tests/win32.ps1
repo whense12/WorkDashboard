@@ -7,12 +7,12 @@
 param(
   [Parameter(Mandatory = $true)][ValidateSet('topmost', 'move', 'rect', 'autostart', 'listwindows')][string]$Action,
   [ValidateSet('main', 'helper')][string]$Kind = 'main',
+  [string]$ProcessName = 'work-calendar-helper',
   [int]$X = 0,
   [int]$Y = 0
 )
 
 $ErrorActionPreference = 'Stop'
-$ProcessName = 'work-calendar-helper'
 
 Add-Type @"
 using System;

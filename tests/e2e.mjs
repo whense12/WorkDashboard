@@ -17,7 +17,7 @@
  */
 import { spawn, execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -27,8 +27,16 @@ if (process.platform !== 'win32') {
   process.exit(0);
 }
 
-const APP = process.argv[2] || join(root, 'src-tauri', 'target', 'release', 'work-calendar-helper.exe');
-if (!existsSync(APP)) { console.error(`빌드된 실행파일이 없습니다: ${APP}`); process.exit(1); }
+// tauri CLI 는 mainBinaryName 으로 리네임하지만 순수 cargo build 는 Cargo 패키지명을 쓴다.
+// 어느 쪽으로 빌드했든 찾도록 후보를 훑는다.
+const RELEASE = join(root, 'src-tauri', 'target', 'release');
+const APP = process.argv[2]
+  || ['work-calendar-helper.exe', 'work_calendar_helper.exe'].map((n) => join(RELEASE, n)).find(existsSync);
+if (!APP || !existsSync(APP)) {
+  console.error(`빌드된 실행파일을 찾지 못했습니다. 확인한 곳: ${RELEASE}`);
+  process.exit(1);
+}
+const PROC = basename(APP).replace(/\.exe$/i, '');
 
 const IDENTIFIER = 'kr.go.goseong.work-calendar-helper';
 const APPDATA = join(process.env.LOCALAPPDATA, IDENTIFIER);
@@ -52,7 +60,7 @@ const PWSH = (() => {
 })();
 const ps = (action, extra = []) => {
   try {
-    return execFileSync(PWSH, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', join(root, 'tests', 'win32.ps1'), '-Action', action, ...extra], { encoding: 'utf8' }).trim();
+    return execFileSync(PWSH, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', join(root, 'tests', 'win32.ps1'), '-Action', action, '-ProcessName', PROC, ...extra], { encoding: 'utf8' }).trim();
   } catch (e) { return `PSERROR:${e.message}`; }
 };
 const psRaw = (script) => {
@@ -103,7 +111,7 @@ async function waitReady(timeoutMs = 30000) {
 }
 
 // ── tauri-driver 기동 ────────────────────────────────────────────────────────
-console.log(`대상 실행파일: ${APP}`);
+console.log(`대상 실행파일: ${APP} (프로세스 ${PROC})`);
 console.log(`앱 데이터 폴더: ${APPDATA}`);
 psRaw(`if (Test-Path '${APPDATA}') { Remove-Item -Recurse -Force '${APPDATA}' }`); // 깨끗한 상태에서 시작
 const driver = spawn('tauri-driver', [], { stdio: ['ignore', 'inherit', 'inherit'] });
