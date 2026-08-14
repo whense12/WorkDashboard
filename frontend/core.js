@@ -43,6 +43,11 @@
       app:T.app,
       addProject:`${P} 추가`, addEvent:`${E} 추가`,
       upcoming:`다가오는 ${E}`,
+      viewCalendar:'캘린더', viewVendor:`${V}별`,
+      boardCaption:`${V}별로 지금 어디까지 왔는지 보여줍니다. 줄을 누르면 ${P} 목록이 펼쳐집니다.`,
+      boardOpen:`진행 중 ${P}`, boardDone:`완료 ${P}`, boardOverdue:'지연',
+      boardNoDate:'날짜 미정', boardProgress:`${S} 진행`,
+      boardEmpty:`진행 중인 ${j(P,['이','가'])} 없습니다.`,
       sideCaption:`${V}별 가장 가까운 ${j(E,['이','가'])} 날짜순으로 표시됩니다.`,
       calHint:`빈 날짜를 클릭하면 ${E} 추가`,
       eventModalTitle:`${E} 추가`, saveEvent:`${E} 저장`,
@@ -313,6 +318,54 @@
     groups.forEach((arr,vendorId)=>{arr.sort((a,b)=>a.date.localeCompare(b.date));const first=arr[0],d=diffDays(first.date);if(d<=max||d<0||max===Infinity)cards.push({...first,extra:arr.length-1,dday:d})});
     return cards.sort((a,b)=>a.date.localeCompare(b.date));
   }
+  // ── 업체별 요약 ──────────────────────────────────────────────────────────
+  // 대시보드의 두 번째 축. 좌측 레일과 캘린더가 "언제"를 묻는다면 여기는
+  // "이 업체는 지금 어디까지 왔나"를 묻는다. 업체가 전화를 걸어 왔을 때 필요한 화면이다.
+  //
+  // 집계를 화면 코드에 두면 좌측 레일과 숫자가 조용히 어긋난다.
+  // eventRecords() 와 같은 규칙 위에서 계산한다.
+  function vendorSummaries(state){
+    const byVendor=new Map();
+    const bucket=id=>{
+      const key=id||'';
+      if(!byVendor.has(key))byVendor.set(key,{vendorId:id||null,vendor:vendor(state,id)||null,
+        items:[],openCount:0,doneCount:0,stepsDone:0,stepsTotal:0,overdueCount:0,next:null});
+      return byVendor.get(key);
+    };
+    state.projects.forEach(p=>{
+      const b=bucket(p.vendorId),steps=p.steps||[];
+      const done=steps.filter(s=>s.completed).length;
+      b.stepsDone+=done;b.stepsTotal+=steps.length;
+      const cur=currentStep(p);
+      if(cur)b.openCount++;else b.doneCount++;
+      // 클릭 대상은 "아직 안 끝났고 날짜가 잡힌 단계". 날짜 미정이면 열 상세가 없다.
+      const rec=steps.find(s=>!s.completed&&s.dueDate);
+      b.items.push({type:'project',id:p.id,name:p.name,projectName:null,
+        stepName:cur?cur.name:null,date:rec?rec.dueDate:null,completed:!cur,
+        stepsDone:done,stepsTotal:steps.length,
+        record:rec?{kind:'step',id:rec.id}:null});
+    });
+    state.manualEvents.forEach(m=>{
+      const b=bucket(m.vendorId),p=project(state,m.projectId);
+      b.items.push({type:'manual',id:m.id,name:m.name,projectName:p?p.name:null,
+        stepName:null,date:m.date||null,completed:!!m.completed,
+        stepsDone:0,stepsTotal:0,record:{kind:'manual',id:m.id}});
+    });
+    eventRecords(state).filter(e=>!e.completed&&e.date).forEach(e=>{
+      const b=byVendor.get(e.vendorId||'');if(!b)return;
+      if(diffDays(e.date)<0)b.overdueCount++;
+      if(!b.next||e.date<b.next.date)b.next=e;
+    });
+    const rank=i=>i.completed?2:(i.date?0:1);   // 날짜 있는 진행 건 → 날짜 미정 → 완료
+    const rows=[...byVendor.values()].filter(b=>b.items.length);
+    rows.forEach(b=>b.items.sort((a,c)=>rank(a)-rank(c)||String(a.date||'').localeCompare(String(c.date||''))));
+    // 급한 순으로 세운다: 지연이 있는 업체 → 가장 가까운 일정이 이른 업체 → 이름순
+    return rows.sort((a,b)=>
+      (b.overdueCount>0)-(a.overdueCount>0)
+      ||(a.next?0:1)-(b.next?0:1)
+      ||String(a.next?.date||'').localeCompare(String(b.next?.date||''))
+      ||String(a.vendor?.name||'').localeCompare(String(b.vendor?.name||'')));
+  }
   function ddayLabel(date){const n=diffDays(date);if(n===0)return'D-DAY';return n>0?`D-${n}`:`D+${Math.abs(n)}`}
   function ddayClass(date){const n=diffDays(date);return n<0?'overdue':n===0?'today':''}
   function projectFromTemplate(template,vendorId,name,firstDate,memo=''){
@@ -452,7 +505,7 @@
     if(moved)await saveState(state);
     return moved;
   }
-  window.WorkCore={KEY,STATE_VERSION,seed,defaultTerms,defaultVendorFields,labels,josa,demoData,hasDemoData,clone,uid,todayISO,parse,iso,addDays,diffDays,pretty,esc,isTauri,nativeFiles,migrate,normalizeState,initStorage,saveState,watchState,readState,vendor,project,currentStep,eventRecords,dueCards,ddayLabel,ddayClass,horizonDays,horizonLabel,projectFromTemplate,completeEvent,reopenEvent,
+  window.WorkCore={KEY,STATE_VERSION,seed,defaultTerms,defaultVendorFields,labels,josa,demoData,hasDemoData,clone,uid,todayISO,parse,iso,addDays,diffDays,pretty,esc,isTauri,nativeFiles,migrate,normalizeState,initStorage,saveState,watchState,readState,vendor,project,currentStep,eventRecords,dueCards,ddayLabel,ddayClass,horizonDays,horizonLabel,vendorSummaries,projectFromTemplate,completeEvent,reopenEvent,
     putAttachment,readAttachment,deleteAttachment,attachmentsOf,purgeAttachments,revealAttachment,migrateAttachmentsToDisk,formatBytes,
     buildBackup,readBackup,restoreBackup,writeBackupFile,listBackups,readBackupFile,rotateBackups,revealBackups,maybeAutoBackup};
 })();

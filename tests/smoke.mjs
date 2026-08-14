@@ -367,26 +367,27 @@ console.log('\n[13] 예시 데이터 넣기/빼기 — 실제 업무는 건드�
   await ctx.close();
 }
 
+// 실제 렌더된 글자 크기를 재는 브라우저 측 함수. [14] 와 [26] 이 함께 쓴다.
+const FLOOR = 13;
+const measure = () => {
+  const bad = new Map();
+  for (const el of document.querySelectorAll('body *')) {
+    if (!el.offsetParent && el !== document.body) continue;      // 숨은 요소 제외
+    const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+    if (!own) continue;                                          // 자기 텍스트가 있는 요소만
+    const px = parseFloat(getComputedStyle(el).fontSize);
+    if (px < 13) {
+      const key = `${el.tagName.toLowerCase()}.${el.className || '(no class)'}`;
+      if (!bad.has(key)) bad.set(key, px);
+    }
+  }
+  return [...bad].map(([k, v]) => `${k} = ${v}px`);
+};
+
 console.log('\n[14] 타이포그래피 하한 — 화면의 모든 글자가 13px 이상 (발주서 §19.3 / KRDS PC 최소 본문)');
 {
   // 이 프로젝트가 거부당한 핵심 이유가 마이크로텍스트였다. 회귀를 눈으로 잡을 수 없으니
-  // 실제 렌더된 글자 크기를 재서 고정한다.
-  const FLOOR = 13;
-  const measure = () => {
-    const bad = new Map();
-    for (const el of document.querySelectorAll('body *')) {
-      if (!el.offsetParent && el !== document.body) continue;      // 숨은 요소 제외
-      const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
-      if (!own) continue;                                          // 자기 텍스트가 있는 요소만
-      const px = parseFloat(getComputedStyle(el).fontSize);
-      if (px < 13) {
-        const key = `${el.tagName.toLowerCase()}.${el.className || '(no class)'}`;
-        if (!bad.has(key)) bad.set(key, px);
-      }
-    }
-    return [...bad].map(([k, v]) => `${k} = ${v}px`);
-  };
-
+  // 재서 고정한다.
   const { ctx, page, errors } = await open();
   const main = await page.evaluate(measure);
   check(`메인 화면에 ${FLOOR}px 미만 텍스트가 없다`, main.length === 0, main.join(' | '));
@@ -846,6 +847,99 @@ console.log('\n[25] 도우미 — 창이 아니라 악세사리로 보이고, �
   await helper.click('#helperQuick');
   await helper.keyboard.press('Escape');
   check('Escape 가 폼만 닫는다', await helper.$eval('#helperQuickForm', (e) => e.hidden));
+
+  check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
+console.log('\n[26] 대시보드 업체별 요약 — 캘린더와 토글로 오가고, 펼쳐서 상세까지 간다');
+{
+  const { ctx, page, errors } = await open();
+
+  const shown = () => page.evaluate(() => ({
+    cal: !document.getElementById('calendarScroll').classList.contains('hidden'),
+    board: !document.getElementById('vendorBoard').classList.contains('hidden'),
+    nav: !document.getElementById('calNav').classList.contains('hidden'),
+    hint: document.getElementById('calHint').textContent,
+  }));
+  const before = await shown();
+  check('처음에는 캘린더다 (기존 화면이 말없이 바뀌지 않는다)', before.cal && !before.board, JSON.stringify(before));
+
+  await page.click('[data-board="vendor"]');
+  await page.waitForSelector('.board-row');
+  const after = await shown();
+  check('업체별로 바뀐다', after.board && !after.cal, JSON.stringify(after));
+  check('업체별에서는 월 이동이 숨는다', after.nav === false);
+  check('안내 문구도 모드에 맞게 바뀐다', after.hint !== before.hint && after.hint.includes('업체별'), after.hint);
+
+  // 저장되어 다시 켜도 유지된다
+  await page.waitForTimeout(300);
+  await page.reload();
+  await page.waitForSelector('.board-row');
+  const kept = await shown();
+  check('선택이 저장되어 새로고침 후에도 유지된다', kept.board && !kept.cal, JSON.stringify(kept));
+
+  // 예시 데이터는 업체 4곳에 업무 4건. 템플릿만 있고 업무가 없는 업체는 나오지 않는다.
+  const rowNames = await page.$$eval('.board-row .bh-name', (e) => e.map((x) => x.textContent.trim()));
+  const expected = await page.evaluate(async () => {
+    const s = await window.WorkCore.readState();
+    const used = new Set([...s.projects.map((p) => p.vendorId), ...s.manualEvents.map((m) => m.vendorId)]);
+    return { used: used.size, templates: s.vendorTemplates.length };
+  });
+  check('업무나 일정이 있는 업체만 나온다', rowNames.length === expected.used, `${rowNames.length} != ${expected.used} (템플릿 ${expected.templates})`);
+
+  // 지연이 있는 업체가 위로
+  const late = await page.$$eval('.board-row', (rows) => rows.map((r) => !!r.querySelector('.bh-late')));
+  const firstClean = late.indexOf(false);
+  check('지연 있는 업체가 맨 위에 온다', firstClean === -1 || !late.slice(firstClean).some(Boolean), JSON.stringify(late));
+
+  // 숫자가 상태와 일치하는가
+  const agree = await page.evaluate(async () => {
+    const C = window.WorkCore, s = await C.readState();
+    const rows = C.vendorSummaries(s);
+    return rows.map((b) => {
+      const ps = s.projects.filter((p) => p.vendorId === b.vendorId);
+      const openCount = ps.filter((p) => C.currentStep(p)).length;
+      const stepsTotal = ps.reduce((n, p) => n + p.steps.length, 0);
+      const stepsDone = ps.reduce((n, p) => n + p.steps.filter((x) => x.completed).length, 0);
+      return { ok: b.openCount === openCount && b.stepsTotal === stepsTotal && b.stepsDone === stepsDone, name: b.vendor?.name };
+    });
+  });
+  check('진행 중 건수와 절차 진행률이 상태와 일치한다', agree.every((x) => x.ok), JSON.stringify(agree.filter((x) => !x.ok)));
+
+  // 펼치기 → 업무 목록 → 클릭 → 상세
+  check('처음에는 접혀 있다', await page.$$eval('.board-row.open', (e) => e.length) === 0);
+  await page.click('.board-row .board-head');
+  await page.waitForSelector('.board-row.open .board-item');
+  const items = await page.$$eval('.board-row.open .board-item', (e) => e.length);
+  check('펼치면 그 업체의 업무가 나온다', items >= 1, `${items}`);
+
+  const vendorOfRow = await page.$eval('.board-row.open .bh-name', (e) => e.textContent.trim());
+  await page.click('.board-row.open .board-item[data-due-id]');
+  await page.waitForTimeout(400);
+  const opened = await page.$eval('#detailModal', (e) => e.classList.contains('show'));
+  check('클릭하면 지금 쓰던 상세 모달이 열린다', opened);
+  if (opened) check('열린 상세가 그 업체다', (await page.innerText('.detail-vendor')) === vendorOfRow, `${await page.innerText('.detail-vendor')} != ${vendorOfRow}`);
+  await page.keyboard.press('Escape');
+
+  // 13px 하한과 가로 스크롤이 새 화면에서도 지켜지는가
+  const tiny = await page.evaluate(measure);
+  check('업체별 화면에 13px 미만 텍스트가 없다', tiny.length === 0, tiny.join(' | '));
+  for (const vp of [{ width: 1280, height: 720 }, { width: 1920, height: 1080 }]) {
+    await page.setViewportSize(vp);
+    await page.waitForTimeout(120);
+    const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    check(`${vp.width}px 에서 가로 스크롤이 없다`, over <= 1, `${over}px`);
+  }
+
+  // 용어를 바꾸면 토글과 화면 문구가 함께 바뀐다
+  const terms = await page.evaluate(() => {
+    const L = window.WorkCore.labels({ vendor: '거래처', project: '계약건', step: '단계', event: '일정' });
+    return { tab: L.viewVendor, caption: L.boardCaption, empty: L.boardEmpty, open: L.boardOpen };
+  });
+  check('토글 이름이 용어를 따른다', terms.tab === '거래처별', terms.tab);
+  check('업체별 문구에 하드코딩 "업체"가 남지 않는다', !/업체/.test(terms.caption + terms.empty + terms.open), terms.caption);
+  check('조사가 맞는다 (계약건이/계약건가 아님)', terms.empty.includes('계약건이'), terms.empty);
 
   check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
   await ctx.close();

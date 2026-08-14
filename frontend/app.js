@@ -31,11 +31,68 @@
     else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
   });
   async function persist(msg){await C.saveState(state);render();if(msg)toast(msg)}
-  function render(){L=C.labels(state.terms);applyStaticLabels();renderHorizon();renderDue();renderCalendar();fillSelects();renderTemplatePanes();}
+  function render(){L=C.labels(state.terms);applyStaticLabels();renderHorizon();renderDue();renderCalendar();renderBoard();applyBoardMode();fillSelects();renderTemplatePanes();}
   // 정적 HTML 의 data-t 를 사전 값으로 채운다. 마크업이 들어가는 문구만 innerHTML 로 넣는다.
   function applyStaticLabels(){document.title=L.app;qa('[data-t]').forEach(el=>{const v=L[el.dataset.t];if(typeof v==='string')el.textContent=v})}
   function renderHorizon(){const s=state.settings;$('horizonSelect').value=s.horizon;$('horizonCustom').value=s.customHorizon;$('horizonCustom').classList.toggle('hidden',s.horizon!=='custom')}
   function renderDue(){const cards=C.dueCards(state),host=$('dueList');if(!cards.length){const blank=!state.projects.length&&!state.manualEvents.length;host.innerHTML=`<div class="empty">${blank?L.emptyBlank:L.emptyHorizon}</div>`;return}host.innerHTML=cards.map(r=>{const v=C.vendor(state,r.vendorId),p=C.project(state,r.projectId);return `<button class="due-card ${C.ddayClass(r.date)}" data-due-kind="${r.kind}" data-due-id="${r.id}"><span><span class="due-vendor">${C.esc(v?.name||L.noVendor)}</span><span class="due-task">${C.esc(r.name)}</span><span class="due-sub">${C.pretty(r.date)}${p?` · ${C.esc(p.name)}`:''}</span>${r.extra?`<span class="due-extra">${C.esc(L.laterCount(r.extra))}</span>`:''}</span><span class="due-dday">${C.ddayLabel(r.date)}</span></button>`}).join('');qa('[data-due-id]',host).forEach(b=>b.addEventListener('click',()=>openRecord(b.dataset.dueKind,b.dataset.dueId)))}
+  // ── 업체별 요약 ──────────────────────────────────────────────────────────
+  // 캘린더와 같은 자리를 쓰는 두 번째 축이다. 좌측 D-day 레일은 두 모드에서 모두 남는다 —
+  // "뭐가 급한가"는 어느 화면을 보고 있든 사라지면 안 된다(발주서 §5.3).
+  const boardMode=()=>state.settings.boardView==='vendor'?'vendor':'calendar';
+  let expandedVendors=new Set();   // 펼침은 화면 상태다. 저장하지 않는다.
+  function applyBoardMode(){
+    const vendorView=boardMode()==='vendor';
+    $('calendarScroll').classList.toggle('hidden',vendorView);
+    $('vendorBoard').classList.toggle('hidden',!vendorView);
+    $('calNav').classList.toggle('hidden',vendorView);   // 월 이동은 업체별에서 의미가 없다
+    $('calHint').textContent=vendorView?L.boardCaption:L.calHint;
+    qa('[data-board]').forEach(b=>{const on=b.dataset.board===(vendorView?'vendor':'calendar');b.classList.toggle('active',on);b.setAttribute('aria-selected',String(on))});
+  }
+  async function setBoardMode(mode){
+    if(boardMode()===mode)return;
+    state.settings.boardView=mode;
+    await C.saveState(state);          // 다시 켰을 때 보던 화면이 그대로 있어야 한다
+    renderBoard();applyBoardMode();
+  }
+  function boardItemRow(it){
+    const dday=it.completed?'완료':(it.date?C.ddayLabel(it.date):L.boardNoDate);
+    const cls=it.completed?'done':(it.date?C.ddayClass(it.date):'undated');
+    const sub=[it.stepName,it.projectName,it.date?C.pretty(it.date):null].filter(Boolean).join(' · ');
+    const body=`<span class="bi-main"><span class="bi-name">${C.esc(it.name)}</span>${sub?`<span class="bi-sub">${C.esc(sub)}</span>`:''}</span>`
+      +`${it.stepsTotal?`<span class="bi-steps">${it.stepsDone}/${it.stepsTotal}</span>`:''}`
+      +`<span class="bi-dday ${cls}">${C.esc(dday)}</span>`;
+    // 날짜가 없으면 열 상세가 없다. 버튼처럼 보이게 해 놓고 아무 일도 안 일어나면 그게 더 나쁘다.
+    return it.record
+      ? `<button class="board-item ${cls}" data-due-kind="${it.record.kind}" data-due-id="${it.record.id}">${body}</button>`
+      : `<div class="board-item flat ${cls}">${body}</div>`;
+  }
+  function renderBoard(){
+    const rows=C.vendorSummaries(state),host=$('vendorBoard');
+    if(!rows.length){const blank=!state.projects.length&&!state.manualEvents.length;host.innerHTML=`<div class="empty">${blank?L.emptyBlank:L.boardEmpty}</div>`;return}
+    host.innerHTML=rows.map(b=>{
+      const open=expandedVendors.has(b.vendorId||'');
+      const pct=b.stepsTotal?Math.round(b.stepsDone/b.stepsTotal*100):0;
+      const info=(state.vendorFields||[]).map(f=>(b.vendor?.values||{})[f.id]||'').filter(Boolean).join(' · ');
+      const next=b.next;
+      return `<section class="board-row${open?' open':''}" data-vendor="${C.esc(b.vendorId||'')}">
+        <button class="board-head" aria-expanded="${open}">
+          <span class="bh-id"><span class="bh-name">${C.esc(b.vendor?.name||L.noVendor)}</span>${info?`<span class="bh-info">${C.esc(info)}</span>`:''}</span>
+          <span class="bh-stat"><span class="bh-counts">${C.esc(L.boardOpen)} <b>${b.openCount}</b> · ${C.esc(L.boardDone)} <b>${b.doneCount}</b>${b.overdueCount?` <span class="bh-late">${C.esc(L.boardOverdue)} ${b.overdueCount}</span>`:''}</span><span class="bh-bar" role="img" aria-label="${C.esc(L.boardProgress)} ${pct}%"><i style="width:${pct}%"></i></span></span>
+          <span class="bh-next">${next?`<span class="bn-name">${C.esc(next.name)}</span><span class="bn-date">${C.pretty(next.date)}</span>`:`<span class="bn-name muted">${C.esc(L.boardEmpty)}</span>`}</span>
+          <span class="bh-dday ${next?C.ddayClass(next.date):'undated'}">${next?C.ddayLabel(next.date):'—'}</span>
+        </button>
+        <div class="board-items">${b.items.map(boardItemRow).join('')}</div>
+      </section>`;
+    }).join('');
+    qa('.board-head',host).forEach(h=>h.addEventListener('click',()=>{
+      const key=h.closest('.board-row').dataset.vendor;
+      if(expandedVendors.has(key))expandedVendors.delete(key);else expandedVendors.add(key);
+      renderBoard();
+    }));
+    // 클릭하면 지금 쓰던 상세 모달이 그대로 열린다. 새 조작 방식을 만들지 않는다.
+    qa('.board-item[data-due-id]',host).forEach(b=>b.addEventListener('click',()=>openRecord(b.dataset.dueKind,b.dataset.dueId)));
+  }
   function allEventRecords(){return C.eventRecords(state)}
   function renderCalendar(){const y=currentMonth.getFullYear(),m=currentMonth.getMonth();$('monthTitle').textContent=`${y}년 ${m+1}월`;$('monthGrid').innerHTML='';const first=new Date(y,m,1),before=first.getDay(),days=new Date(y,m+1,0).getDate(),cells=Math.ceil((before+days)/7)*7,events=allEventRecords();for(let i=0;i<cells;i++){const d=new Date(y,m,1-before+i),ds=C.iso(d),inMonth=d.getMonth()===m,isToday=ds===C.todayISO(),rows=events.filter(e=>e.date===ds).sort((a,b)=>Number(a.completed)-Number(b.completed));const cell=document.createElement('div');cell.className=`day ${inMonth?'':'out'} ${[0,6].includes(d.getDay())?'weekend':''} ${isToday?'today':''}`;cell.dataset.date=ds;cell.innerHTML=`<div class="day-head"><span class="day-num">${d.getDate()}</span>${isToday?'<span class="today-label">TODAY</span>':''}</div><div class="events">${rows.map(r=>{const v=C.vendor(state,r.vendorId);return `<button class="event ${r.completed?'done':''} ${r.kind==='manual'?'manual':''} ${!r.completed?C.ddayClass(r.date):''}" data-event-kind="${r.kind}" data-event-id="${r.id}" title="${C.esc(v?.name||'')} · ${C.esc(r.name)}">${r.completed?'✓ ':''}${C.esc(v?.name||L.noVendor)} · ${C.esc(r.name)}</button>`}).join('')}</div>${inMonth?`<span class="add-hint">+ ${C.esc(state.terms.event)}</span>`:''}`;if(inMonth)cell.addEventListener('click',e=>{if(e.target.closest('[data-event-id]'))return;openSchedule(ds)});$('monthGrid').appendChild(cell)}qa('[data-event-id]',$('monthGrid')).forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();openRecord(b.dataset.eventKind,b.dataset.eventId)}))}
   function fillSelects(){const vendorOpts=state.vendorTemplates.map(v=>`<option value="${v.id}">${C.esc(v.name)}</option>`).join('');$('sVendor').innerHTML=vendorOpts;$('wVendor').innerHTML=vendorOpts;$('wTemplate').innerHTML=state.workTemplates.map(t=>`<option value="${t.id}">${C.esc(t.name)}</option>`).join('');updateProjectSelect()}
@@ -267,6 +324,7 @@
   $('horizonSelect').addEventListener('change',async e=>{state.settings.horizon=e.target.value;$('horizonCustom').classList.toggle('hidden',e.target.value!=='custom');await persist()});$('horizonCustom').addEventListener('change',async e=>{state.settings.customHorizon=Math.max(1,Number(e.target.value||1));await persist()});
   $('prevMonth').addEventListener('click',()=>{currentMonth=new Date(currentMonth.getFullYear(),currentMonth.getMonth()-1,1);renderCalendar()});$('nextMonth').addEventListener('click',()=>{currentMonth=new Date(currentMonth.getFullYear(),currentMonth.getMonth()+1,1);renderCalendar()});$('todayBtn').addEventListener('click',()=>{const d=C.parse(C.todayISO());currentMonth=new Date(d.getFullYear(),d.getMonth(),1);renderCalendar();setTimeout(()=>q('.day.today')?.scrollIntoView({block:'center',behavior:'smooth'}),10)});
   $('addScheduleBtn').addEventListener('click',()=>openSchedule());$('saveScheduleBtn').addEventListener('click',saveSchedule);$('sVendor').addEventListener('change',updateProjectSelect);$('addWorkBtn').addEventListener('click',openWork);$('saveWorkBtn').addEventListener('click',saveWork);$('templateBtn').addEventListener('click',openTemplates);$('settingsBtn').addEventListener('click',openSettings);$('helperBtn').addEventListener('click',openHelper);$('settingsOpenHelper').addEventListener('click',openHelper);$('alwaysOnTop').addEventListener('change',setTop);$('autostart').addEventListener('change',setAutostart);$('completeBtn').addEventListener('click',completeSelected);$('changeDateBtn').addEventListener('click',openDateModal);$('saveDateBtn').addEventListener('click',saveSelectedDate);$('reopenBtn').addEventListener('click',reopenSelected);$('deleteEventBtn').addEventListener('click',deleteSelected);$('demoToggleBtn').addEventListener('click',toggleDemo);$('backupNowBtn').addEventListener('click',backupNow);$('backupFolderBtn').addEventListener('click',async()=>{if(!await C.revealBackups())toast('이 환경에서는 폴더를 열 수 없습니다.')});$('restoreBtn').addEventListener('click',restoreFromList);$('restoreFile').addEventListener('change',restoreFromFile);$('projectAddStep').addEventListener('click',()=>{projectStepsDraft.push({id:null,name:'새 단계',offset:1,dueDate:null,completed:false,completedAt:null});renderProjectSteps()});$('saveProjectSteps').addEventListener('click',saveProjectSteps);
+  qa('[data-board]').forEach(b=>b.addEventListener('click',()=>setBoardMode(b.dataset.board)));
   qa('[data-template-tab]').forEach(b=>b.addEventListener('click',()=>{templateTab=b.dataset.templateTab;qa('[data-template-tab]').forEach(x=>x.classList.toggle('active',x===b));$('vendorTemplatePane').classList.toggle('hidden',templateTab!=='vendor');$('workTemplatePane').classList.toggle('hidden',templateTab!=='work');$('termsPane').classList.toggle('hidden',templateTab!=='terms')}));qa('[data-close]').forEach(b=>b.addEventListener('click',()=>hide(b.dataset.close)));qa('.modal-bg').forEach(bg=>bg.addEventListener('mousedown',e=>{if(e.target===bg)hide(bg.id)}));document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modalStack.length)hide(modalStack[modalStack.length-1].id)});
   await C.watchState(v=>{state=v;render();consumePendingSelection()});
   const d=C.parse(C.todayISO());currentMonth=new Date(d.getFullYear(),d.getMonth(),1);render();consumePendingSelection();  // 사용자가 버튼을 눌러야 보호된다면 그건 또 하나의 업무다. 시작할 때 조용히 처리한다.

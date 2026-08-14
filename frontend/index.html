@@ -17,8 +17,9 @@
     <div class="due-list" id="dueList"></div>
   </aside>
   <section class="panel calendar-panel">
-    <div class="cal-toolbar"><button class="btn icon" id="prevMonth" aria-label="이전 달"><svg class="ico" aria-hidden="true"><use href="#i-chevron-left"/></svg></button><div class="month-title" id="monthTitle"></div><button class="btn icon" id="nextMonth" aria-label="다음 달"><svg class="ico" aria-hidden="true"><use href="#i-chevron-right"/></svg></button><button class="btn" id="todayBtn">Today</button><div class="cal-spacer"></div><span class="hint" data-t="calHint"></span></div>
+    <div class="cal-toolbar"><div class="tabs seg" role="tablist" aria-label="대시보드 보기"><button class="tab active" role="tab" data-board="calendar" data-t="viewCalendar"></button><button class="tab" role="tab" data-board="vendor" data-t="viewVendor"></button></div><div class="cal-nav" id="calNav"><button class="btn icon" id="prevMonth" aria-label="이전 달"><svg class="ico" aria-hidden="true"><use href="#i-chevron-left"/></svg></button><div class="month-title" id="monthTitle"></div><button class="btn icon" id="nextMonth" aria-label="다음 달"><svg class="ico" aria-hidden="true"><use href="#i-chevron-right"/></svg></button><button class="btn" id="todayBtn">Today</button></div><div class="cal-spacer"></div><span class="hint" id="calHint"></span></div>
     <div class="calendar-scroll" id="calendarScroll"><div class="weekdays"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div><div class="month-grid" id="monthGrid"></div></div>
+    <div class="vendor-board hidden" id="vendorBoard"></div>
   </section>
 </main></div>
 
