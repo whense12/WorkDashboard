@@ -45,13 +45,18 @@ const check = (name, cond, detail = '') => {
 const skip = (name, why) => { skips.push(`${name} — ${why}`); console.log(`  SKIP ${name} — ${why}`); };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const PWSH = (() => {
+  // PowerShell 7 은 .ps1 을 UTF-8 로 읽는다. 5.1 은 ANSI 로 읽어 한글 주석에서 깨진다.
+  try { execFileSync('pwsh', ['-NoProfile', '-Command', 'exit 0']); return 'pwsh'; }
+  catch { return 'powershell'; }
+})();
 const ps = (action, extra = []) => {
   try {
-    return execFileSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', join(root, 'tests', 'win32.ps1'), '-Action', action, ...extra], { encoding: 'utf8' }).trim();
+    return execFileSync(PWSH, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', join(root, 'tests', 'win32.ps1'), '-Action', action, ...extra], { encoding: 'utf8' }).trim();
   } catch (e) { return `PSERROR:${e.message}`; }
 };
 const psRaw = (script) => {
-  try { return execFileSync('powershell', ['-NoProfile', '-Command', script], { encoding: 'utf8' }).trim(); }
+  try { return execFileSync(PWSH, ['-NoProfile', '-Command', script], { encoding: 'utf8' }).trim(); }
   catch (e) { return `PSERROR:${e.message}`; }
 };
 
@@ -170,17 +175,19 @@ try {
 
   // ── 4. 자동 실행 ──────────────────────────────────────────────────────────
   console.log('\n[E4] 자동 실행 설정이 레지스트리에 반영된다 (인수조건 H)');
-  check('설정 전에는 등록되어 있지 않다', ps('autostart') === 'NONE', ps('autostart'));
+  const runKeyBefore = ps('autostart');
+  check('설정 전에는 앱이 등록되어 있지 않다', !/work-calendar|업체별/.test(runKeyBefore), runKeyBefore);
   const onErr = await evalAsync(`try { await window.__TAURI__.core.invoke('set_autostart', { enabled: true }); return null } catch (e) { return String(e) }`);
   check('set_autostart(true) 가 오류 없이 끝난다', onErr === null, String(onErr));
   await sleep(500);
   const reg = ps('autostart');
-  check('HKCU Run 키에 등록된다', reg !== 'NONE' && !reg.startsWith('PSERROR'), reg);
+  check('HKCU Run 키에 앱이 등록된다', /work-calendar|업체별/.test(reg), reg);
   const enabled = await evalAsync(`return await window.__TAURI__.core.invoke('is_autostart_enabled')`);
   check('앱도 켜져 있다고 보고한다', enabled === true, String(enabled));
   await evalAsync(`await window.__TAURI__.core.invoke('set_autostart', { enabled: false }); return 1`);
   await sleep(500);
-  check('끄면 레지스트리에서 사라진다', ps('autostart') === 'NONE', ps('autostart'));
+  const runKeyAfter = ps('autostart');
+  check('끄면 레지스트리에서 사라진다', !/work-calendar|업체별/.test(runKeyAfter), runKeyAfter);
 
   // ── 5. 도우미 창 ──────────────────────────────────────────────────────────
   console.log('\n[E5] 도우미 창 — 표시와 항상 위에 두기 (인수조건 H)');
@@ -189,10 +196,11 @@ try {
   await sleep(1200);
   const titles = ps('listwindows');
   check('도우미 창이 화면에 존재한다', titles.includes('D-day'), titles);
+  check('본 창과 도우미 창이 함께 떠 있다', titles.split('|').length >= 2, titles);
   const topErr = await evalAsync(`try { await window.__TAURI__.core.invoke('set_helper_always_on_top', { enabled: true }); return null } catch (e) { return String(e) }`);
   check('always-on-top 명령이 오류 없이 끝난다', topErr === null, String(topErr));
   await sleep(500);
-  const topmost = ps('topmost', ['-Title', 'D-day']);
+  const topmost = ps('topmost', ['-Kind', 'helper']);
   if (topmost === 'NOWINDOW' || topmost.startsWith('PSERROR')) skip('창에 WS_EX_TOPMOST 가 설정된다', `창을 찾지 못함 (${topmost})`);
   else check('창에 WS_EX_TOPMOST 가 실제로 설정된다', topmost === 'True', topmost);
 
@@ -231,7 +239,7 @@ try {
 
   // ── 7. 창 위치 복원 + 첨부 유지 ───────────────────────────────────────────
   console.log('\n[E7] 앱을 껐다 켠다 — 창 위치 복원과 첨부 유지');
-  const moved = ps('move', ['-Title', '업체별', '-X', '140', '-Y', '90']);
+  const moved = ps('move', ['-Kind', 'main', '-X', '140', '-Y', '90']);
   const movedOk = /^\d+,\d+$/.test(moved);
   if (!movedOk) skip('창 위치 복원', `창을 옮기지 못함 (${moved})`);
   await sleep(800);
@@ -253,7 +261,7 @@ try {
 
   if (movedOk) {
     await sleep(500);
-    const rect = ps('rect', ['-Title', '업체별']);
+    const rect = ps('rect', ['-Kind', 'main']);
     if (!/^\d+,\d+$/.test(rect)) skip('창 위치 복원', `재기동 후 창을 찾지 못함 (${rect})`);
     else {
       const [mx, my] = moved.split(',').map(Number), [rx, ry] = rect.split(',').map(Number);
