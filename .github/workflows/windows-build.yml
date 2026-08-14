@@ -2,6 +2,11 @@ name: Build
 
 on:
   workflow_dispatch:
+    inputs:
+      run_e2e:
+        description: '실동작 E2E 를 함께 돌린다 (GitHub 러너에서는 현재 실패한다 — 아래 주석 참고)'
+        type: boolean
+        default: false
   push:
     branches: [ main, 'claude/**' ]
   pull_request:
@@ -117,12 +122,19 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-  # 빌드된 실물 앱을 띄워 조작한다. 브라우저 스모크로는 확인할 수 없는 것들 —
-  # 앱 폴더에 파일이 실제로 생기는가, 재시작 후에도 남는가, 자동 실행이 레지스트리에
-  # 들어가는가, 도우미가 항상 위에 오는가, 창 위치가 복원되는가, 실제 WebView2 에서
-  # CSP 가 화면을 깨뜨리지 않는가 — 를 여기서 확인한다.
+  # 빌드된 실물 앱을 띄워 조작하는 검사.
+  #
+  # 현재 GitHub 의 windows-latest 러너에서는 성립하지 않는다. 세션 생성이 언제나
+  # "DevToolsActivePort file doesn't exist" 로 실패한다 — 러너의 비대화형 세션에서는
+  # GUI 앱의 WebView2 가 디버깅 포트를 열지 못한다. msedgedriver 를 WebView2 런타임
+  # 버전에 맞추고 3회 재시도해도 같았다.
+  #
+  # 그래서 기본 실행에서 빼 두고 수동 실행 입력으로만 켠다. 스크립트(tests/e2e.mjs)는
+  # 그대로 둔다 — 실제 Windows PC 나 대화형 세션을 쓰는 러너에서는 npm run test:e2e 로
+  # 그대로 돌아간다. 자동 검사가 못 하는 항목은 README 에 확인 필요로 적어 두었다.
   windows-e2e:
-    name: Windows 실동작 E2E
+    name: Windows 실동작 E2E (수동)
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_e2e }}
     runs-on: windows-latest
     needs: windows
     permissions:
