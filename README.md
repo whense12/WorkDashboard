@@ -106,7 +106,7 @@ GitHub Actions(`.github/workflows/windows-build.yml`)에서도 같은 빌드를 
 npm ci                      # 의존성 (Playwright만)
 npm run check               # JavaScript 구문 검사
 npm run build:standalone    # frontend/ -> web_standalone.html, helper_preview.html
-npm test                    # 브라우저 스모크 테스트 (147건)
+npm test                    # 브라우저 스모크 테스트 (268건)
 npm run test:e2e            # Windows 실동작 E2E (Windows + tauri-driver 필요)
 ```
 
@@ -238,9 +238,10 @@ ZIP 안에는 상태 JSON과 **첨부파일 실물**이 함께 들어갑니다. 
 | 첨부가 앱을 껐다 켜도 남는가 | 상세 → 파일 첨부 후 재실행 |
 | 자동 백업 ZIP 이 생기는가 | 설정 → 백업 → 폴더 열기 |
 
-나머지 기능(일정 등록, 절차 진행, OK 완료 → 다음 단계 날짜 계산, 업무 기록,
-완료 취소, 템플릿 스냅샷 격리, 용어 변경, 백업 왕복, 데이터 이관)은
-브라우저 스모크 147건으로 확인되어 있습니다.
+나머지 기능(일정 등록, 기간 일정, 절차 진행, OK 완료 → 다음 단계 날짜 계산,
+업무 기록, 완료 취소, 템플릿 스냅샷 격리, 용어 변경, 업체·업무·일정 일괄 등록,
+예산 집계와 드릴다운, 백업 왕복, 데이터 이관)은 브라우저 스모크 268건으로
+확인되어 있습니다.
 
 ## 라이선스 / 서드파티
 
