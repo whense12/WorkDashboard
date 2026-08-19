@@ -103,7 +103,17 @@
   const spanText=r=>C.isPeriod(r)?`${C.pretty(r.date)} ~ ${C.pretty(r.endDate)}`:C.pretty(r.date);
   function allEventRecords(){return C.eventRecords(state)}
   function renderCalendar(){const y=currentMonth.getFullYear(),m=currentMonth.getMonth();$('monthTitle').textContent=`${y}년 ${m+1}월`;$('monthGrid').innerHTML='';const first=new Date(y,m,1),before=first.getDay(),days=new Date(y,m+1,0).getDate(),cells=Math.ceil((before+days)/7)*7,events=allEventRecords(),bands=C.projectBands(state);for(let i=0;i<cells;i++){const d=new Date(y,m,1-before+i),ds=C.iso(d),inMonth=d.getMonth()===m,isToday=ds===C.todayISO(),rows=events.filter(e=>C.spansDay(e,ds)).sort((a,b)=>Number(a.completed)-Number(b.completed)),dayBands=bands.filter(b=>C.spansDay(b,ds));const cell=document.createElement('div');cell.className=`day ${inMonth?'':'out'} ${[0,6].includes(d.getDay())?'weekend':''} ${isToday?'today':''}`;cell.dataset.date=ds;cell.innerHTML=`<div class="day-head"><span class="day-num">${d.getDate()}</span>${isToday?'<span class="today-label">TODAY</span>':''}</div>${dayBands.length?`<div class="day-bands">${dayBands.map(b=>`<span class="day-band ${edgeClass(b,ds)}" title="${C.esc(b.name)} · ${spanText(b)}">${b.date===ds||d.getDay()===0?C.esc(b.name):''}</span>`).join('')}</div>`:''}<div class="events">${rows.map(r=>{const v=C.vendor(state,r.vendorId);return `<button class="event ${r.completed?'done':''} ${r.kind==='manual'?'manual':''} ${!r.completed?C.ddayClass(r):''} ${edgeClass(r,ds)}" data-event-kind="${r.kind}" data-event-id="${r.id}" title="${C.esc(v?.name||'')} · ${C.esc(r.name)} · ${spanText(r)}">${r.completed?'✓ ':''}${C.esc(v?.name||L.noVendor)} · ${C.esc(r.name)}${C.isPeriod(r)&&r.date===ds?` (${C.periodDays(r)}일)`:''}</button>`}).join('')}</div>${inMonth?`<span class="add-hint">+ ${C.esc(state.terms.event)}</span>`:''}`;if(inMonth)cell.addEventListener('click',e=>{if(e.target.closest('[data-event-id]'))return;openSchedule(ds)});$('monthGrid').appendChild(cell)}qa('[data-event-id]',$('monthGrid')).forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();openRecord(b.dataset.eventKind,b.dataset.eventId)}))}
-  function fillSelects(){const vendorOpts=state.vendorTemplates.map(v=>`<option value="${v.id}">${C.esc(v.name)}</option>`).join('');$('sVendor').innerHTML=vendorOpts;$('wVendor').innerHTML=vendorOpts;$('wTemplate').innerHTML=state.workTemplates.map(t=>`<option value="${t.id}">${C.esc(t.name)}</option>`).join('');updateProjectSelect()}
+  function fillSelects(){
+    const vendorOpts=state.vendorTemplates.map(v=>`<option value="${v.id}">${C.esc(v.name)}</option>`).join('');
+    $('sVendor').innerHTML=vendorOpts;
+    // 업체를 새로 들이는 흐름이 없어 화면 세 곳을 오가야 했다. 여기서 끝나게 한다.
+    const keep=$('wVendor').value,keepT=$('wTemplate').value;
+    $('wVendor').innerHTML=vendorOpts+`<option value="__new__">${C.esc(L.optNewVendor)}</option>`;
+    $('wTemplate').innerHTML=`<option value="">${C.esc(L.optNoTemplate)}</option>`+state.workTemplates.map(t=>`<option value="${t.id}">${C.esc(t.name)}</option>`).join('');
+    if(keep)$('wVendor').value=keep;
+    if(keepT!==null&&keepT!==undefined)$('wTemplate').value=keepT;
+    updateProjectSelect();
+  }
   function updateProjectSelect(){const vid=$('sVendor').value;const rows=state.projects.filter(p=>p.vendorId===vid);$('sProject').innerHTML=`<option value="">${C.esc(L.genericEvent)}</option>`+rows.map(p=>`<option value="${p.id}">${C.esc(p.name)}</option>`).join('')}
   function openSchedule(date=C.todayISO()){selectedRecord=null;$('scheduleTitle').textContent=L.eventModalTitle;$('sDate').value=date;$('sEnd').value='';fillSelects();$('sName').value='';$('sMemo').value='';show('scheduleModal');setTimeout(()=>$('sName').focus(),0)}
   async function saveSchedule(){const date=$('sDate').value,endDate=$('sEnd').value||null,vendorId=$('sVendor').value,name=$('sName').value.trim();
@@ -111,8 +121,82 @@
     if(endDate&&endDate<date){toast(L.badEndDate);return}
     state.manualEvents.push({id:C.uid('m'),vendorId,projectId:$('sProject').value||null,date,endDate,name,memo:$('sMemo').value.trim(),completed:false,completedAt:null,logs:[],attachments:[]});
     hide('scheduleModal');await persist(L.savedEvent)}
-  function openWork(){fillSelects();$('wProject').value='';$('wFirstDate').value=C.todayISO();$('wMemo').value='';show('workModal')}
-  async function saveWork(){const vendorId=$('wVendor').value,template=state.workTemplates.find(t=>t.id===$('wTemplate').value),name=$('wProject').value.trim(),date=$('wFirstDate').value;if(!vendorId||!template||!name||!date){toast(L.needProjectFields);return}state.projects.push(C.projectFromTemplate(template,vendorId,name,date,$('wMemo').value.trim()));hide('workModal');await persist(L.savedProject)}
+  // ── 업체·업무·일정 일괄 등록 ─────────────────────────────────────────────
+  // 업체는 템플릿 화면, 업무는 여기, 일정은 또 다른 모달 — 새 업체 한 곳을 들이려면
+  // 화면 세 곳을 오가야 했다. 실제 업무는 "업체가 새로 들어왔고 그 업체 일정이 여러 건"이
+  // 한 덩어리다. 헤더에 버튼을 만들지 않고(§4.3) 이 모달 하나로 끝낸다.
+  let bundleDraft=[];
+  function renderBundleEvents(){
+    const host=$('wEvents');
+    host.innerHTML=bundleDraft.map((e,i)=>`<div class="ev-row"><input data-ev-name="${i}" value="${C.esc(e.name)}" placeholder="${C.esc(L.fEventName)}" autocomplete="off"><input data-ev-start="${i}" type="date" value="${C.esc(e.date||'')}" aria-label="${C.esc(L.fStartDate)}"><input data-ev-end="${i}" type="date" value="${C.esc(e.endDate||'')}" aria-label="${C.esc(L.fEndDate)}"><button type="button" class="remove" data-ev-remove="${i}">삭제</button></div>`).join('');
+    qa('[data-ev-name]',host).forEach(el=>el.addEventListener('input',()=>bundleDraft[+el.dataset.evName].name=el.value));
+    qa('[data-ev-start]',host).forEach(el=>el.addEventListener('input',()=>bundleDraft[+el.dataset.evStart].date=el.value));
+    qa('[data-ev-end]',host).forEach(el=>el.addEventListener('input',()=>bundleDraft[+el.dataset.evEnd].endDate=el.value));
+    qa('[data-ev-remove]',host).forEach(b=>b.addEventListener('click',()=>{bundleDraft.splice(+b.dataset.evRemove,1);if(!bundleDraft.length)bundleDraft.push(blankBundleRow());renderBundleEvents()}));
+  }
+  const blankBundleRow=()=>({name:'',date:C.todayISO(),endDate:''});
+  function applyWorkMode(){
+    const isNew=$('wVendor').value==='__new__';
+    $('wNewVendorBox').classList.toggle('hidden',!isNew);
+    if(isNew&&!$('wNewVendorFields').dataset.filled){
+      $('wNewVendorFields').innerHTML=vendorFieldInputs({values:{}});
+      $('wNewVendorFields').dataset.filled='1';
+    }
+    // 템플릿을 고르지 않으면 업무를 만들지 않는다. 업체와 일정만 등록하는 길이다.
+    const hasTpl=!!$('wTemplate').value;
+    $('wProjectBox').classList.toggle('hidden',!hasTpl);
+    $('wFirstDateBox').classList.toggle('hidden',!hasTpl);
+    $('wPeriodBox').classList.toggle('hidden',!hasTpl);
+  }
+  function openWork(){
+    bundleDraft=[blankBundleRow()];
+    $('wNewVendorFields').dataset.filled='';$('wNewVendorFields').innerHTML='';
+    $('wNewVendorName').value='';$('wProject').value='';$('wFirstDate').value=C.todayISO();
+    $('wStart').value='';$('wEnd').value='';$('wMemo').value='';
+    fillSelects();
+    $('wVendor').value=state.vendorTemplates[0]?.id||'__new__';
+    $('wTemplate').value=state.workTemplates[0]?.id||'';
+    $('wEventsLabel').textContent=L.bundleEvents;
+    $('wEventsHint').textContent=L.bundleHint;
+    $('wAddEvent').textContent=L.addBundleEvent;
+    renderBundleEvents();applyWorkMode();show('workModal');
+  }
+  async function saveWork(){
+    // 1) 업체 — 기존을 고르거나 여기서 새로 만든다
+    let vendorId=$('wVendor').value,vendorName='';
+    if(vendorId==='__new__'){
+      const nm=$('wNewVendorName').value.trim();
+      if(!nm){toast(L.needVendor);return}
+      const values={};qa('[data-vf]',$('wNewVendorFields')).forEach(el=>{values[el.dataset.vf]=el.value.trim()});
+      vendorId=C.uid('v');vendorName=nm;
+      state.vendorTemplates.push({id:vendorId,name:nm,values});
+    }else{
+      if(!vendorId){toast(L.needVendor);return}
+      vendorName=C.vendor(state,vendorId)?.name||'';
+    }
+    // 2) 업무 — 템플릿을 골랐을 때만
+    const template=state.workTemplates.find(t=>t.id===$('wTemplate').value);
+    const rows=bundleDraft.filter(e=>e.name.trim()&&e.date);
+    let project=null;
+    if(template){
+      const name=$('wProject').value.trim(),date=$('wFirstDate').value;
+      if(!name||!date){toast(L.needProjectFields);return}
+      const start=$('wStart').value||null,end=$('wEnd').value||null;
+      if(start&&end&&end<start){toast(L.badEndDate);return}
+      project=C.projectFromTemplate(template,vendorId,name,date,$('wMemo').value.trim());
+      project.startDate=start;project.endDate=end;
+    }else if(!rows.length){
+      // 업체만 새로 만들었다면 그것으로 충분하다. 기존 업체를 고르고 아무것도 안 넣었으면 헛일이다.
+      if($('wVendor').value!=='__new__'){toast(L.needAnything);return}
+    }
+    for(const e of rows)if(e.endDate&&e.endDate<e.date){toast(L.badEndDate);return}
+    if(project)state.projects.push(project);
+    // 3) 일정 — 만든 업무에 자동으로 걸린다
+    rows.forEach(e=>state.manualEvents.push({id:C.uid('m'),vendorId,projectId:project?project.id:null,
+      date:e.date,endDate:e.endDate||null,name:e.name.trim(),memo:'',completed:false,completedAt:null,logs:[],attachments:[]}));
+    hide('workModal');
+    await persist(L.savedBundle(vendorName,!!project,rows.length));
+  }
   function findRecord(kind,id){return allEventRecords().find(r=>r.kind===kind&&r.id===id)}
   function recordEntity(record){if(!record)return null;if(record.kind==='manual')return state.manualEvents.find(x=>x.id===record.id)||null;const p=C.project(state,record.projectId);return p?.steps?.find(x=>x.id===record.id)||null}
   function stepStatus(p,s){const current=C.currentStep(p);if(s.completed)return{key:'done',label:`완료${s.completedAt?` · ${C.pretty(s.completedAt)}`:''}`};if(current?.id===s.id)return{key:'current',label:`현재${s.dueDate?` · ${C.pretty(s.dueDate)}`:''}`};return{key:'future',label:s.dueDate?`예정 · ${C.pretty(s.dueDate)}`:'예정 · 날짜 미정'}}
@@ -342,7 +426,7 @@
   async function setAutostart(){const enabled=$('autostart').checked;state.settings.autostart=enabled;await C.saveState(state);if(C.isTauri())try{await window.__TAURI__.core.invoke('set_autostart',{enabled})}catch(e){toast('자동실행 설정을 적용하지 못했습니다.')}}
   $('horizonSelect').addEventListener('change',async e=>{state.settings.horizon=e.target.value;$('horizonCustom').classList.toggle('hidden',e.target.value!=='custom');await persist()});$('horizonCustom').addEventListener('change',async e=>{state.settings.customHorizon=Math.max(1,Number(e.target.value||1));await persist()});
   $('prevMonth').addEventListener('click',()=>{currentMonth=new Date(currentMonth.getFullYear(),currentMonth.getMonth()-1,1);renderCalendar()});$('nextMonth').addEventListener('click',()=>{currentMonth=new Date(currentMonth.getFullYear(),currentMonth.getMonth()+1,1);renderCalendar()});$('todayBtn').addEventListener('click',()=>{const d=C.parse(C.todayISO());currentMonth=new Date(d.getFullYear(),d.getMonth(),1);renderCalendar();setTimeout(()=>q('.day.today')?.scrollIntoView({block:'center',behavior:'smooth'}),10)});
-  $('addScheduleBtn').addEventListener('click',()=>openSchedule());$('saveScheduleBtn').addEventListener('click',saveSchedule);$('sVendor').addEventListener('change',updateProjectSelect);$('addWorkBtn').addEventListener('click',openWork);$('saveWorkBtn').addEventListener('click',saveWork);$('templateBtn').addEventListener('click',openTemplates);$('settingsBtn').addEventListener('click',openSettings);$('helperBtn').addEventListener('click',openHelper);$('settingsOpenHelper').addEventListener('click',openHelper);$('alwaysOnTop').addEventListener('change',setTop);$('autostart').addEventListener('change',setAutostart);$('completeBtn').addEventListener('click',completeSelected);$('changeDateBtn').addEventListener('click',openDateModal);$('saveDateBtn').addEventListener('click',saveSelectedDate);$('reopenBtn').addEventListener('click',reopenSelected);$('deleteEventBtn').addEventListener('click',deleteSelected);$('demoToggleBtn').addEventListener('click',toggleDemo);$('backupNowBtn').addEventListener('click',backupNow);$('backupFolderBtn').addEventListener('click',async()=>{if(!await C.revealBackups())toast('이 환경에서는 폴더를 열 수 없습니다.')});$('restoreBtn').addEventListener('click',restoreFromList);$('restoreFile').addEventListener('change',restoreFromFile);$('projectAddStep').addEventListener('click',()=>{projectStepsDraft.push({id:null,name:'새 단계',offset:1,dueDate:null,completed:false,completedAt:null});renderProjectSteps()});$('saveProjectSteps').addEventListener('click',saveProjectSteps);
+  $('addScheduleBtn').addEventListener('click',()=>openSchedule());$('saveScheduleBtn').addEventListener('click',saveSchedule);$('sVendor').addEventListener('change',updateProjectSelect);$('addWorkBtn').addEventListener('click',openWork);$('saveWorkBtn').addEventListener('click',saveWork);$('wVendor').addEventListener('change',applyWorkMode);$('wTemplate').addEventListener('change',applyWorkMode);$('wAddEvent').addEventListener('click',()=>{bundleDraft.push(blankBundleRow());renderBundleEvents()});$('templateBtn').addEventListener('click',openTemplates);$('settingsBtn').addEventListener('click',openSettings);$('helperBtn').addEventListener('click',openHelper);$('settingsOpenHelper').addEventListener('click',openHelper);$('alwaysOnTop').addEventListener('change',setTop);$('autostart').addEventListener('change',setAutostart);$('completeBtn').addEventListener('click',completeSelected);$('changeDateBtn').addEventListener('click',openDateModal);$('saveDateBtn').addEventListener('click',saveSelectedDate);$('reopenBtn').addEventListener('click',reopenSelected);$('deleteEventBtn').addEventListener('click',deleteSelected);$('demoToggleBtn').addEventListener('click',toggleDemo);$('backupNowBtn').addEventListener('click',backupNow);$('backupFolderBtn').addEventListener('click',async()=>{if(!await C.revealBackups())toast('이 환경에서는 폴더를 열 수 없습니다.')});$('restoreBtn').addEventListener('click',restoreFromList);$('restoreFile').addEventListener('change',restoreFromFile);$('projectAddStep').addEventListener('click',()=>{projectStepsDraft.push({id:null,name:'새 단계',offset:1,dueDate:null,completed:false,completedAt:null});renderProjectSteps()});$('saveProjectSteps').addEventListener('click',saveProjectSteps);
   qa('[data-board]').forEach(b=>b.addEventListener('click',()=>setBoardMode(b.dataset.board)));
   qa('[data-template-tab]').forEach(b=>b.addEventListener('click',()=>{templateTab=b.dataset.templateTab;qa('[data-template-tab]').forEach(x=>x.classList.toggle('active',x===b));$('vendorTemplatePane').classList.toggle('hidden',templateTab!=='vendor');$('workTemplatePane').classList.toggle('hidden',templateTab!=='work');$('termsPane').classList.toggle('hidden',templateTab!=='terms')}));qa('[data-close]').forEach(b=>b.addEventListener('click',()=>hide(b.dataset.close)));qa('.modal-bg').forEach(bg=>bg.addEventListener('mousedown',e=>{if(e.target===bg)hide(bg.id)}));document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modalStack.length)hide(modalStack[modalStack.length-1].id)});
   await C.watchState(v=>{state=v;render();consumePendingSelection()});

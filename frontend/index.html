@@ -32,10 +32,13 @@
 </div></div><div class="modal-foot"><button class="btn" data-close="scheduleModal">취소</button><button class="btn primary" id="saveScheduleBtn" data-t="saveEvent"></button></div></section></div>
 
 <div class="modal-bg" id="workModal"><section class="modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="workTitle"><div class="modal-head"><h2 id="workTitle" data-t="projectModalTitle"></h2><button class="close" data-close="workModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body"><div class="form-grid">
-  <div class="field"><label for="wVendor" data-t="fVendorTemplate"></label><select id="wVendor"></select></div><div class="field"><label for="wTemplate" data-t="fWorkTemplate"></label><select id="wTemplate"></select></div>
-  <div class="field full"><label for="wProject" data-t="fProjectName"></label><input id="wProject" placeholder="예: ○○배수로 정비공사"></div>
-  <div class="field"><label for="wFirstDate" data-t="fFirstDate"></label><input id="wFirstDate" type="date"></div><div class="field"><label for="wMemo">메모</label><input id="wMemo" placeholder="선택"></div>
-</div></div><div class="modal-foot"><button class="btn" data-close="workModal">취소</button><button class="btn primary" id="saveWorkBtn" data-t="saveProject"></button></div></section></div>
+  <div class="field"><label for="wVendor" data-t="fVendor"></label><select id="wVendor"></select></div><div class="field"><label for="wTemplate" data-t="fWorkTemplate"></label><select id="wTemplate"></select></div>
+  <div class="field full hidden" id="wNewVendorBox"><label for="wNewVendorName" data-t="vendorName"></label><input id="wNewVendorName" autocomplete="off"><div class="form-grid" id="wNewVendorFields" style="margin-top:9px"></div></div>
+  <div class="field full" id="wProjectBox"><label for="wProject" data-t="fProjectName"></label><input id="wProject" placeholder="예: ○○배수로 정비공사"></div>
+  <div class="field" id="wFirstDateBox"><label for="wFirstDate" data-t="fFirstDate"></label><input id="wFirstDate" type="date"></div><div class="field"><label for="wMemo">메모</label><input id="wMemo" placeholder="선택"></div>
+  <div class="field full" id="wPeriodBox"><span class="label" data-t="fProjectPeriod"></span><div class="ev-row two"><input id="wStart" type="date" aria-label="시작일"><input id="wEnd" type="date" aria-label="종료일"></div></div>
+  <div class="field full"><span class="label" id="wEventsLabel"></span><div class="ev-list" id="wEvents"></div><button class="btn" id="wAddEvent" style="margin-top:7px"></button><div class="field-note" id="wEventsHint"></div></div>
+</div></div><div class="modal-foot"><button class="btn" data-close="workModal">취소</button><button class="btn primary" id="saveWorkBtn">등록</button></div></section></div>
 
 <div class="modal-bg" id="detailModal"><section class="modal detail-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="detailTitle"><div class="modal-head"><h2 id="detailTitle" data-t="detailTitle"></h2><button class="close" data-close="detailModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body" id="detailBody"></div><div class="modal-foot"><button class="btn danger hidden" id="deleteEventBtn" data-t="deleteEvent"></button><button class="btn hidden" id="reopenBtn">완료 취소</button><button class="btn" id="changeDateBtn">날짜 변경</button><button class="btn primary" id="completeBtn">OK 완료</button></div></section></div>
 

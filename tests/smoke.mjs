@@ -1062,6 +1062,89 @@ console.log('\n[27] 기간 일정 — 시작과 끝이 있는 일을 한 건으�
   await ctx.close();
 }
 
+console.log('\n[28] 업체·업무·일정 일괄 등록 — 화면 세 곳을 오갈 일이 없다');
+{
+  const { ctx, page, errors } = await open();
+  const st = () => page.evaluate(() => window.WorkCore.readState());
+
+  await page.click('#addWorkBtn');
+  await page.waitForSelector('#workModal.show');
+  check('일정 행이 한 줄 준비돼 있다', await page.$$eval('#wEvents .ev-row', (e) => e.length) === 1);
+  check('새 업체 직접 입력 선택지가 있다', await page.$$eval('#wVendor option[value="__new__"]', (e) => e.length) === 1);
+  check('업체명 칸은 기본으로 접혀 있다', await page.$eval('#wNewVendorBox', (e) => e.classList.contains('hidden')));
+
+  await page.selectOption('#wVendor', '__new__');
+  check('새 업체를 고르면 업체명 칸이 펼쳐진다', await page.$eval('#wNewVendorBox', (e) => !e.classList.contains('hidden')));
+  const vfCount = await page.$$eval('#wNewVendorFields [data-vf]', (e) => e.length);
+  check('업체 커스텀 항목이 그대로 따라온다', vfCount === 3, `${vfCount}`);
+
+  // 템플릿 '없음' 이면 업무 칸이 사라진다
+  await page.selectOption('#wTemplate', '');
+  check('템플릿 없음이면 업무명 칸이 숨는다', await page.$eval('#wProjectBox', (e) => e.classList.contains('hidden')));
+  check('템플릿 없음이면 행사 기간 칸도 숨는다', await page.$eval('#wPeriodBox', (e) => e.classList.contains('hidden')));
+
+  // 업체명을 비우면 막는다
+  await page.click('#saveWorkBtn');
+  await page.waitForTimeout(250);
+  check('업체명 없이 저장하면 막는다', await page.$eval('#workModal', (e) => e.classList.contains('show')));
+
+  // 업체 + 일정 1건만 등록 (업무 없이)
+  await page.fill('#wNewVendorName', '한빛푸드');
+  await page.fill('#wNewVendorFields [data-vf="vf-person"]', '정OO');
+  await page.fill('#wEvents [data-ev-name="0"]', '납품 확인');
+  await page.fill('#wEvents [data-ev-start="0"]', await page.evaluate(() => window.WorkCore.addDays(window.WorkCore.todayISO(), 4)));
+  await page.click('#saveWorkBtn');
+  await page.waitForTimeout(500);
+  const a = await st();
+  const hanbit = a.vendorTemplates.find((v) => v.name === '한빛푸드');
+  check('업무 없이 업체만 새로 만들어진다', !!hanbit, JSON.stringify(a.vendorTemplates.map((v) => v.name)));
+  check('업체 커스텀 항목 값이 함께 저장된다', hanbit?.values['vf-person'] === '정OO', JSON.stringify(hanbit?.values));
+  const ev1 = a.manualEvents.find((m) => m.name === '납품 확인');
+  check('일정이 그 업체로 등록된다', ev1?.vendorId === hanbit?.id);
+  check('업무를 안 만들었으면 일정도 업무에 걸리지 않는다', ev1?.projectId === null, JSON.stringify(ev1?.projectId));
+
+  // 새 업체 + 업무 + 기간 + 일정 2건을 한 번에
+  await page.click('#addWorkBtn');
+  await page.waitForSelector('#workModal.show');
+  await page.selectOption('#wVendor', '__new__');
+  await page.fill('#wNewVendorName', '들녘유통');
+  await page.selectOption('#wTemplate', 'wt-simple');
+  await page.fill('#wProject', '가을 직거래장터');
+  const d = (n) => page.evaluate((k) => window.WorkCore.addDays(window.WorkCore.todayISO(), k), n);
+  await page.fill('#wFirstDate', await d(1));
+  await page.fill('#wStart', await d(10));
+  await page.fill('#wEnd', await d(13));
+  await page.fill('#wEvents [data-ev-name="0"]', '부스 배치');
+  await page.fill('#wEvents [data-ev-start="0"]', await d(9));
+  await page.click('#wAddEvent');
+  await page.fill('#wEvents [data-ev-name="1"]', '행사참여기간');
+  await page.fill('#wEvents [data-ev-start="1"]', await d(10));
+  await page.fill('#wEvents [data-ev-end="1"]', await d(13));
+  await page.click('#wAddEvent');   // 빈 줄 — 무시돼야 한다
+  await page.click('#saveWorkBtn');
+  await page.waitForTimeout(600);
+
+  const b = await st();
+  const dl = b.vendorTemplates.find((v) => v.name === '들녘유통');
+  const pj = b.projects.find((p) => p.name === '가을 직거래장터');
+  const mine = b.manualEvents.filter((m) => m.vendorId === dl?.id);
+  check('업체가 만들어진다', !!dl);
+  check('업무가 그 업체로 만들어진다', pj?.vendorId === dl?.id);
+  check('업무 절차가 템플릿대로 생긴다', pj?.steps.length === 5, `${pj?.steps.length}`);
+  check('행사 기간이 업무에 저장된다', !!pj?.startDate && !!pj?.endDate, JSON.stringify([pj?.startDate, pj?.endDate]));
+  check('일정 2건이 함께 등록된다 (빈 줄은 무시)', mine.length === 2, `${mine.length}`);
+  check('일정이 만든 업무에 걸린다', mine.every((m) => m.projectId === pj?.id));
+  check('기간 일정의 종료일이 살아 있다', !!mine.find((m) => m.name === '행사참여기간')?.endDate);
+  check('한 번의 저장으로 끝난다 (모달이 닫힌다)', await page.$eval('#workModal', (e) => !e.classList.contains('show')));
+
+  const toastText = await page.innerText('#toast');
+  check('무엇이 등록됐는지 알려준다', toastText.includes('들녘유통') && toastText.includes('2건'), toastText);
+  check('새 업체가 캘린더·레일에 바로 나타난다', (await page.innerText('#dueList')).includes('들녘유통'));
+
+  check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 await browser.close();
 server.close();

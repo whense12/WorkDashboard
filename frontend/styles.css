@@ -163,4 +163,11 @@ html.helper,body.helper-body{background:transparent}
 .terms-preview b{font-size:var(--fs-xs);color:var(--accent);letter-spacing:.02em}
 .terms-preview span{font-size:var(--fs-xs);color:var(--ink)}
 #vfList .proc-row{grid-template-columns:58px minmax(0,1fr) 116px 64px}
+/* 업체·업무·일정을 한 모달에서 등록할 때 쓰는 일정 행 */
+.ev-list{display:grid;gap:5px}
+.ev-row{display:grid;grid-template-columns:minmax(0,1fr) 130px 130px 56px;gap:5px;align-items:center}
+.ev-row.two{grid-template-columns:1fr 1fr}
+.ev-row input{width:100%;height:var(--ctl-h-sm);border:1px solid var(--line);border-radius:7px;padding:0 8px;font-size:var(--fs-sm)}
+.ev-row .remove{height:var(--ctl-h-sm);border:1px solid var(--line);background:#fff;border-radius:7px;font-size:var(--fs-xs);color:var(--danger);font-weight:750}
+.ev-row .remove:hover{background:var(--danger-soft)}
 #vfList select{height:var(--ctl-h-sm);border:1px solid var(--line);border-radius:7px;padding:0 6px;font-size:var(--fs-xs);background:#fff}
