@@ -945,6 +945,123 @@ console.log('\n[26] 대시보드 업체별 요약 — 캘린더와 토글로 오
   await ctx.close();
 }
 
+console.log('\n[27] 기간 일정 — 시작과 끝이 있는 일을 한 건으로 적는다');
+{
+  const { ctx, page, errors } = await open();
+
+  // (1) 회귀가 먼저다. 종료일이 없는 기존 일정의 D-day 는 하나도 달라지면 안 된다.
+  const same = await page.evaluate(() => {
+    const C = window.WorkCore, iso = (n) => C.addDays(C.todayISO(), n);
+    const out = {};
+    for (const n of [-3, -1, 0, 1, 14]) out[n] = [C.ddayLabel(iso(n)), C.ddayClass(iso(n))];
+    return out;
+  });
+  check('종료일 없는 일정의 D-day 가 그대로다',
+    JSON.stringify(same) === JSON.stringify({ '-3': ['D+3', 'overdue'], '-1': ['D+1', 'overdue'], 0: ['D-DAY', 'today'], 1: ['D-1', ''], 14: ['D-14', ''] }),
+    JSON.stringify(same));
+
+  // (2) 기간의 세 국면
+  const phases = await page.evaluate(() => {
+    const C = window.WorkCore, d = (n) => C.addDays(C.todayISO(), n);
+    const mk = (a, b) => ({ date: d(a), endDate: d(b) });
+    return {
+      before: [C.ddayLabel(mk(3, 9)), C.ddayClass(mk(3, 9)), C.phaseOf(mk(3, 9))],
+      during: [C.ddayLabel(mk(-2, 4)), C.ddayClass(mk(-2, 4)), C.phaseOf(mk(-2, 4))],
+      startsToday: [C.ddayLabel(mk(0, 5)), C.phaseOf(mk(0, 5))],
+      endsToday: [C.ddayLabel(mk(-5, 0)), C.phaseOf(mk(-5, 0))],
+      after: [C.ddayLabel(mk(-9, -3)), C.ddayClass(mk(-9, -3)), C.phaseOf(mk(-9, -3))],
+      days: C.periodDays(mk(0, 4)),
+      notPeriod: C.isPeriod({ date: d(0), endDate: d(0) }),
+    };
+  });
+  check('시작 전에는 시작까지 D-n', JSON.stringify(phases.before) === JSON.stringify(['D-3', '', 'before']), JSON.stringify(phases.before));
+  check('기간 중에는 진행중', JSON.stringify(phases.during) === JSON.stringify(['진행중', 'today', 'during']), JSON.stringify(phases.during));
+  check('시작일 당일도 진행중', JSON.stringify(phases.startsToday) === JSON.stringify(['진행중', 'during']), JSON.stringify(phases.startsToday));
+  check('종료일 당일도 진행중', JSON.stringify(phases.endsToday) === JSON.stringify(['진행중', 'during']), JSON.stringify(phases.endsToday));
+  check('종료 후에는 종료일 기준 D+n', JSON.stringify(phases.after) === JSON.stringify(['D+3', 'overdue', 'after']), JSON.stringify(phases.after));
+  check('기간 일수는 양끝을 포함한다 (오늘~+4 = 5일)', phases.days === 5, `${phases.days}`);
+  check('시작=종료면 기간이 아니다', phases.notPeriod === false);
+
+  // (3) 캘린더에서 시작~종료 모든 칸에 뜬다
+  await page.evaluate(async () => {
+    const C = window.WorkCore, s = await C.readState();
+    const t = C.parse(C.todayISO()), y = t.getFullYear(), m = String(t.getMonth() + 1).padStart(2, '0');
+    s.manualEvents.push({ id: 'per-1', vendorId: s.vendorTemplates[0].id, projectId: null,
+      date: `${y}-${m}-05`, endDate: `${y}-${m}-09`, name: '행사참여기간', memo: '',
+      completed: false, completedAt: null, logs: [], attachments: [] });
+    await C.saveState(s);
+  });
+  await page.reload();
+  await page.waitForSelector('.due-card');
+  const cells = await page.$$eval('.day', (days) =>
+    days.filter((d) => !d.classList.contains('out') && d.innerText.includes('행사참여기간')).map((d) => d.dataset.date));
+  check('기간 일정이 시작~종료 5칸에 모두 뜬다', cells.length === 5, cells.join(','));
+  check('범위 밖 날짜에는 뜨지 않는다', cells.every((d) => d.slice(-2) >= '05' && d.slice(-2) <= '09'), cells.join(','));
+  const edges = await page.evaluate(() => {
+    const hit = [...document.querySelectorAll('.event')].filter((e) => e.textContent.includes('행사참여기간'));
+    return { total: hit.length, start: hit.filter((e) => e.classList.contains('start')).length,
+      end: hit.filter((e) => e.classList.contains('end')).length,
+      cont: hit.filter((e) => e.classList.contains('cont')).length,
+      allPeriod: hit.every((e) => e.classList.contains('period')) };
+  });
+  check('시작 칸과 종료 칸이 하나씩이고 나머지는 이어짐 표시', edges.start === 1 && edges.end === 1 && edges.cont === 4 && edges.allPeriod, JSON.stringify(edges));
+  check('시작 칩에만 일수가 붙는다', (await page.$eval('.event.period.start', (e) => e.textContent)).includes('(5일)'));
+
+  // (4) 이미 시작한 건이 기준일 필터에서 밀려나지 않는다.
+  // 좌측 레일은 업체당 한 건만 세우므로, 업체가 겹치지 않는 최소 상태로 확인한다.
+  const kept = await page.evaluate(async () => {
+    const C = window.WorkCore, s = await C.readState(), t = C.todayISO();
+    const ev = (id, vi, name, date, endDate) => ({ id, vendorId: s.vendorTemplates[vi].id, projectId: null,
+      date, endDate, name, memo: '', completed: false, completedAt: null, logs: [], attachments: [] });
+    s.settings.horizon = '3';
+    s.projects = [];
+    s.manualEvents = [
+      ev('per-2', 1, '장기 접수기간', C.addDays(t, -20), C.addDays(t, 40)),  // 이미 진행 중
+      ev('per-3', 2, '먼 일정', C.addDays(t, 40), null),                     // 아직 멀었다
+    ];
+    return C.dueCards(s).map((c) => c.name);
+  });
+  check('D-3 기준이어도 진행 중인 기간 건은 남는다', kept.includes('장기 접수기간'), kept.join(','));
+  check('아직 오지 않은 먼 일정은 D-3 기준 밖이다', !kept.includes('먼 일정'), kept.join(','));
+
+  // (5) 행사 기간은 일정 칩이 아니라 상단 띠다
+  await page.evaluate(async () => {
+    const C = window.WorkCore, s = await C.readState();
+    const t = C.parse(C.todayISO()), y = t.getFullYear(), m = String(t.getMonth() + 1).padStart(2, '0');
+    s.projects.push({ id: 'pj-band', vendorId: s.vendorTemplates[0].id, name: '가을 축제', memo: '',
+      templateId: null, startDate: `${y}-${m}-10`, endDate: `${y}-${m}-12`, steps: [] });
+    await C.saveState(s);
+  });
+  await page.reload();
+  await page.waitForSelector('.day-band');
+  const bandDays = await page.$$eval('.day', (days) =>
+    days.filter((d) => !d.classList.contains('out') && d.querySelector('.day-band')).map((d) => d.dataset.date));
+  check('행사 기간이 3칸에 띠로 그려진다', bandDays.length === 3, bandDays.join(','));
+  check('띠는 일정 칩 목록 밖에 있다', await page.$eval('.day-band', (e) => !e.closest('.events')));
+
+  // (6) 종료일이 시작일보다 빠르면 막는다
+  await page.click('#addScheduleBtn');
+  await page.fill('#sDate', await page.evaluate(() => window.WorkCore.addDays(window.WorkCore.todayISO(), 5)));
+  await page.fill('#sEnd', await page.evaluate(() => window.WorkCore.addDays(window.WorkCore.todayISO(), 1)));
+  await page.fill('#sName', '거꾸로 기간');
+  await page.click('#saveScheduleBtn');
+  await page.waitForTimeout(300);
+  check('종료일이 시작일보다 빠르면 저장하지 않는다', await page.$eval('#scheduleModal', (e) => e.classList.contains('show')));
+  check('막은 이유를 알린다', (await page.innerText('#toast')).includes('종료일'), await page.innerText('#toast'));
+
+  // 정상 저장
+  await page.fill('#sEnd', await page.evaluate(() => window.WorkCore.addDays(window.WorkCore.todayISO(), 8)));
+  await page.click('#saveScheduleBtn');
+  await page.waitForTimeout(400);
+  const saved = await page.evaluate(async () => (await window.WorkCore.readState()).manualEvents.find((m) => m.name === '거꾸로 기간'));
+  check('종료일이 상태에 저장된다', !!saved?.endDate, JSON.stringify(saved));
+  const railText = await page.innerText('#dueList');
+  check('좌측 레일이 기간을 시작~종료로 보여준다', /~/.test(railText), railText.slice(0, 120));
+
+  check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 await browser.close();
 server.close();

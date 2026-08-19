@@ -50,7 +50,23 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .workspace{flex:1;min-height:0;display:grid;grid-template-columns:340px minmax(0,1fr);gap:10px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
 .sidebar{height:100%;min-height:0;overflow:hidden;display:flex;flex-direction:column}.side-head{padding:11px 12px 9px;border-bottom:1px solid var(--line)}.side-row{display:flex;align-items:center;justify-content:space-between;gap:8px}.side-title{font-size:var(--fs-md);font-weight:850}.horizon{display:flex;align-items:center;gap:5px;font-size:var(--fs-xs);color:var(--muted)}.horizon select,.horizon input{height:var(--ctl-h-sm);border:1px solid var(--line);background:#fff;border-radius:8px;padding:0 6px;font-size:var(--fs-sm);font-weight:750}.horizon input{width:68px}.side-caption{font-size:var(--fs-xs);color:var(--muted);margin-top:5px}.due-list{padding:8px;display:grid;gap:7px;overflow:auto;align-content:start}.due-card{border:1px solid var(--line);background:#fff;border-radius:11px;padding:12px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;text-align:left;width:100%}.due-card:hover{border-color:#b1b8be;background:#fafbfc}.due-vendor{display:block;font-size:var(--fs-md);font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.due-task{display:block;font-size:var(--fs-sm);font-weight:750;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.due-sub{display:block;font-size:var(--fs-xs);color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.due-dday{min-width:64px;height:48px;border-radius:9px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-size:var(--fs-md);font-weight:900;font-variant-numeric:tabular-nums}.due-card.today .due-dday{background:var(--warn-soft);color:var(--warn)}.due-card.overdue .due-dday{background:var(--danger-soft);color:var(--danger)}.due-extra{font-size:var(--fs-xs);color:var(--muted);margin-top:5px}.empty{padding:30px 14px;text-align:center;color:var(--muted);font-size:var(--fs-xs)}
 .calendar-panel{height:100%;min-height:0;overflow:hidden;display:flex;flex-direction:column}.cal-toolbar{height:50px;flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:0 10px;border-bottom:1px solid var(--line)}.month-title{font-size:var(--fs-md);font-weight:900;min-width:104px;text-align:center;letter-spacing:-.02em}.cal-spacer{flex:1}.hint{font-size:var(--fs-xs);color:var(--muted)}
-.calendar-scroll{flex:1;min-height:0;overflow:auto;scrollbar-gutter:stable}.weekdays{position:sticky;top:0;z-index:6;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:#f7f8f9;border-bottom:1px solid var(--line)}.weekdays div{padding:8px 4px;text-align:center;font-size:var(--fs-xs);color:var(--muted);font-weight:800}.month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));align-items:stretch}.day{position:relative;min-height:146px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:6px;background:#fff;cursor:pointer}.day:nth-child(7n){border-right:0}.day:hover{background:#fafbfc}.day.out{background:#fafbfc;color:#b1b8be;cursor:default}.day.today{background:var(--today);box-shadow:inset 0 0 0 2px var(--accent-line);z-index:1}.day.today:before{content:"";position:absolute;left:0;right:0;top:0;height:5px;background:var(--accent-line)}.day-head{height:28px;display:flex;align-items:center;justify-content:space-between;gap:4px}.day-num{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font-size:14px;font-weight:850;font-variant-numeric:tabular-nums}.weekend .day-num{color:var(--danger)}.today .day-num{background:var(--accent);color:#fff}.today-label{font-size:var(--fs-xs);font-weight:900;letter-spacing:.06em;color:var(--accent)}.events{display:grid;gap:4px;margin-top:5px}.event{width:100%;border:0;background:#eef0f3;border-radius:6px;padding:5px 7px;font-size:var(--fs-xs);line-height:1.35;text-align:left;color:var(--ink);white-space:normal;word-break:keep-all;overflow-wrap:anywhere}.event:hover{background:#e0e5ec}.event.done{color:#6d7882;background:#f4f5f6;text-decoration:line-through}.event.overdue:not(.done){background:var(--danger-soft);color:var(--danger)}.event.manual{border-left:3px solid #8a949e}.add-hint{position:absolute;right:6px;bottom:5px;font-size:var(--fs-xs);color:#8a949e;opacity:0}.day:hover .add-hint{opacity:1}
+.calendar-scroll{flex:1;min-height:0;overflow:auto;scrollbar-gutter:stable}.weekdays{position:sticky;top:0;z-index:6;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:#f7f8f9;border-bottom:1px solid var(--line)}.weekdays div{padding:8px 4px;text-align:center;font-size:var(--fs-xs);color:var(--muted);font-weight:800}.month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));align-items:stretch}.day{position:relative;min-height:146px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:6px;background:#fff;cursor:pointer}.day:nth-child(7n){border-right:0}.day:hover{background:#fafbfc}.day.out{background:#fafbfc;color:#b1b8be;cursor:default}.day.today{background:var(--today);box-shadow:inset 0 0 0 2px var(--accent-line);z-index:1}.day.today:before{content:"";position:absolute;left:0;right:0;top:0;height:5px;background:var(--accent-line)}.day-head{height:28px;display:flex;align-items:center;justify-content:space-between;gap:4px}.day-num{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font-size:14px;font-weight:850;font-variant-numeric:tabular-nums}.weekend .day-num{color:var(--danger)}.today .day-num{background:var(--accent);color:#fff}.today-label{font-size:var(--fs-xs);font-weight:900;letter-spacing:.06em;color:var(--accent)}.events{display:grid;gap:4px;margin-top:5px}.event{width:100%;border:0;background:#eef0f3;border-radius:6px;padding:5px 7px;font-size:var(--fs-xs);line-height:1.35;text-align:left;color:var(--ink);white-space:normal;word-break:keep-all;overflow-wrap:anywhere}.event:hover{background:#e0e5ec}.event.done{color:#6d7882;background:#f4f5f6;text-decoration:line-through}.event.overdue:not(.done){background:var(--danger-soft);color:var(--danger)}.event.today:not(.done){background:var(--warn-soft);color:var(--warn)}.event.manual{border-left:3px solid #8a949e}
+/* 기간 일정 — 시작~종료 모든 날짜 칸에 칩이 선다. 월 그리드가 날짜 칸 단위라 진짜 하나로
+   이어진 막대는 아니다. 시작 칸만 왼쪽을, 종료 칸만 오른쪽을 둥글게 하고 이어지는 칸은
+   톤을 낮춰 하나의 띠로 읽히게 한다. 클릭 대상은 매일 살아 있다. */
+.event.period{border-radius:0;margin-left:-7px;margin-right:-7px;padding-left:7px;padding-right:7px}
+.event.period.start{border-top-left-radius:6px;border-bottom-left-radius:6px;margin-left:0}
+.event.period.end{border-top-right-radius:6px;border-bottom-right-radius:6px;margin-right:0}
+.event.period.cont{color:var(--muted)}
+.event.period.cont:before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.45;margin-right:5px;vertical-align:middle}
+/* 행사 기간은 일정 칩과 섞지 않는다. "이 날 할 일"과 "이 행사가 도는 중"은 층위가 다르다. */
+.day-bands{display:grid;gap:2px;margin-top:4px}
+.day-band{display:block;height:17px;line-height:17px;padding:0 6px;font-size:var(--fs-xs);font-weight:800;
+  color:var(--accent);background:var(--accent-soft);border-radius:0;
+  margin-left:-7px;margin-right:-7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.day-band.start{border-top-left-radius:999px;border-bottom-left-radius:999px;margin-left:0;padding-left:9px}
+.day-band.end{border-top-right-radius:999px;border-bottom-right-radius:999px;margin-right:0}
+.day.out .day-band{opacity:.45}.add-hint{position:absolute;right:6px;bottom:5px;font-size:var(--fs-xs);color:#8a949e;opacity:0}.day:hover .add-hint{opacity:1}
 /* 업체별 요약 — 캘린더와 같은 자리를 쓰는 두 번째 축.
    색은 기존 규칙 그대로: 파랑(예정) → 주황(오늘) → 빨강(지남), 초록은 완료에만.
    진행률 막대도 완료분이므로 초록이다. 새 색을 만들지 않는다. */
@@ -119,6 +135,7 @@ html.helper,body.helper-body{background:transparent}
 .helper-quick[hidden]{display:none}
 .helper-quick input,.helper-quick select{width:100%;height:var(--ctl-h-sm);border:1px solid #cdd1d5;border-radius:8px;background:#fff;padding:0 8px;font-size:var(--fs-xs)}
 .helper-quick .q-row{display:grid;grid-template-columns:minmax(0,1fr) 118px;gap:6px}
+.helper-quick .q-row.two{grid-template-columns:1fr 1fr}
 .helper-quick .q-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px}
 .helper-quick .q-msg{flex:1;font-size:var(--fs-xs);color:var(--danger);font-weight:750}
 .helper-quick .q-save{height:var(--ctl-h-sm);border:0;border-radius:8px;background:var(--accent);color:#fff;font-size:var(--fs-xs);font-weight:850;padding:0 14px}
@@ -153,7 +170,7 @@ html.helper,body.helper-body{background:transparent}
 #vfList .proc-row{grid-template-columns:58px minmax(0,1fr) 116px 64px}
 #vfList select{height:var(--ctl-h-sm);border:1px solid var(--line);border-radius:7px;padding:0 6px;font-size:var(--fs-xs);background:#fff}
 
-</style></head><body class="helper-body"><main class="helper-shell" data-tauri-drag-region><header class="helper-grip" data-tauri-drag-region><span class="helper-handle" data-tauri-drag-region aria-hidden="true"></span><strong id="helperTitle" data-tauri-drag-region></strong><span class="helper-chip" id="helperHorizon" data-tauri-drag-region></span><button class="helper-icon add" id="helperQuick" title="빠른 일정 추가" aria-label="빠른 일정 추가" aria-expanded="false">+</button><button class="helper-icon" id="helperHide" title="치우기" aria-label="도우미 치우기">×</button></header><form class="helper-quick" id="helperQuickForm" hidden><input class="q-name" id="qName" type="text" autocomplete="off" maxlength="60"><div class="q-row"><select class="q-vendor" id="qVendor"></select><input class="q-date" id="qDate" type="date"></div><div class="q-row q-actions"><span class="q-msg" id="qMsg" role="status"></span><button class="link" id="qCancel" type="button">취소</button><button class="q-save" type="submit">추가</button></div></form><section class="helper-list" id="helperList" data-tauri-drag-region></section><footer class="helper-footer" data-tauri-drag-region><span id="helperUpdated" data-tauri-drag-region></span><button class="link" id="helperOpenMain">대시보드 열기</button></footer></main><script>
+</style></head><body class="helper-body"><main class="helper-shell" data-tauri-drag-region><header class="helper-grip" data-tauri-drag-region><span class="helper-handle" data-tauri-drag-region aria-hidden="true"></span><strong id="helperTitle" data-tauri-drag-region></strong><span class="helper-chip" id="helperHorizon" data-tauri-drag-region></span><button class="helper-icon add" id="helperQuick" title="빠른 일정 추가" aria-label="빠른 일정 추가" aria-expanded="false">+</button><button class="helper-icon" id="helperHide" title="치우기" aria-label="도우미 치우기">×</button></header><form class="helper-quick" id="helperQuickForm" hidden><input class="q-name" id="qName" type="text" autocomplete="off" maxlength="60"><div class="q-row two"><input class="q-date" id="qDate" type="date"><input class="q-date" id="qEnd" type="date"></div><select class="q-vendor" id="qVendor"></select><div class="q-row q-actions"><span class="q-msg" id="qMsg" role="status"></span><button class="link" id="qCancel" type="button">취소</button><button class="q-save" type="submit">추가</button></div></form><section class="helper-list" id="helperList" data-tauri-drag-region></section><footer class="helper-footer" data-tauri-drag-region><span id="helperUpdated" data-tauri-drag-region></span><button class="link" id="helperOpenMain">대시보드 열기</button></footer></main><script>
 (function(){
   // 저장 키는 v5 그대로 둔다. 키를 올리면 기존 사용자의 v5 데이터가 통째로 고아가 된다.
   // 스키마 버전은 상태 안의 version 필드와 migrate() 가 관리한다.
@@ -164,6 +181,25 @@ html.helper,body.helper-body{background:transparent}
   const addDays=(s,n)=>{const d=parse(s);d.setDate(d.getDate()+Number(n||0));return iso(d)};
   const diffDays=(s,base=todayISO())=>Math.round((parse(s)-parse(base))/86400000);
   const pretty=s=>{if(!s)return'';const d=parse(s);return `${d.getMonth()+1}.${d.getDate()}.`};
+  // ── 기간 ────────────────────────────────────────────────────────────────
+  // 일정이 마감일 하나로만 표현돼 있었다. 행사참여기간·접수기간처럼 시작과 끝이 있는 일은
+  // 두 건으로 쪼개 넣어야 했고, 둘이 이어져 있다는 사실이 화면 어디에도 남지 않았다.
+  // endDate 가 없으면 지금까지와 완전히 같게 동작한다.
+  const endOf=r=>{const st=r?.date;if(!st)return null;const e=r.endDate;return e&&e>st?e:st};
+  const isPeriod=r=>!!(r&&r.date&&r.endDate&&r.endDate>r.date);
+  const periodDays=r=>isPeriod(r)?diffDays(r.endDate,r.date)+1:1;
+  const spansDay=(r,ds)=>{const st=r?.date;return !!st&&ds>=st&&ds<=endOf(r)};
+  /** 'before' 시작 전 · 'on' 당일(단일) · 'during' 기간 중 · 'after' 지남 */
+  function phaseOf(r,base=todayISO()){
+    if(!r?.date)return 'none';
+    if(base<r.date)return 'before';
+    if(!isPeriod(r))return base>r.date?'after':'on';
+    return base>r.endDate?'after':'during';
+  }
+  // 정렬과 기준일 필터가 쓰는 날짜. 이미 시작한 행사가 D-14 기준 밖으로 밀려나면 안 된다.
+  const sortDate=r=>phaseOf(r)==='during'?todayISO():(r?.date||'');
+  // ddayLabel(rec) 과 ddayLabel(date) 를 모두 받는다. 기존 호출부를 한꺼번에 고치지 않아도 된다.
+  const asRange=(a,b)=>(a&&typeof a==='object')?{date:a.date,endDate:a.endDate}:{date:a,endDate:b||null};
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
   const uid=p=>`${p}-${Date.now()}-${Math.random().toString(16).slice(2,8)}`;
   const clone=x=>JSON.parse(JSON.stringify(x));
@@ -210,6 +246,10 @@ html.helper,body.helper-body{background:transparent}
       fVendor:V, fLinkedProject:`연결 ${P}`,
       fLinkedNote:`${j(P,['과','와'])} 무관한 ${j(E,['은','는'])} ‘일반 ${E}’을 선택합니다.`,
       fEventName:`${E}명`,
+      fStartDate:'시작일', fEndDate:'종료일(선택)', fNewEndDate:'새 종료일(선택)',
+      fProjectPeriod:`${P} 기간(선택)`, inProgress:'진행중',
+      periodSpan:(a,b,n)=>`${a} ~ ${b} · ${n}일`,
+      badEndDate:'종료일은 시작일보다 빠를 수 없습니다.',
       projectModalTitle:`${P} 추가`, saveProject:`${P} 등록`,
       fVendorTemplate:`${V} 템플릿`, fWorkTemplate:`${P} 템플릿`,
       fProjectName:`${P}명`, fFirstDate:`첫 ${E} 날짜`,
@@ -461,8 +501,9 @@ html.helper,body.helper-body{background:transparent}
   function currentStep(p){return p?.steps?.find(s=>!s.completed)||null}
   function eventRecords(state){
     const rows=[];
-    state.projects.forEach(p=>p.steps.forEach(s=>{if(s.dueDate)rows.push({kind:'step',id:s.id,date:s.dueDate,name:s.name,completed:!!s.completed,vendorId:p.vendorId,projectId:p.id,memo:s.memo||p.memo||'',step:s})}));
-    state.manualEvents.forEach(m=>rows.push({kind:'manual',id:m.id,date:m.date,name:m.name,completed:!!m.completed,vendorId:m.vendorId,projectId:m.projectId||null,memo:m.memo||'',manual:m}));
+    // 절차 단계에는 기간을 주지 않는다. 절차는 본질적으로 마감일이고, 기간을 주면 의미가 흐려진다.
+    state.projects.forEach(p=>p.steps.forEach(s=>{if(s.dueDate)rows.push({kind:'step',id:s.id,date:s.dueDate,endDate:null,name:s.name,completed:!!s.completed,vendorId:p.vendorId,projectId:p.id,memo:s.memo||p.memo||'',step:s})}));
+    state.manualEvents.forEach(m=>rows.push({kind:'manual',id:m.id,date:m.date,endDate:m.endDate||null,name:m.name,completed:!!m.completed,vendorId:m.vendorId,projectId:m.projectId||null,memo:m.memo||'',manual:m}));
     return rows;
   }
   function horizonDays(settings){if(settings.horizon==='all')return Infinity;if(settings.horizon==='custom')return Math.max(1,Number(settings.customHorizon||1));return Number(settings.horizon||14)}
@@ -471,8 +512,8 @@ html.helper,body.helper-body{background:transparent}
     const groups=new Map();
     future.forEach(e=>{const arr=groups.get(e.vendorId)||[];arr.push(e);groups.set(e.vendorId,arr)});
     const cards=[];
-    groups.forEach((arr,vendorId)=>{arr.sort((a,b)=>a.date.localeCompare(b.date));const first=arr[0],d=diffDays(first.date);if(d<=max||d<0||max===Infinity)cards.push({...first,extra:arr.length-1,dday:d})});
-    return cards.sort((a,b)=>a.date.localeCompare(b.date));
+    groups.forEach((arr,vendorId)=>{arr.sort((a,b)=>sortDate(a).localeCompare(sortDate(b))||a.date.localeCompare(b.date));const first=arr[0],d=diffDays(sortDate(first));if(d<=max||d<0||max===Infinity)cards.push({...first,extra:arr.length-1,dday:d})});
+    return cards.sort((a,b)=>sortDate(a).localeCompare(sortDate(b))||a.date.localeCompare(b.date));
   }
   // ── 업체별 요약 ──────────────────────────────────────────────────────────
   // 대시보드의 두 번째 축. 좌측 레일과 캘린더가 "언제"를 묻는다면 여기는
@@ -496,21 +537,21 @@ html.helper,body.helper-body{background:transparent}
       if(cur)b.openCount++;else b.doneCount++;
       // 클릭 대상은 "아직 안 끝났고 날짜가 잡힌 단계". 날짜 미정이면 열 상세가 없다.
       const rec=steps.find(s=>!s.completed&&s.dueDate);
-      b.items.push({type:'project',id:p.id,name:p.name,projectName:null,
+      b.items.push({type:'project',id:p.id,name:p.name,projectName:null,endDate:null,
         stepName:cur?cur.name:null,date:rec?rec.dueDate:null,completed:!cur,
         stepsDone:done,stepsTotal:steps.length,
         record:rec?{kind:'step',id:rec.id}:null});
     });
     state.manualEvents.forEach(m=>{
       const b=bucket(m.vendorId),p=project(state,m.projectId);
-      b.items.push({type:'manual',id:m.id,name:m.name,projectName:p?p.name:null,
+      b.items.push({type:'manual',id:m.id,name:m.name,projectName:p?p.name:null,endDate:m.endDate||null,
         stepName:null,date:m.date||null,completed:!!m.completed,
         stepsDone:0,stepsTotal:0,record:{kind:'manual',id:m.id}});
     });
     eventRecords(state).filter(e=>!e.completed&&e.date).forEach(e=>{
       const b=byVendor.get(e.vendorId||'');if(!b)return;
-      if(diffDays(e.date)<0)b.overdueCount++;
-      if(!b.next||e.date<b.next.date)b.next=e;
+      if(phaseOf(e)==='after')b.overdueCount++;              // 기간 건은 종료일이 지나야 지연이다
+      if(!b.next||sortDate(e)<sortDate(b.next))b.next=e;
     });
     const rank=i=>i.completed?2:(i.date?0:1);   // 날짜 있는 진행 건 → 날짜 미정 → 완료
     const rows=[...byVendor.values()].filter(b=>b.items.length);
@@ -522,8 +563,27 @@ html.helper,body.helper-body{background:transparent}
       ||String(a.next?.date||'').localeCompare(String(b.next?.date||''))
       ||String(a.vendor?.name||'').localeCompare(String(b.vendor?.name||'')));
   }
-  function ddayLabel(date){const n=diffDays(date);if(n===0)return'D-DAY';return n>0?`D-${n}`:`D+${Math.abs(n)}`}
-  function ddayClass(date){const n=diffDays(date);return n<0?'overdue':n===0?'today':''}
+  function ddayLabel(a,b){
+    const r=asRange(a,b);
+    switch(phaseOf(r)){
+      case 'during':return '진행중';
+      case 'before':return `D-${diffDays(r.date)}`;
+      case 'on':return 'D-DAY';
+      case 'after':return `D+${Math.abs(diffDays(endOf(r)))}`;
+      default:return '';
+    }
+  }
+  function ddayClass(a,b){
+    const ph=phaseOf(asRange(a,b));
+    // 색 축은 그대로다: 파랑(예정) -> 주황(오늘) -> 빨강(지남).
+    // '진행중'은 지금 벌어지고 있는 일이므로 '오늘' 자리에 놓는다. 글자가 달라 구분된다.
+    return ph==='after'?'overdue':(ph==='on'||ph==='during')?'today':'';
+  }
+  /** 캘린더 상단 띠로 그릴 행사 기간. "이 날 할 일"과 "이 행사가 도는 중"은 층위가 다르다. */
+  function projectBands(state){
+    return (state.projects||[]).filter(p=>p.startDate).map(p=>({
+      id:p.id,vendorId:p.vendorId,name:p.name,date:p.startDate,endDate:p.endDate||p.startDate}));
+  }
   function projectFromTemplate(template,vendorId,name,firstDate,memo=''){
     const id=uid('p');return {id,vendorId,name,memo,templateId:template.id,steps:template.steps.map((s,i)=>({id:uid(`${id}s`),name:s.name,offset:Number(s.offset||0),dueDate:i===0?firstDate:null,completed:false,completedAt:null,memo:'',logs:[],attachments:[]}))};
   }
@@ -661,7 +721,7 @@ html.helper,body.helper-body{background:transparent}
     if(moved)await saveState(state);
     return moved;
   }
-  window.WorkCore={KEY,STATE_VERSION,seed,defaultTerms,defaultVendorFields,labels,josa,demoData,hasDemoData,clone,uid,todayISO,parse,iso,addDays,diffDays,pretty,esc,isTauri,nativeFiles,migrate,normalizeState,initStorage,saveState,watchState,readState,vendor,project,currentStep,eventRecords,dueCards,ddayLabel,ddayClass,horizonDays,horizonLabel,vendorSummaries,projectFromTemplate,completeEvent,reopenEvent,
+  window.WorkCore={KEY,STATE_VERSION,seed,defaultTerms,defaultVendorFields,labels,josa,demoData,hasDemoData,clone,uid,todayISO,parse,iso,addDays,diffDays,pretty,esc,isTauri,nativeFiles,migrate,normalizeState,initStorage,saveState,watchState,readState,vendor,project,currentStep,eventRecords,dueCards,ddayLabel,ddayClass,horizonDays,horizonLabel,vendorSummaries,isPeriod,periodDays,spansDay,phaseOf,sortDate,endOf,projectBands,projectFromTemplate,completeEvent,reopenEvent,
     putAttachment,readAttachment,deleteAttachment,attachmentsOf,purgeAttachments,revealAttachment,migrateAttachmentsToDisk,formatBytes,
     buildBackup,readBackup,restoreBackup,writeBackupFile,listBackups,readBackupFile,rotateBackups,revealBackups,maybeAutoBackup};
 })();
@@ -670,7 +730,7 @@ html.helper,body.helper-body{background:transparent}
 (async function(){
  const C=window.WorkCore;let state=await C.initStorage();const $=id=>document.getElementById(id);
  let L=C.labels(state.terms);
- function render(){const cards=C.dueCards(state);L=C.labels(state.terms);document.title=L.upcoming;$('helperTitle').textContent=L.upcoming;$('helperHorizon').textContent=C.horizonLabel(state.settings);$('helperList').innerHTML=cards.length?cards.map(r=>{const v=C.vendor(state,r.vendorId),p=C.project(state,r.projectId);return `<button class="helper-card ${C.ddayClass(r.date)}" data-kind="${r.kind}" data-id="${r.id}"><span><span class="helper-vendor">${C.esc(v?.name||L.noVendor)}</span><span class="helper-task">${C.esc(r.name)}</span><span class="helper-sub">${C.pretty(r.date)}${p?` · ${C.esc(p.name)}`:''}</span></span><span class="helper-dday">${C.ddayLabel(r.date)}</span></button>`}).join(''):`<div class="empty" data-tauri-drag-region>${C.esc(L.upcoming)}이 없습니다.<br>위 <b>+</b> 로 바로 추가할 수 있습니다.</div>`;$('helperUpdated').textContent=`${new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})} 갱신`;document.querySelectorAll('.helper-card').forEach(b=>b.addEventListener('click',()=>openInMain(b.dataset.kind,b.dataset.id)))}
+ function render(){const cards=C.dueCards(state);L=C.labels(state.terms);document.title=L.upcoming;$('helperTitle').textContent=L.upcoming;$('helperHorizon').textContent=C.horizonLabel(state.settings);$('helperList').innerHTML=cards.length?cards.map(r=>{const v=C.vendor(state,r.vendorId),p=C.project(state,r.projectId);return `<button class="helper-card ${C.ddayClass(r)}" data-kind="${r.kind}" data-id="${r.id}"><span><span class="helper-vendor">${C.esc(v?.name||L.noVendor)}</span><span class="helper-task">${C.esc(r.name)}</span><span class="helper-sub">${C.isPeriod(r)?`${C.pretty(r.date)} ~ ${C.pretty(r.endDate)}`:C.pretty(r.date)}${p?` · ${C.esc(p.name)}`:''}</span></span><span class="helper-dday">${C.ddayLabel(r)}</span></button>`}).join(''):`<div class="empty" data-tauri-drag-region>${C.esc(L.upcoming)}이 없습니다.<br>위 <b>+</b> 로 바로 추가할 수 있습니다.</div>`;$('helperUpdated').textContent=`${new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})} 갱신`;document.querySelectorAll('.helper-card').forEach(b=>b.addEventListener('click',()=>openInMain(b.dataset.kind,b.dataset.id)))}
  async function invoke(cmd,args){if(C.isTauri())try{return await window.__TAURI__.core.invoke(cmd,args||{})}catch(e){console.warn(e)}}
  async function openMain(){if(C.isTauri())await invoke('show_main');else if(window.opener)window.opener.focus()}
  // 카드 클릭은 본체를 띄우는 데서 끝나면 안 된다. 어떤 일정인지 공유 상태에 적어두면
@@ -684,20 +744,23 @@ html.helper,body.helper-body{background:transparent}
  function fillQuick(){
    $('qName').placeholder=L.fEventName;
    $('qName').setAttribute('aria-label',L.fEventName);
-   $('qDate').setAttribute('aria-label',`${state.terms.event} 날짜`);
+   $('qDate').setAttribute('aria-label',`${state.terms.event} 시작일`);
+   $('qEnd').setAttribute('aria-label',`${state.terms.event} ${L.fEndDate}`);
+   $('qEnd').title=L.fEndDate;
    $('qVendor').setAttribute('aria-label',L.fVendor);
    $('qVendor').innerHTML=`<option value="">${C.esc(L.noVendor)}</option>`+
      state.vendorTemplates.map(v=>`<option value="${C.esc(v.id)}">${C.esc(v.name)}</option>`).join('');
  }
- function openQuick(){fillQuick();$('qMsg').textContent='';$('qName').value='';$('qDate').value=C.todayISO();quick.hidden=false;$('helperQuick').setAttribute('aria-expanded','true');$('qName').focus()}
+ function openQuick(){fillQuick();$('qMsg').textContent='';$('qName').value='';$('qDate').value=C.todayISO();$('qEnd').value='';quick.hidden=false;$('helperQuick').setAttribute('aria-expanded','true');$('qName').focus()}
  function closeQuick(){quick.hidden=true;$('helperQuick').setAttribute('aria-expanded','false')}
  $('helperQuick').addEventListener('click',()=>{quick.hidden?openQuick():closeQuick()});
  $('qCancel').addEventListener('click',closeQuick);
  quick.addEventListener('submit',async e=>{
    e.preventDefault();
-   const name=$('qName').value.trim(),date=$('qDate').value;
+   const name=$('qName').value.trim(),date=$('qDate').value,endDate=$('qEnd').value||null;
    if(!name||!date){$('qMsg').textContent=`${L.fEventName}과 날짜를 확인하세요.`;return}
-   state.manualEvents.push({id:C.uid('m'),vendorId:$('qVendor').value||null,projectId:null,date,name,memo:'',completed:false,completedAt:null,logs:[],attachments:[]});
+   if(endDate&&endDate<date){$('qMsg').textContent=L.badEndDate;return}
+   state.manualEvents.push({id:C.uid('m'),vendorId:$('qVendor').value||null,projectId:null,date,endDate,name,memo:'',completed:false,completedAt:null,logs:[],attachments:[]});
    await C.saveState(state);
    closeQuick();render();
  });

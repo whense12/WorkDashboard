@@ -50,7 +50,23 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .workspace{flex:1;min-height:0;display:grid;grid-template-columns:340px minmax(0,1fr);gap:10px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
 .sidebar{height:100%;min-height:0;overflow:hidden;display:flex;flex-direction:column}.side-head{padding:11px 12px 9px;border-bottom:1px solid var(--line)}.side-row{display:flex;align-items:center;justify-content:space-between;gap:8px}.side-title{font-size:var(--fs-md);font-weight:850}.horizon{display:flex;align-items:center;gap:5px;font-size:var(--fs-xs);color:var(--muted)}.horizon select,.horizon input{height:var(--ctl-h-sm);border:1px solid var(--line);background:#fff;border-radius:8px;padding:0 6px;font-size:var(--fs-sm);font-weight:750}.horizon input{width:68px}.side-caption{font-size:var(--fs-xs);color:var(--muted);margin-top:5px}.due-list{padding:8px;display:grid;gap:7px;overflow:auto;align-content:start}.due-card{border:1px solid var(--line);background:#fff;border-radius:11px;padding:12px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;text-align:left;width:100%}.due-card:hover{border-color:#b1b8be;background:#fafbfc}.due-vendor{display:block;font-size:var(--fs-md);font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.due-task{display:block;font-size:var(--fs-sm);font-weight:750;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.due-sub{display:block;font-size:var(--fs-xs);color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.due-dday{min-width:64px;height:48px;border-radius:9px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-size:var(--fs-md);font-weight:900;font-variant-numeric:tabular-nums}.due-card.today .due-dday{background:var(--warn-soft);color:var(--warn)}.due-card.overdue .due-dday{background:var(--danger-soft);color:var(--danger)}.due-extra{font-size:var(--fs-xs);color:var(--muted);margin-top:5px}.empty{padding:30px 14px;text-align:center;color:var(--muted);font-size:var(--fs-xs)}
 .calendar-panel{height:100%;min-height:0;overflow:hidden;display:flex;flex-direction:column}.cal-toolbar{height:50px;flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:0 10px;border-bottom:1px solid var(--line)}.month-title{font-size:var(--fs-md);font-weight:900;min-width:104px;text-align:center;letter-spacing:-.02em}.cal-spacer{flex:1}.hint{font-size:var(--fs-xs);color:var(--muted)}
-.calendar-scroll{flex:1;min-height:0;overflow:auto;scrollbar-gutter:stable}.weekdays{position:sticky;top:0;z-index:6;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:#f7f8f9;border-bottom:1px solid var(--line)}.weekdays div{padding:8px 4px;text-align:center;font-size:var(--fs-xs);color:var(--muted);font-weight:800}.month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));align-items:stretch}.day{position:relative;min-height:146px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:6px;background:#fff;cursor:pointer}.day:nth-child(7n){border-right:0}.day:hover{background:#fafbfc}.day.out{background:#fafbfc;color:#b1b8be;cursor:default}.day.today{background:var(--today);box-shadow:inset 0 0 0 2px var(--accent-line);z-index:1}.day.today:before{content:"";position:absolute;left:0;right:0;top:0;height:5px;background:var(--accent-line)}.day-head{height:28px;display:flex;align-items:center;justify-content:space-between;gap:4px}.day-num{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font-size:14px;font-weight:850;font-variant-numeric:tabular-nums}.weekend .day-num{color:var(--danger)}.today .day-num{background:var(--accent);color:#fff}.today-label{font-size:var(--fs-xs);font-weight:900;letter-spacing:.06em;color:var(--accent)}.events{display:grid;gap:4px;margin-top:5px}.event{width:100%;border:0;background:#eef0f3;border-radius:6px;padding:5px 7px;font-size:var(--fs-xs);line-height:1.35;text-align:left;color:var(--ink);white-space:normal;word-break:keep-all;overflow-wrap:anywhere}.event:hover{background:#e0e5ec}.event.done{color:#6d7882;background:#f4f5f6;text-decoration:line-through}.event.overdue:not(.done){background:var(--danger-soft);color:var(--danger)}.event.manual{border-left:3px solid #8a949e}.add-hint{position:absolute;right:6px;bottom:5px;font-size:var(--fs-xs);color:#8a949e;opacity:0}.day:hover .add-hint{opacity:1}
+.calendar-scroll{flex:1;min-height:0;overflow:auto;scrollbar-gutter:stable}.weekdays{position:sticky;top:0;z-index:6;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:#f7f8f9;border-bottom:1px solid var(--line)}.weekdays div{padding:8px 4px;text-align:center;font-size:var(--fs-xs);color:var(--muted);font-weight:800}.month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));align-items:stretch}.day{position:relative;min-height:146px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:6px;background:#fff;cursor:pointer}.day:nth-child(7n){border-right:0}.day:hover{background:#fafbfc}.day.out{background:#fafbfc;color:#b1b8be;cursor:default}.day.today{background:var(--today);box-shadow:inset 0 0 0 2px var(--accent-line);z-index:1}.day.today:before{content:"";position:absolute;left:0;right:0;top:0;height:5px;background:var(--accent-line)}.day-head{height:28px;display:flex;align-items:center;justify-content:space-between;gap:4px}.day-num{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font-size:14px;font-weight:850;font-variant-numeric:tabular-nums}.weekend .day-num{color:var(--danger)}.today .day-num{background:var(--accent);color:#fff}.today-label{font-size:var(--fs-xs);font-weight:900;letter-spacing:.06em;color:var(--accent)}.events{display:grid;gap:4px;margin-top:5px}.event{width:100%;border:0;background:#eef0f3;border-radius:6px;padding:5px 7px;font-size:var(--fs-xs);line-height:1.35;text-align:left;color:var(--ink);white-space:normal;word-break:keep-all;overflow-wrap:anywhere}.event:hover{background:#e0e5ec}.event.done{color:#6d7882;background:#f4f5f6;text-decoration:line-through}.event.overdue:not(.done){background:var(--danger-soft);color:var(--danger)}.event.today:not(.done){background:var(--warn-soft);color:var(--warn)}.event.manual{border-left:3px solid #8a949e}
+/* 기간 일정 — 시작~종료 모든 날짜 칸에 칩이 선다. 월 그리드가 날짜 칸 단위라 진짜 하나로
+   이어진 막대는 아니다. 시작 칸만 왼쪽을, 종료 칸만 오른쪽을 둥글게 하고 이어지는 칸은
+   톤을 낮춰 하나의 띠로 읽히게 한다. 클릭 대상은 매일 살아 있다. */
+.event.period{border-radius:0;margin-left:-7px;margin-right:-7px;padding-left:7px;padding-right:7px}
+.event.period.start{border-top-left-radius:6px;border-bottom-left-radius:6px;margin-left:0}
+.event.period.end{border-top-right-radius:6px;border-bottom-right-radius:6px;margin-right:0}
+.event.period.cont{color:var(--muted)}
+.event.period.cont:before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.45;margin-right:5px;vertical-align:middle}
+/* 행사 기간은 일정 칩과 섞지 않는다. "이 날 할 일"과 "이 행사가 도는 중"은 층위가 다르다. */
+.day-bands{display:grid;gap:2px;margin-top:4px}
+.day-band{display:block;height:17px;line-height:17px;padding:0 6px;font-size:var(--fs-xs);font-weight:800;
+  color:var(--accent);background:var(--accent-soft);border-radius:0;
+  margin-left:-7px;margin-right:-7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.day-band.start{border-top-left-radius:999px;border-bottom-left-radius:999px;margin-left:0;padding-left:9px}
+.day-band.end{border-top-right-radius:999px;border-bottom-right-radius:999px;margin-right:0}
+.day.out .day-band{opacity:.45}.add-hint{position:absolute;right:6px;bottom:5px;font-size:var(--fs-xs);color:#8a949e;opacity:0}.day:hover .add-hint{opacity:1}
 /* 업체별 요약 — 캘린더와 같은 자리를 쓰는 두 번째 축.
    색은 기존 규칙 그대로: 파랑(예정) → 주황(오늘) → 빨강(지남), 초록은 완료에만.
    진행률 막대도 완료분이므로 초록이다. 새 색을 만들지 않는다. */
@@ -119,6 +135,7 @@ html.helper,body.helper-body{background:transparent}
 .helper-quick[hidden]{display:none}
 .helper-quick input,.helper-quick select{width:100%;height:var(--ctl-h-sm);border:1px solid #cdd1d5;border-radius:8px;background:#fff;padding:0 8px;font-size:var(--fs-xs)}
 .helper-quick .q-row{display:grid;grid-template-columns:minmax(0,1fr) 118px;gap:6px}
+.helper-quick .q-row.two{grid-template-columns:1fr 1fr}
 .helper-quick .q-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px}
 .helper-quick .q-msg{flex:1;font-size:var(--fs-xs);color:var(--danger);font-weight:750}
 .helper-quick .q-save{height:var(--ctl-h-sm);border:0;border-radius:8px;background:var(--accent);color:#fff;font-size:var(--fs-xs);font-weight:850;padding:0 14px}
@@ -179,7 +196,8 @@ html.helper,body.helper-body{background:transparent}
 </main></div>
 
 <div class="modal-bg" id="scheduleModal"><section class="modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="scheduleTitle"><div class="modal-head"><h2 id="scheduleTitle" data-t="eventModalTitle"></h2><button class="close" data-close="scheduleModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body"><div class="form-grid">
-  <div class="field"><label for="sDate">날짜</label><input id="sDate" type="date"></div><div class="field"><label for="sVendor" data-t="fVendor"></label><select id="sVendor"></select></div>
+  <div class="field"><label for="sDate" data-t="fStartDate"></label><input id="sDate" type="date"></div><div class="field"><label for="sEnd" data-t="fEndDate"></label><input id="sEnd" type="date"></div>
+  <div class="field full"><label for="sVendor" data-t="fVendor"></label><select id="sVendor"></select></div>
   <div class="field full"><label for="sProject" data-t="fLinkedProject"></label><select id="sProject"></select><div class="field-note" data-t="fLinkedNote"></div></div>
   <div class="field full"><label for="sName" data-t="fEventName"></label><input id="sName" placeholder="예: 현장확인, 서류제출, 계약의뢰…"></div>
   <div class="field full"><label for="sMemo">메모</label><textarea id="sMemo" placeholder="필요한 내용만 간단히 기록"></textarea></div>
@@ -193,7 +211,7 @@ html.helper,body.helper-body{background:transparent}
 
 <div class="modal-bg" id="detailModal"><section class="modal detail-modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="detailTitle"><div class="modal-head"><h2 id="detailTitle" data-t="detailTitle"></h2><button class="close" data-close="detailModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body" id="detailBody"></div><div class="modal-foot"><button class="btn danger hidden" id="deleteEventBtn" data-t="deleteEvent"></button><button class="btn hidden" id="reopenBtn">완료 취소</button><button class="btn" id="changeDateBtn">날짜 변경</button><button class="btn primary" id="completeBtn">OK 완료</button></div></section></div>
 
-<div class="modal-bg" id="dateModal"><section class="modal narrow" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="dateTitle"><div class="modal-head"><h2 id="dateTitle">날짜 변경</h2><button class="close" data-close="dateModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body"><div class="field full"><label for="dNewDate">새 날짜</label><input id="dNewDate" type="date"></div><div class="field-note" id="dateModalNote"></div></div><div class="modal-foot"><button class="btn" data-close="dateModal">취소</button><button class="btn primary" id="saveDateBtn">날짜 저장</button></div></section></div>
+<div class="modal-bg" id="dateModal"><section class="modal narrow" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="dateTitle"><div class="modal-head"><h2 id="dateTitle">날짜 변경</h2><button class="close" data-close="dateModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body"><div class="form-grid"><div class="field"><label for="dNewDate">새 시작일</label><input id="dNewDate" type="date"></div><div class="field"><label for="dNewEnd" data-t="fNewEndDate"></label><input id="dNewEnd" type="date"></div></div><div class="field-note" id="dateModalNote"></div></div><div class="modal-foot"><button class="btn" data-close="dateModal">취소</button><button class="btn primary" id="saveDateBtn">날짜 저장</button></div></section></div>
 
 <div class="modal-bg" id="templateModal"><section class="modal wide" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="templateTitle"><div class="modal-head"><h2 id="templateTitle">템플릿 관리</h2><button class="close" data-close="templateModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body"><div class="tabs"><button class="tab active" data-template-tab="vendor" data-t="fVendorTemplate"></button><button class="tab" data-template-tab="work" data-t="fWorkTemplate"></button><button class="tab" data-template-tab="terms">용어·항목</button></div><div id="vendorTemplatePane"></div><div id="workTemplatePane" class="hidden"></div><div id="termsPane" class="hidden"></div></div><div class="modal-foot"><button class="btn" data-close="templateModal">닫기</button></div></section></div>
 
@@ -400,6 +418,25 @@ html.helper,body.helper-body{background:transparent}
   const addDays=(s,n)=>{const d=parse(s);d.setDate(d.getDate()+Number(n||0));return iso(d)};
   const diffDays=(s,base=todayISO())=>Math.round((parse(s)-parse(base))/86400000);
   const pretty=s=>{if(!s)return'';const d=parse(s);return `${d.getMonth()+1}.${d.getDate()}.`};
+  // ── 기간 ────────────────────────────────────────────────────────────────
+  // 일정이 마감일 하나로만 표현돼 있었다. 행사참여기간·접수기간처럼 시작과 끝이 있는 일은
+  // 두 건으로 쪼개 넣어야 했고, 둘이 이어져 있다는 사실이 화면 어디에도 남지 않았다.
+  // endDate 가 없으면 지금까지와 완전히 같게 동작한다.
+  const endOf=r=>{const st=r?.date;if(!st)return null;const e=r.endDate;return e&&e>st?e:st};
+  const isPeriod=r=>!!(r&&r.date&&r.endDate&&r.endDate>r.date);
+  const periodDays=r=>isPeriod(r)?diffDays(r.endDate,r.date)+1:1;
+  const spansDay=(r,ds)=>{const st=r?.date;return !!st&&ds>=st&&ds<=endOf(r)};
+  /** 'before' 시작 전 · 'on' 당일(단일) · 'during' 기간 중 · 'after' 지남 */
+  function phaseOf(r,base=todayISO()){
+    if(!r?.date)return 'none';
+    if(base<r.date)return 'before';
+    if(!isPeriod(r))return base>r.date?'after':'on';
+    return base>r.endDate?'after':'during';
+  }
+  // 정렬과 기준일 필터가 쓰는 날짜. 이미 시작한 행사가 D-14 기준 밖으로 밀려나면 안 된다.
+  const sortDate=r=>phaseOf(r)==='during'?todayISO():(r?.date||'');
+  // ddayLabel(rec) 과 ddayLabel(date) 를 모두 받는다. 기존 호출부를 한꺼번에 고치지 않아도 된다.
+  const asRange=(a,b)=>(a&&typeof a==='object')?{date:a.date,endDate:a.endDate}:{date:a,endDate:b||null};
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
   const uid=p=>`${p}-${Date.now()}-${Math.random().toString(16).slice(2,8)}`;
   const clone=x=>JSON.parse(JSON.stringify(x));
@@ -446,6 +483,10 @@ html.helper,body.helper-body{background:transparent}
       fVendor:V, fLinkedProject:`연결 ${P}`,
       fLinkedNote:`${j(P,['과','와'])} 무관한 ${j(E,['은','는'])} ‘일반 ${E}’을 선택합니다.`,
       fEventName:`${E}명`,
+      fStartDate:'시작일', fEndDate:'종료일(선택)', fNewEndDate:'새 종료일(선택)',
+      fProjectPeriod:`${P} 기간(선택)`, inProgress:'진행중',
+      periodSpan:(a,b,n)=>`${a} ~ ${b} · ${n}일`,
+      badEndDate:'종료일은 시작일보다 빠를 수 없습니다.',
       projectModalTitle:`${P} 추가`, saveProject:`${P} 등록`,
       fVendorTemplate:`${V} 템플릿`, fWorkTemplate:`${P} 템플릿`,
       fProjectName:`${P}명`, fFirstDate:`첫 ${E} 날짜`,
@@ -697,8 +738,9 @@ html.helper,body.helper-body{background:transparent}
   function currentStep(p){return p?.steps?.find(s=>!s.completed)||null}
   function eventRecords(state){
     const rows=[];
-    state.projects.forEach(p=>p.steps.forEach(s=>{if(s.dueDate)rows.push({kind:'step',id:s.id,date:s.dueDate,name:s.name,completed:!!s.completed,vendorId:p.vendorId,projectId:p.id,memo:s.memo||p.memo||'',step:s})}));
-    state.manualEvents.forEach(m=>rows.push({kind:'manual',id:m.id,date:m.date,name:m.name,completed:!!m.completed,vendorId:m.vendorId,projectId:m.projectId||null,memo:m.memo||'',manual:m}));
+    // 절차 단계에는 기간을 주지 않는다. 절차는 본질적으로 마감일이고, 기간을 주면 의미가 흐려진다.
+    state.projects.forEach(p=>p.steps.forEach(s=>{if(s.dueDate)rows.push({kind:'step',id:s.id,date:s.dueDate,endDate:null,name:s.name,completed:!!s.completed,vendorId:p.vendorId,projectId:p.id,memo:s.memo||p.memo||'',step:s})}));
+    state.manualEvents.forEach(m=>rows.push({kind:'manual',id:m.id,date:m.date,endDate:m.endDate||null,name:m.name,completed:!!m.completed,vendorId:m.vendorId,projectId:m.projectId||null,memo:m.memo||'',manual:m}));
     return rows;
   }
   function horizonDays(settings){if(settings.horizon==='all')return Infinity;if(settings.horizon==='custom')return Math.max(1,Number(settings.customHorizon||1));return Number(settings.horizon||14)}
@@ -707,8 +749,8 @@ html.helper,body.helper-body{background:transparent}
     const groups=new Map();
     future.forEach(e=>{const arr=groups.get(e.vendorId)||[];arr.push(e);groups.set(e.vendorId,arr)});
     const cards=[];
-    groups.forEach((arr,vendorId)=>{arr.sort((a,b)=>a.date.localeCompare(b.date));const first=arr[0],d=diffDays(first.date);if(d<=max||d<0||max===Infinity)cards.push({...first,extra:arr.length-1,dday:d})});
-    return cards.sort((a,b)=>a.date.localeCompare(b.date));
+    groups.forEach((arr,vendorId)=>{arr.sort((a,b)=>sortDate(a).localeCompare(sortDate(b))||a.date.localeCompare(b.date));const first=arr[0],d=diffDays(sortDate(first));if(d<=max||d<0||max===Infinity)cards.push({...first,extra:arr.length-1,dday:d})});
+    return cards.sort((a,b)=>sortDate(a).localeCompare(sortDate(b))||a.date.localeCompare(b.date));
   }
   // ── 업체별 요약 ──────────────────────────────────────────────────────────
   // 대시보드의 두 번째 축. 좌측 레일과 캘린더가 "언제"를 묻는다면 여기는
@@ -732,21 +774,21 @@ html.helper,body.helper-body{background:transparent}
       if(cur)b.openCount++;else b.doneCount++;
       // 클릭 대상은 "아직 안 끝났고 날짜가 잡힌 단계". 날짜 미정이면 열 상세가 없다.
       const rec=steps.find(s=>!s.completed&&s.dueDate);
-      b.items.push({type:'project',id:p.id,name:p.name,projectName:null,
+      b.items.push({type:'project',id:p.id,name:p.name,projectName:null,endDate:null,
         stepName:cur?cur.name:null,date:rec?rec.dueDate:null,completed:!cur,
         stepsDone:done,stepsTotal:steps.length,
         record:rec?{kind:'step',id:rec.id}:null});
     });
     state.manualEvents.forEach(m=>{
       const b=bucket(m.vendorId),p=project(state,m.projectId);
-      b.items.push({type:'manual',id:m.id,name:m.name,projectName:p?p.name:null,
+      b.items.push({type:'manual',id:m.id,name:m.name,projectName:p?p.name:null,endDate:m.endDate||null,
         stepName:null,date:m.date||null,completed:!!m.completed,
         stepsDone:0,stepsTotal:0,record:{kind:'manual',id:m.id}});
     });
     eventRecords(state).filter(e=>!e.completed&&e.date).forEach(e=>{
       const b=byVendor.get(e.vendorId||'');if(!b)return;
-      if(diffDays(e.date)<0)b.overdueCount++;
-      if(!b.next||e.date<b.next.date)b.next=e;
+      if(phaseOf(e)==='after')b.overdueCount++;              // 기간 건은 종료일이 지나야 지연이다
+      if(!b.next||sortDate(e)<sortDate(b.next))b.next=e;
     });
     const rank=i=>i.completed?2:(i.date?0:1);   // 날짜 있는 진행 건 → 날짜 미정 → 완료
     const rows=[...byVendor.values()].filter(b=>b.items.length);
@@ -758,8 +800,27 @@ html.helper,body.helper-body{background:transparent}
       ||String(a.next?.date||'').localeCompare(String(b.next?.date||''))
       ||String(a.vendor?.name||'').localeCompare(String(b.vendor?.name||'')));
   }
-  function ddayLabel(date){const n=diffDays(date);if(n===0)return'D-DAY';return n>0?`D-${n}`:`D+${Math.abs(n)}`}
-  function ddayClass(date){const n=diffDays(date);return n<0?'overdue':n===0?'today':''}
+  function ddayLabel(a,b){
+    const r=asRange(a,b);
+    switch(phaseOf(r)){
+      case 'during':return '진행중';
+      case 'before':return `D-${diffDays(r.date)}`;
+      case 'on':return 'D-DAY';
+      case 'after':return `D+${Math.abs(diffDays(endOf(r)))}`;
+      default:return '';
+    }
+  }
+  function ddayClass(a,b){
+    const ph=phaseOf(asRange(a,b));
+    // 색 축은 그대로다: 파랑(예정) -> 주황(오늘) -> 빨강(지남).
+    // '진행중'은 지금 벌어지고 있는 일이므로 '오늘' 자리에 놓는다. 글자가 달라 구분된다.
+    return ph==='after'?'overdue':(ph==='on'||ph==='during')?'today':'';
+  }
+  /** 캘린더 상단 띠로 그릴 행사 기간. "이 날 할 일"과 "이 행사가 도는 중"은 층위가 다르다. */
+  function projectBands(state){
+    return (state.projects||[]).filter(p=>p.startDate).map(p=>({
+      id:p.id,vendorId:p.vendorId,name:p.name,date:p.startDate,endDate:p.endDate||p.startDate}));
+  }
   function projectFromTemplate(template,vendorId,name,firstDate,memo=''){
     const id=uid('p');return {id,vendorId,name,memo,templateId:template.id,steps:template.steps.map((s,i)=>({id:uid(`${id}s`),name:s.name,offset:Number(s.offset||0),dueDate:i===0?firstDate:null,completed:false,completedAt:null,memo:'',logs:[],attachments:[]}))};
   }
@@ -897,7 +958,7 @@ html.helper,body.helper-body{background:transparent}
     if(moved)await saveState(state);
     return moved;
   }
-  window.WorkCore={KEY,STATE_VERSION,seed,defaultTerms,defaultVendorFields,labels,josa,demoData,hasDemoData,clone,uid,todayISO,parse,iso,addDays,diffDays,pretty,esc,isTauri,nativeFiles,migrate,normalizeState,initStorage,saveState,watchState,readState,vendor,project,currentStep,eventRecords,dueCards,ddayLabel,ddayClass,horizonDays,horizonLabel,vendorSummaries,projectFromTemplate,completeEvent,reopenEvent,
+  window.WorkCore={KEY,STATE_VERSION,seed,defaultTerms,defaultVendorFields,labels,josa,demoData,hasDemoData,clone,uid,todayISO,parse,iso,addDays,diffDays,pretty,esc,isTauri,nativeFiles,migrate,normalizeState,initStorage,saveState,watchState,readState,vendor,project,currentStep,eventRecords,dueCards,ddayLabel,ddayClass,horizonDays,horizonLabel,vendorSummaries,isPeriod,periodDays,spansDay,phaseOf,sortDate,endOf,projectBands,projectFromTemplate,completeEvent,reopenEvent,
     putAttachment,readAttachment,deleteAttachment,attachmentsOf,purgeAttachments,revealAttachment,migrateAttachmentsToDisk,formatBytes,
     buildBackup,readBackup,restoreBackup,writeBackupFile,listBackups,readBackupFile,rotateBackups,revealBackups,maybeAutoBackup};
 })();
@@ -940,7 +1001,7 @@ html.helper,body.helper-body{background:transparent}
   // 정적 HTML 의 data-t 를 사전 값으로 채운다. 마크업이 들어가는 문구만 innerHTML 로 넣는다.
   function applyStaticLabels(){document.title=L.app;qa('[data-t]').forEach(el=>{const v=L[el.dataset.t];if(typeof v==='string')el.textContent=v})}
   function renderHorizon(){const s=state.settings;$('horizonSelect').value=s.horizon;$('horizonCustom').value=s.customHorizon;$('horizonCustom').classList.toggle('hidden',s.horizon!=='custom')}
-  function renderDue(){const cards=C.dueCards(state),host=$('dueList');if(!cards.length){const blank=!state.projects.length&&!state.manualEvents.length;host.innerHTML=`<div class="empty">${blank?L.emptyBlank:L.emptyHorizon}</div>`;return}host.innerHTML=cards.map(r=>{const v=C.vendor(state,r.vendorId),p=C.project(state,r.projectId);return `<button class="due-card ${C.ddayClass(r.date)}" data-due-kind="${r.kind}" data-due-id="${r.id}"><span><span class="due-vendor">${C.esc(v?.name||L.noVendor)}</span><span class="due-task">${C.esc(r.name)}</span><span class="due-sub">${C.pretty(r.date)}${p?` · ${C.esc(p.name)}`:''}</span>${r.extra?`<span class="due-extra">${C.esc(L.laterCount(r.extra))}</span>`:''}</span><span class="due-dday">${C.ddayLabel(r.date)}</span></button>`}).join('');qa('[data-due-id]',host).forEach(b=>b.addEventListener('click',()=>openRecord(b.dataset.dueKind,b.dataset.dueId)))}
+  function renderDue(){const cards=C.dueCards(state),host=$('dueList');if(!cards.length){const blank=!state.projects.length&&!state.manualEvents.length;host.innerHTML=`<div class="empty">${blank?L.emptyBlank:L.emptyHorizon}</div>`;return}host.innerHTML=cards.map(r=>{const v=C.vendor(state,r.vendorId),p=C.project(state,r.projectId);return `<button class="due-card ${C.ddayClass(r)}" data-due-kind="${r.kind}" data-due-id="${r.id}"><span><span class="due-vendor">${C.esc(v?.name||L.noVendor)}</span><span class="due-task">${C.esc(r.name)}</span><span class="due-sub">${spanText(r)}${p?` · ${C.esc(p.name)}`:''}</span>${r.extra?`<span class="due-extra">${C.esc(L.laterCount(r.extra))}</span>`:''}</span><span class="due-dday">${C.ddayLabel(r)}</span></button>`}).join('');qa('[data-due-id]',host).forEach(b=>b.addEventListener('click',()=>openRecord(b.dataset.dueKind,b.dataset.dueId)))}
   // ── 업체별 요약 ──────────────────────────────────────────────────────────
   // 캘린더와 같은 자리를 쓰는 두 번째 축이다. 좌측 D-day 레일은 두 모드에서 모두 남는다 —
   // "뭐가 급한가"는 어느 화면을 보고 있든 사라지면 안 된다(발주서 §5.3).
@@ -961,9 +1022,9 @@ html.helper,body.helper-body{background:transparent}
     renderBoard();applyBoardMode();
   }
   function boardItemRow(it){
-    const dday=it.completed?'완료':(it.date?C.ddayLabel(it.date):L.boardNoDate);
-    const cls=it.completed?'done':(it.date?C.ddayClass(it.date):'undated');
-    const sub=[it.stepName,it.projectName,it.date?C.pretty(it.date):null].filter(Boolean).join(' · ');
+    const dday=it.completed?'완료':(it.date?C.ddayLabel(it):L.boardNoDate);
+    const cls=it.completed?'done':(it.date?C.ddayClass(it):'undated');
+    const sub=[it.stepName,it.projectName,it.date?spanText(it):null].filter(Boolean).join(' · ');
     const body=`<span class="bi-main"><span class="bi-name">${C.esc(it.name)}</span>${sub?`<span class="bi-sub">${C.esc(sub)}</span>`:''}</span>`
       +`${it.stepsTotal?`<span class="bi-steps">${it.stepsDone}/${it.stepsTotal}</span>`:''}`
       +`<span class="bi-dday ${cls}">${C.esc(dday)}</span>`;
@@ -984,8 +1045,8 @@ html.helper,body.helper-body{background:transparent}
         <button class="board-head" aria-expanded="${open}">
           <span class="bh-id"><span class="bh-name">${C.esc(b.vendor?.name||L.noVendor)}</span>${info?`<span class="bh-info">${C.esc(info)}</span>`:''}</span>
           <span class="bh-stat"><span class="bh-counts">${C.esc(L.boardOpen)} <b>${b.openCount}</b> · ${C.esc(L.boardDone)} <b>${b.doneCount}</b>${b.overdueCount?` <span class="bh-late">${C.esc(L.boardOverdue)} ${b.overdueCount}</span>`:''}</span><span class="bh-bar" role="img" aria-label="${C.esc(L.boardProgress)} ${pct}%"><i style="width:${pct}%"></i></span></span>
-          <span class="bh-next">${next?`<span class="bn-name">${C.esc(next.name)}</span><span class="bn-date">${C.pretty(next.date)}</span>`:`<span class="bn-name muted">${C.esc(L.boardEmpty)}</span>`}</span>
-          <span class="bh-dday ${next?C.ddayClass(next.date):'undated'}">${next?C.ddayLabel(next.date):'—'}</span>
+          <span class="bh-next">${next?`<span class="bn-name">${C.esc(next.name)}</span><span class="bn-date">${spanText(next)}</span>`:`<span class="bn-name muted">${C.esc(L.boardEmpty)}</span>`}</span>
+          <span class="bh-dday ${next?C.ddayClass(next):'undated'}">${next?C.ddayLabel(next):'—'}</span>
         </button>
         <div class="board-items">${b.items.map(boardItemRow).join('')}</div>
       </section>`;
@@ -998,12 +1059,24 @@ html.helper,body.helper-body{background:transparent}
     // 클릭하면 지금 쓰던 상세 모달이 그대로 열린다. 새 조작 방식을 만들지 않는다.
     qa('.board-item[data-due-id]',host).forEach(b=>b.addEventListener('click',()=>openRecord(b.dataset.dueKind,b.dataset.dueId)));
   }
+  // 기간 일정은 시작~종료 모든 날짜 칸에 선다. 월 그리드가 날짜 칸 단위라 진짜 하나로
+  // 이어진 막대는 아니다. 모서리 처리와 톤으로 이어짐을 표현하고, 클릭 대상은 매일 살려 둔다.
+  function edgeClass(r,ds){
+    if(!C.isPeriod(r))return '';
+    return ['period',r.date===ds?'start':'',C.endOf(r)===ds?'end':'',r.date!==ds?'cont':''].filter(Boolean).join(' ');
+  }
+  // 날짜 문구는 한 곳에서 만든다. 기간이면 시작~종료, 아니면 지금까지와 같다.
+  const spanText=r=>C.isPeriod(r)?`${C.pretty(r.date)} ~ ${C.pretty(r.endDate)}`:C.pretty(r.date);
   function allEventRecords(){return C.eventRecords(state)}
-  function renderCalendar(){const y=currentMonth.getFullYear(),m=currentMonth.getMonth();$('monthTitle').textContent=`${y}년 ${m+1}월`;$('monthGrid').innerHTML='';const first=new Date(y,m,1),before=first.getDay(),days=new Date(y,m+1,0).getDate(),cells=Math.ceil((before+days)/7)*7,events=allEventRecords();for(let i=0;i<cells;i++){const d=new Date(y,m,1-before+i),ds=C.iso(d),inMonth=d.getMonth()===m,isToday=ds===C.todayISO(),rows=events.filter(e=>e.date===ds).sort((a,b)=>Number(a.completed)-Number(b.completed));const cell=document.createElement('div');cell.className=`day ${inMonth?'':'out'} ${[0,6].includes(d.getDay())?'weekend':''} ${isToday?'today':''}`;cell.dataset.date=ds;cell.innerHTML=`<div class="day-head"><span class="day-num">${d.getDate()}</span>${isToday?'<span class="today-label">TODAY</span>':''}</div><div class="events">${rows.map(r=>{const v=C.vendor(state,r.vendorId);return `<button class="event ${r.completed?'done':''} ${r.kind==='manual'?'manual':''} ${!r.completed?C.ddayClass(r.date):''}" data-event-kind="${r.kind}" data-event-id="${r.id}" title="${C.esc(v?.name||'')} · ${C.esc(r.name)}">${r.completed?'✓ ':''}${C.esc(v?.name||L.noVendor)} · ${C.esc(r.name)}</button>`}).join('')}</div>${inMonth?`<span class="add-hint">+ ${C.esc(state.terms.event)}</span>`:''}`;if(inMonth)cell.addEventListener('click',e=>{if(e.target.closest('[data-event-id]'))return;openSchedule(ds)});$('monthGrid').appendChild(cell)}qa('[data-event-id]',$('monthGrid')).forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();openRecord(b.dataset.eventKind,b.dataset.eventId)}))}
+  function renderCalendar(){const y=currentMonth.getFullYear(),m=currentMonth.getMonth();$('monthTitle').textContent=`${y}년 ${m+1}월`;$('monthGrid').innerHTML='';const first=new Date(y,m,1),before=first.getDay(),days=new Date(y,m+1,0).getDate(),cells=Math.ceil((before+days)/7)*7,events=allEventRecords(),bands=C.projectBands(state);for(let i=0;i<cells;i++){const d=new Date(y,m,1-before+i),ds=C.iso(d),inMonth=d.getMonth()===m,isToday=ds===C.todayISO(),rows=events.filter(e=>C.spansDay(e,ds)).sort((a,b)=>Number(a.completed)-Number(b.completed)),dayBands=bands.filter(b=>C.spansDay(b,ds));const cell=document.createElement('div');cell.className=`day ${inMonth?'':'out'} ${[0,6].includes(d.getDay())?'weekend':''} ${isToday?'today':''}`;cell.dataset.date=ds;cell.innerHTML=`<div class="day-head"><span class="day-num">${d.getDate()}</span>${isToday?'<span class="today-label">TODAY</span>':''}</div>${dayBands.length?`<div class="day-bands">${dayBands.map(b=>`<span class="day-band ${edgeClass(b,ds)}" title="${C.esc(b.name)} · ${spanText(b)}">${b.date===ds||d.getDay()===0?C.esc(b.name):''}</span>`).join('')}</div>`:''}<div class="events">${rows.map(r=>{const v=C.vendor(state,r.vendorId);return `<button class="event ${r.completed?'done':''} ${r.kind==='manual'?'manual':''} ${!r.completed?C.ddayClass(r):''} ${edgeClass(r,ds)}" data-event-kind="${r.kind}" data-event-id="${r.id}" title="${C.esc(v?.name||'')} · ${C.esc(r.name)} · ${spanText(r)}">${r.completed?'✓ ':''}${C.esc(v?.name||L.noVendor)} · ${C.esc(r.name)}${C.isPeriod(r)&&r.date===ds?` (${C.periodDays(r)}일)`:''}</button>`}).join('')}</div>${inMonth?`<span class="add-hint">+ ${C.esc(state.terms.event)}</span>`:''}`;if(inMonth)cell.addEventListener('click',e=>{if(e.target.closest('[data-event-id]'))return;openSchedule(ds)});$('monthGrid').appendChild(cell)}qa('[data-event-id]',$('monthGrid')).forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();openRecord(b.dataset.eventKind,b.dataset.eventId)}))}
   function fillSelects(){const vendorOpts=state.vendorTemplates.map(v=>`<option value="${v.id}">${C.esc(v.name)}</option>`).join('');$('sVendor').innerHTML=vendorOpts;$('wVendor').innerHTML=vendorOpts;$('wTemplate').innerHTML=state.workTemplates.map(t=>`<option value="${t.id}">${C.esc(t.name)}</option>`).join('');updateProjectSelect()}
   function updateProjectSelect(){const vid=$('sVendor').value;const rows=state.projects.filter(p=>p.vendorId===vid);$('sProject').innerHTML=`<option value="">${C.esc(L.genericEvent)}</option>`+rows.map(p=>`<option value="${p.id}">${C.esc(p.name)}</option>`).join('')}
-  function openSchedule(date=C.todayISO()){selectedRecord=null;$('scheduleTitle').textContent=L.eventModalTitle;$('sDate').value=date;fillSelects();$('sName').value='';$('sMemo').value='';show('scheduleModal');setTimeout(()=>$('sName').focus(),0)}
-  async function saveSchedule(){const date=$('sDate').value,vendorId=$('sVendor').value,name=$('sName').value.trim();if(!date||!vendorId||!name){toast(L.needEventFields);return}state.manualEvents.push({id:C.uid('m'),vendorId,projectId:$('sProject').value||null,date,name,memo:$('sMemo').value.trim(),completed:false,completedAt:null,logs:[],attachments:[]});hide('scheduleModal');await persist(L.savedEvent)}
+  function openSchedule(date=C.todayISO()){selectedRecord=null;$('scheduleTitle').textContent=L.eventModalTitle;$('sDate').value=date;$('sEnd').value='';fillSelects();$('sName').value='';$('sMemo').value='';show('scheduleModal');setTimeout(()=>$('sName').focus(),0)}
+  async function saveSchedule(){const date=$('sDate').value,endDate=$('sEnd').value||null,vendorId=$('sVendor').value,name=$('sName').value.trim();
+    if(!date||!vendorId||!name){toast(L.needEventFields);return}
+    if(endDate&&endDate<date){toast(L.badEndDate);return}
+    state.manualEvents.push({id:C.uid('m'),vendorId,projectId:$('sProject').value||null,date,endDate,name,memo:$('sMemo').value.trim(),completed:false,completedAt:null,logs:[],attachments:[]});
+    hide('scheduleModal');await persist(L.savedEvent)}
   function openWork(){fillSelects();$('wProject').value='';$('wFirstDate').value=C.todayISO();$('wMemo').value='';show('workModal')}
   async function saveWork(){const vendorId=$('wVendor').value,template=state.workTemplates.find(t=>t.id===$('wTemplate').value),name=$('wProject').value.trim(),date=$('wFirstDate').value;if(!vendorId||!template||!name||!date){toast(L.needProjectFields);return}state.projects.push(C.projectFromTemplate(template,vendorId,name,date,$('wMemo').value.trim()));hide('workModal');await persist(L.savedProject)}
   function findRecord(kind,id){return allEventRecords().find(r=>r.kind===kind&&r.id===id)}
@@ -1012,8 +1085,8 @@ html.helper,body.helper-body{background:transparent}
   function openRecord(kind,id){selectedRecord=findRecord(kind,id);if(!selectedRecord)return;const v=C.vendor(state,selectedRecord.vendorId),p=C.project(state,selectedRecord.projectId),entity=recordEntity(selectedRecord);if(entity){entity.logs=Array.isArray(entity.logs)?entity.logs:[];entity.attachments=Array.isArray(entity.attachments)?entity.attachments:[]}
     $('detailTitle').textContent=L.detailTitle;$('deleteEventBtn').classList.toggle('hidden',kind!=='manual');$('completeBtn').classList.toggle('hidden',selectedRecord.completed);$('changeDateBtn').classList.toggle('hidden',selectedRecord.completed);$('reopenBtn').classList.toggle('hidden',!selectedRecord.completed);const steps=p?.steps||[];
     const logs=(entity?.logs||[]).slice().sort((a,b)=>String(b.time).localeCompare(String(a.time))),files=entity?.attachments||[];
-    $('detailBody').innerHTML=`<div class="detail-hero"><div><div class="detail-vendor">${C.esc(v?.name||'업체')}</div><div class="detail-project">${C.esc(p?.name||L.genericEvent)}</div></div><div class="detail-dday ${selectedRecord.completed?'done':C.ddayClass(selectedRecord.date)}">${selectedRecord.completed?'완료':C.ddayLabel(selectedRecord.date)}</div></div>
-    <div class="current-box"><div class="current-label">${C.esc(selectedRecord.kind==='manual'?state.terms.event:L.selectedStep)}</div><div class="current-title">${C.esc(selectedRecord.name)}</div><div class="current-date">${C.pretty(selectedRecord.date)}${selectedRecord.memo?` · ${C.esc(selectedRecord.memo)}`:''}</div></div>
+    $('detailBody').innerHTML=`<div class="detail-hero"><div><div class="detail-vendor">${C.esc(v?.name||'업체')}</div><div class="detail-project">${C.esc(p?.name||L.genericEvent)}</div></div><div class="detail-dday ${selectedRecord.completed?'done':C.ddayClass(selectedRecord)}">${selectedRecord.completed?'완료':C.ddayLabel(selectedRecord)}</div></div>
+    <div class="current-box"><div class="current-label">${C.esc(selectedRecord.kind==='manual'?state.terms.event:L.selectedStep)}</div><div class="current-title">${C.esc(selectedRecord.name)}</div><div class="current-date">${C.isPeriod(selectedRecord)?C.esc(L.periodSpan(C.pretty(selectedRecord.date),C.pretty(selectedRecord.endDate),C.periodDays(selectedRecord))):C.pretty(selectedRecord.date)}${selectedRecord.memo?` · ${C.esc(selectedRecord.memo)}`:''}</div></div>
     ${vendorInfoRow(v)}
     <section class="worklog-section"><div class="section-headline"><div><b>${C.esc(L.worklog)}</b><span>진행 경과, 통화·협의 내용, 전달사항을 계속 남길 수 있습니다.</span></div></div><div class="log-compose"><textarea id="workLogText" placeholder="예: 업체 담당자와 통화. 평가서 보완본을 8/14 오전까지 제출하기로 함."></textarea><button class="btn primary" id="addWorkLogBtn">기록 추가</button></div><div class="worklog-list">${logs.length?logs.map(l=>`<div class="worklog-item"><div class="worklog-time">${new Intl.DateTimeFormat('ko-KR',{year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(l.time))}</div><div class="worklog-text">${C.esc(l.text)}</div><button class="tiny-link danger" data-delete-log="${l.id}">삭제</button></div>`).join(''):'<div class="section-empty">아직 기록이 없습니다.</div>'}</div></section>
     <section class="attachment-section"><div class="section-headline"><div><b>첨부파일</b><span>이 일정과 관련된 문서·사진을 로컬에 보관합니다.</span></div><label class="btn file-btn" for="detailFiles">+ 파일 첨부</label><input id="detailFiles" type="file" multiple hidden></div><div class="attachment-list">${files.length?files.map(f=>`<div class="attachment-item"><span class="file-icon">↳</span><span class="attachment-main"><b>${C.esc(f.name)}</b><small>${C.formatBytes(f.size)}</small></span><button class="tiny-link" data-download-file="${f.id}">열기/저장</button><button class="tiny-link danger" data-delete-file="${f.id}">삭제</button></div>`).join(''):'<div class="section-empty">첨부된 파일이 없습니다.</div>'}</div><div class="attachment-note">첨부파일은 이 PC/브라우저의 로컬 저장소에 보관됩니다. 다른 PC로 옮길 때는 파일 백업 기능을 별도로 추가하는 것이 안전합니다.</div></section>
@@ -1042,9 +1115,16 @@ html.helper,body.helper-body{background:transparent}
   async function deleteAttachment(id){const entity=recordEntity(selectedRecord),meta=attachmentMeta(id);if(!entity||!meta)return;if(!confirm('이 첨부파일을 삭제할까요?'))return;entity.attachments=(entity.attachments||[]).filter(x=>x.id!==id);await C.deleteAttachment(meta);await refreshDetail('첨부파일을 삭제했습니다.')}
   async function completeSelected(){if(!selectedRecord)return;const next=C.completeEvent(state,selectedRecord,C.todayISO());hide('detailModal');await persist(next?`완료 · 다음 일정 ${next.name} ${C.pretty(next.dueDate)}`:'완료 처리했습니다.')}
   // 날짜 변경은 네이티브 prompt() 대신 앱 안의 date 입력으로 받는다.
-  function openDateModal(){if(!selectedRecord||selectedRecord.completed)return;$('dNewDate').value=selectedRecord.date;$('dateModalNote').textContent=`${C.esc(selectedRecord.name)} · 현재 ${C.pretty(selectedRecord.date)}`;show('dateModal');setTimeout(()=>$('dNewDate').focus(),0)}
-  async function saveSelectedDate(){const next=$('dNewDate').value;if(!selectedRecord||!next){toast('날짜를 선택하세요.');return}
-    if(selectedRecord.kind==='manual'){const m=state.manualEvents.find(x=>x.id===selectedRecord.id);if(m)m.date=next}
+  function openDateModal(){if(!selectedRecord||selectedRecord.completed)return;
+    $('dNewDate').value=selectedRecord.date;
+    $('dNewEnd').value=selectedRecord.endDate||'';
+    // 절차 단계는 마감일이다. 기간 칸을 열어 두면 의미가 흐려지므로 일정에서만 보인다.
+    $('dNewEnd').closest('.field').classList.toggle('hidden',selectedRecord.kind!=='manual');
+    $('dateModalNote').textContent=`${selectedRecord.name} · 현재 ${spanText(selectedRecord)}`;
+    show('dateModal');setTimeout(()=>$('dNewDate').focus(),0)}
+  async function saveSelectedDate(){const next=$('dNewDate').value,nextEnd=$('dNewEnd').value||null;if(!selectedRecord||!next){toast('날짜를 선택하세요.');return}
+    if(selectedRecord.kind==='manual'&&nextEnd&&nextEnd<next){toast(L.badEndDate);return}
+    if(selectedRecord.kind==='manual'){const m=state.manualEvents.find(x=>x.id===selectedRecord.id);if(m){m.date=next;m.endDate=nextEnd}}
     else{const p=C.project(state,selectedRecord.projectId),s=p?.steps.find(x=>x.id===selectedRecord.id);if(s)s.dueDate=next}
     hide('dateModal');hide('detailModal');await persist(L.changedDate)}
   // 완료 취소 — 잘못 누른 `OK 완료` 를 되돌리는 경로. 기록·첨부·완료일 외 데이터는 그대로 둔다.

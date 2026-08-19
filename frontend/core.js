@@ -8,6 +8,25 @@
   const addDays=(s,n)=>{const d=parse(s);d.setDate(d.getDate()+Number(n||0));return iso(d)};
   const diffDays=(s,base=todayISO())=>Math.round((parse(s)-parse(base))/86400000);
   const pretty=s=>{if(!s)return'';const d=parse(s);return `${d.getMonth()+1}.${d.getDate()}.`};
+  // ── 기간 ────────────────────────────────────────────────────────────────
+  // 일정이 마감일 하나로만 표현돼 있었다. 행사참여기간·접수기간처럼 시작과 끝이 있는 일은
+  // 두 건으로 쪼개 넣어야 했고, 둘이 이어져 있다는 사실이 화면 어디에도 남지 않았다.
+  // endDate 가 없으면 지금까지와 완전히 같게 동작한다.
+  const endOf=r=>{const st=r?.date;if(!st)return null;const e=r.endDate;return e&&e>st?e:st};
+  const isPeriod=r=>!!(r&&r.date&&r.endDate&&r.endDate>r.date);
+  const periodDays=r=>isPeriod(r)?diffDays(r.endDate,r.date)+1:1;
+  const spansDay=(r,ds)=>{const st=r?.date;return !!st&&ds>=st&&ds<=endOf(r)};
+  /** 'before' 시작 전 · 'on' 당일(단일) · 'during' 기간 중 · 'after' 지남 */
+  function phaseOf(r,base=todayISO()){
+    if(!r?.date)return 'none';
+    if(base<r.date)return 'before';
+    if(!isPeriod(r))return base>r.date?'after':'on';
+    return base>r.endDate?'after':'during';
+  }
+  // 정렬과 기준일 필터가 쓰는 날짜. 이미 시작한 행사가 D-14 기준 밖으로 밀려나면 안 된다.
+  const sortDate=r=>phaseOf(r)==='during'?todayISO():(r?.date||'');
+  // ddayLabel(rec) 과 ddayLabel(date) 를 모두 받는다. 기존 호출부를 한꺼번에 고치지 않아도 된다.
+  const asRange=(a,b)=>(a&&typeof a==='object')?{date:a.date,endDate:a.endDate}:{date:a,endDate:b||null};
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
   const uid=p=>`${p}-${Date.now()}-${Math.random().toString(16).slice(2,8)}`;
   const clone=x=>JSON.parse(JSON.stringify(x));
@@ -54,6 +73,10 @@
       fVendor:V, fLinkedProject:`연결 ${P}`,
       fLinkedNote:`${j(P,['과','와'])} 무관한 ${j(E,['은','는'])} ‘일반 ${E}’을 선택합니다.`,
       fEventName:`${E}명`,
+      fStartDate:'시작일', fEndDate:'종료일(선택)', fNewEndDate:'새 종료일(선택)',
+      fProjectPeriod:`${P} 기간(선택)`, inProgress:'진행중',
+      periodSpan:(a,b,n)=>`${a} ~ ${b} · ${n}일`,
+      badEndDate:'종료일은 시작일보다 빠를 수 없습니다.',
       projectModalTitle:`${P} 추가`, saveProject:`${P} 등록`,
       fVendorTemplate:`${V} 템플릿`, fWorkTemplate:`${P} 템플릿`,
       fProjectName:`${P}명`, fFirstDate:`첫 ${E} 날짜`,
@@ -305,8 +328,9 @@
   function currentStep(p){return p?.steps?.find(s=>!s.completed)||null}
   function eventRecords(state){
     const rows=[];
-    state.projects.forEach(p=>p.steps.forEach(s=>{if(s.dueDate)rows.push({kind:'step',id:s.id,date:s.dueDate,name:s.name,completed:!!s.completed,vendorId:p.vendorId,projectId:p.id,memo:s.memo||p.memo||'',step:s})}));
-    state.manualEvents.forEach(m=>rows.push({kind:'manual',id:m.id,date:m.date,name:m.name,completed:!!m.completed,vendorId:m.vendorId,projectId:m.projectId||null,memo:m.memo||'',manual:m}));
+    // 절차 단계에는 기간을 주지 않는다. 절차는 본질적으로 마감일이고, 기간을 주면 의미가 흐려진다.
+    state.projects.forEach(p=>p.steps.forEach(s=>{if(s.dueDate)rows.push({kind:'step',id:s.id,date:s.dueDate,endDate:null,name:s.name,completed:!!s.completed,vendorId:p.vendorId,projectId:p.id,memo:s.memo||p.memo||'',step:s})}));
+    state.manualEvents.forEach(m=>rows.push({kind:'manual',id:m.id,date:m.date,endDate:m.endDate||null,name:m.name,completed:!!m.completed,vendorId:m.vendorId,projectId:m.projectId||null,memo:m.memo||'',manual:m}));
     return rows;
   }
   function horizonDays(settings){if(settings.horizon==='all')return Infinity;if(settings.horizon==='custom')return Math.max(1,Number(settings.customHorizon||1));return Number(settings.horizon||14)}
@@ -315,8 +339,8 @@
     const groups=new Map();
     future.forEach(e=>{const arr=groups.get(e.vendorId)||[];arr.push(e);groups.set(e.vendorId,arr)});
     const cards=[];
-    groups.forEach((arr,vendorId)=>{arr.sort((a,b)=>a.date.localeCompare(b.date));const first=arr[0],d=diffDays(first.date);if(d<=max||d<0||max===Infinity)cards.push({...first,extra:arr.length-1,dday:d})});
-    return cards.sort((a,b)=>a.date.localeCompare(b.date));
+    groups.forEach((arr,vendorId)=>{arr.sort((a,b)=>sortDate(a).localeCompare(sortDate(b))||a.date.localeCompare(b.date));const first=arr[0],d=diffDays(sortDate(first));if(d<=max||d<0||max===Infinity)cards.push({...first,extra:arr.length-1,dday:d})});
+    return cards.sort((a,b)=>sortDate(a).localeCompare(sortDate(b))||a.date.localeCompare(b.date));
   }
   // ── 업체별 요약 ──────────────────────────────────────────────────────────
   // 대시보드의 두 번째 축. 좌측 레일과 캘린더가 "언제"를 묻는다면 여기는
@@ -340,21 +364,21 @@
       if(cur)b.openCount++;else b.doneCount++;
       // 클릭 대상은 "아직 안 끝났고 날짜가 잡힌 단계". 날짜 미정이면 열 상세가 없다.
       const rec=steps.find(s=>!s.completed&&s.dueDate);
-      b.items.push({type:'project',id:p.id,name:p.name,projectName:null,
+      b.items.push({type:'project',id:p.id,name:p.name,projectName:null,endDate:null,
         stepName:cur?cur.name:null,date:rec?rec.dueDate:null,completed:!cur,
         stepsDone:done,stepsTotal:steps.length,
         record:rec?{kind:'step',id:rec.id}:null});
     });
     state.manualEvents.forEach(m=>{
       const b=bucket(m.vendorId),p=project(state,m.projectId);
-      b.items.push({type:'manual',id:m.id,name:m.name,projectName:p?p.name:null,
+      b.items.push({type:'manual',id:m.id,name:m.name,projectName:p?p.name:null,endDate:m.endDate||null,
         stepName:null,date:m.date||null,completed:!!m.completed,
         stepsDone:0,stepsTotal:0,record:{kind:'manual',id:m.id}});
     });
     eventRecords(state).filter(e=>!e.completed&&e.date).forEach(e=>{
       const b=byVendor.get(e.vendorId||'');if(!b)return;
-      if(diffDays(e.date)<0)b.overdueCount++;
-      if(!b.next||e.date<b.next.date)b.next=e;
+      if(phaseOf(e)==='after')b.overdueCount++;              // 기간 건은 종료일이 지나야 지연이다
+      if(!b.next||sortDate(e)<sortDate(b.next))b.next=e;
     });
     const rank=i=>i.completed?2:(i.date?0:1);   // 날짜 있는 진행 건 → 날짜 미정 → 완료
     const rows=[...byVendor.values()].filter(b=>b.items.length);
@@ -366,8 +390,27 @@
       ||String(a.next?.date||'').localeCompare(String(b.next?.date||''))
       ||String(a.vendor?.name||'').localeCompare(String(b.vendor?.name||'')));
   }
-  function ddayLabel(date){const n=diffDays(date);if(n===0)return'D-DAY';return n>0?`D-${n}`:`D+${Math.abs(n)}`}
-  function ddayClass(date){const n=diffDays(date);return n<0?'overdue':n===0?'today':''}
+  function ddayLabel(a,b){
+    const r=asRange(a,b);
+    switch(phaseOf(r)){
+      case 'during':return '진행중';
+      case 'before':return `D-${diffDays(r.date)}`;
+      case 'on':return 'D-DAY';
+      case 'after':return `D+${Math.abs(diffDays(endOf(r)))}`;
+      default:return '';
+    }
+  }
+  function ddayClass(a,b){
+    const ph=phaseOf(asRange(a,b));
+    // 색 축은 그대로다: 파랑(예정) -> 주황(오늘) -> 빨강(지남).
+    // '진행중'은 지금 벌어지고 있는 일이므로 '오늘' 자리에 놓는다. 글자가 달라 구분된다.
+    return ph==='after'?'overdue':(ph==='on'||ph==='during')?'today':'';
+  }
+  /** 캘린더 상단 띠로 그릴 행사 기간. "이 날 할 일"과 "이 행사가 도는 중"은 층위가 다르다. */
+  function projectBands(state){
+    return (state.projects||[]).filter(p=>p.startDate).map(p=>({
+      id:p.id,vendorId:p.vendorId,name:p.name,date:p.startDate,endDate:p.endDate||p.startDate}));
+  }
   function projectFromTemplate(template,vendorId,name,firstDate,memo=''){
     const id=uid('p');return {id,vendorId,name,memo,templateId:template.id,steps:template.steps.map((s,i)=>({id:uid(`${id}s`),name:s.name,offset:Number(s.offset||0),dueDate:i===0?firstDate:null,completed:false,completedAt:null,memo:'',logs:[],attachments:[]}))};
   }
@@ -505,7 +548,7 @@
     if(moved)await saveState(state);
     return moved;
   }
-  window.WorkCore={KEY,STATE_VERSION,seed,defaultTerms,defaultVendorFields,labels,josa,demoData,hasDemoData,clone,uid,todayISO,parse,iso,addDays,diffDays,pretty,esc,isTauri,nativeFiles,migrate,normalizeState,initStorage,saveState,watchState,readState,vendor,project,currentStep,eventRecords,dueCards,ddayLabel,ddayClass,horizonDays,horizonLabel,vendorSummaries,projectFromTemplate,completeEvent,reopenEvent,
+  window.WorkCore={KEY,STATE_VERSION,seed,defaultTerms,defaultVendorFields,labels,josa,demoData,hasDemoData,clone,uid,todayISO,parse,iso,addDays,diffDays,pretty,esc,isTauri,nativeFiles,migrate,normalizeState,initStorage,saveState,watchState,readState,vendor,project,currentStep,eventRecords,dueCards,ddayLabel,ddayClass,horizonDays,horizonLabel,vendorSummaries,isPeriod,periodDays,spansDay,phaseOf,sortDate,endOf,projectBands,projectFromTemplate,completeEvent,reopenEvent,
     putAttachment,readAttachment,deleteAttachment,attachmentsOf,purgeAttachments,revealAttachment,migrateAttachmentsToDisk,formatBytes,
     buildBackup,readBackup,restoreBackup,writeBackupFile,listBackups,readBackupFile,rotateBackups,revealBackups,maybeAutoBackup};
 })();
