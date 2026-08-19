@@ -30,12 +30,12 @@
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
   const uid=p=>`${p}-${Date.now()}-${Math.random().toString(16).slice(2,8)}`;
   const clone=x=>JSON.parse(JSON.stringify(x));
-  const STATE_VERSION=7;
+  const STATE_VERSION=8;
 
   // ── 용어 ─────────────────────────────────────────────────────────────────
   // 발주서 §1: 도메인 규칙을 하드코딩하지 말 것. 시드 절차명은 예시일 뿐 정책이 아니다.
   // 그런데 '업체/업무/절차/일정' 이 화면 문자열에 박혀 있어 다른 업무에는 쓸 수 없었다.
-  const defaultTerms=()=>({app:'업체별 업무 일정',vendor:'업체',project:'업무',step:'절차',event:'일정'});
+  const defaultTerms=()=>({app:'업체별 업무 일정',vendor:'업체',project:'업무',step:'절차',event:'일정',budgetItem:'예산항목',spend:'지출'});
 
   // 한국어 조사. 용어를 바꿀 수 있게 하면 "거래처을 선택" 같은 문장이 나온다.
   // 한글 음절은 0xAC00 부터 종성 28개 주기를 가지므로 (코드-0xAC00)%28 이 0 이면 받침이 없다.
@@ -57,7 +57,7 @@
   /** 화면 문자열 사전. 용어가 바뀌면 여기 한 곳만 다시 계산하면 된다. */
   function labels(terms){
     const T={...defaultTerms(),...(terms||{})};
-    const V=T.vendor,P=T.project,S=T.step,E=T.event,j=josa;
+    const V=T.vendor,P=T.project,S=T.step,E=T.event,BI=T.budgetItem,SP=T.spend,j=josa;
     return {
       app:T.app,
       addProject:`${P} 추가`, addEvent:`${E} 추가`,
@@ -112,6 +112,27 @@
       newVendorName:`신규 ${V}`, newWorkTplName:`신규 ${P} 템플릿`,
       confirmDeleteEvent:`이 ${j(E,['을','를'])} 삭제할까요?`,
       demoCopy:`기능을 둘러볼 수 있는 예시 ${P}·${j(E,['을','를'])} 넣거나 뺍니다. 실제 데이터는 건드리지 않습니다.`,
+      // ── 예산 ────────────────────────────────────────────────────────────
+      viewBudget:'예산',
+      budgetCaption:`${BI}별로 얼마가 나갔는지 봅니다. 줄을 누르면 ${P}별로, 다시 누르면 ${V}별로 펼쳐집니다.`,
+      budgetTotal:'총예산', budgetSpent:'기지출', budgetPlanned:'지출예정', budgetRemain:'잔액', budgetOver:'초과',
+      editBudget:'합본예산서', addSpend:`+ ${SP} 등록`,
+      budgetEmpty:`등록된 ${j(BI,['이','가'])} 없습니다.<br>위 <b>합본예산서</b>에서 ${j(BI,['과','와'])} 예산액을 넣어 주세요.`,
+      unassignedItem:`${BI} 미지정`, noProjectGroup:`${P} 미지정`,
+      budgetEmptyItem:`아직 ${j(SP,['이','가'])} 없습니다.`,
+      budgetModalTitle:'합본예산서', budgetTitleLabel:'예산서 이름', budgetYear:'연도',
+      addBudgetItem:`+ ${BI} 추가`, budgetCode:'코드', budgetItemName:`${BI}명`, budgetAmount:'예산액',
+      savedBudget:'합본예산서를 저장했습니다.',
+      budgetShrinkWarn:n=>`이미 잡힌 ${SP}보다 예산액이 작아지는 ${BI}이 ${n}건 있습니다.\n그래도 저장할까요?`,
+      spendModalTitle:`${SP} 등록`, saveSpend:`${SP} 저장`, deleteSpend:`${SP} 삭제`,
+      fBudgetItem:BI, fSpendName:`${SP} 내용`, fAmount:'금액(원)', fStatus:'구분', fSpendDate:'날짜',
+      statusSpent:'기지출', statusPlanned:'지출예정',
+      needSpendFields:`${BI}, ${SP} 내용, 금액을 확인하세요.`,
+      savedSpend:`${j(SP,['을','를'])} 저장했습니다.`,
+      deletedSpend:`${j(SP,['을','를'])} 삭제했습니다.`,
+      confirmDeleteSpend:`이 ${j(SP,['을','를'])} 삭제할까요?`,
+      detailSpendTitle:SP, detailSpendSub:`이 ${E}에 걸린 ${SP} 내역입니다.`, addSpendHere:`+ ${SP}`,
+      vendorSpendLine:a=>`${SP} ${a}원`,
     };
   }
 
@@ -127,7 +148,9 @@
     version:STATE_VERSION,
     settings:{horizon:'14',customHorizon:45,helperAlwaysOnTop:true,autostart:false},
     pendingSelection:null,
-    terms:{app:'업체별 업무 일정',vendor:'업체',project:'업무',step:'절차',event:'일정'},
+    terms:{app:'업체별 업무 일정',vendor:'업체',project:'업무',step:'절차',event:'일정',budgetItem:'예산항목',spend:'지출'},
+    budget:{title:'',year:null,items:[]},
+    spends:[],
     vendorFields:[{id:'vf-person',label:'담당자',type:'text'},{id:'vf-contact',label:'연락처',type:'tel'},{id:'vf-memo',label:'메모',type:'multiline'}],
     vendorTemplates:[
       {id:'v-daehan',name:'대한건설',values:{'vf-person':'김OO','vf-contact':'010-1111-1111','vf-memo':''}},
@@ -204,6 +227,13 @@
       }
       v=7;
     }
+    if(v<8){
+      // v7 -> v8: 예산과 지출이 생긴다. 기존 필드는 하나도 건드리지 않는다.
+      if(!s.budget||typeof s.budget!=='object')s.budget={title:'',year:null,items:[]};
+      if(!Array.isArray(s.budget.items))s.budget.items=[];
+      if(!Array.isArray(s.spends))s.spends=[];
+      v=8;
+    }
     s.version=v;
     return s;
   }
@@ -219,6 +249,9 @@
     s.workTemplates=Array.isArray(s.workTemplates)?s.workTemplates:[];
     s.projects=Array.isArray(s.projects)?s.projects:[];
     s.manualEvents=Array.isArray(s.manualEvents)?s.manualEvents:[];
+    s.budget={title:'',year:null,...(s.budget||{})};
+    s.budget.items=Array.isArray(s.budget.items)?s.budget.items:[];
+    s.spends=Array.isArray(s.spends)?s.spends:[];
     s.projects.forEach(p=>{
       p.steps=Array.isArray(p.steps)?p.steps:[];
       p.steps.forEach(st=>{st.logs=Array.isArray(st.logs)?st.logs:[];st.attachments=Array.isArray(st.attachments)?st.attachments:[];st.memo=st.memo||''});
@@ -359,7 +392,7 @@
     const bucket=id=>{
       const key=id||'';
       if(!byVendor.has(key))byVendor.set(key,{vendorId:id||null,vendor:vendor(state,id)||null,
-        items:[],openCount:0,doneCount:0,stepsDone:0,stepsTotal:0,overdueCount:0,next:null});
+        items:[],openCount:0,doneCount:0,stepsDone:0,stepsTotal:0,overdueCount:0,next:null,spent:0,planned:0});
       return byVendor.get(key);
     };
     state.projects.forEach(p=>{
@@ -386,8 +419,13 @@
       if(phaseOf(e)==='after')b.overdueCount++;              // 기간 건은 종료일이 지나야 지연이다
       if(!b.next||sortDate(e)<sortDate(b.next))b.next=e;
     });
+    // 업체별로 얼마가 나갔는지는 업체 화면에서 바로 답해야 한다.
+    (state.spends||[]).forEach(sp=>{
+      const b=bucket(sp.vendorId),amt=money(sp.amount);
+      if(isSpent(sp))b.spent+=amt;else b.planned+=amt;
+    });
     const rank=i=>i.completed?2:(i.date?0:1);   // 날짜 있는 진행 건 → 날짜 미정 → 완료
-    const rows=[...byVendor.values()].filter(b=>b.items.length);
+    const rows=[...byVendor.values()].filter(b=>b.items.length||b.spent||b.planned);
     rows.forEach(b=>b.items.sort((a,c)=>rank(a)-rank(c)||String(a.date||'').localeCompare(String(c.date||''))));
     // 급한 순으로 세운다: 지연이 있는 업체 → 가장 가까운 일정이 이른 업체 → 이름순
     return rows.sort((a,b)=>
@@ -396,6 +434,62 @@
       ||String(a.next?.date||'').localeCompare(String(b.next?.date||''))
       ||String(a.vendor?.name||'').localeCompare(String(b.vendor?.name||'')));
   }
+  // ── 예산 ─────────────────────────────────────────────────────────────────
+  // 합본예산서와 집행 현황이 앱 밖에 있었다. 그래서 "이 행사에 얼마 썼나",
+  // "이 업체에 얼마 나갔나"를 답하려면 다른 파일을 열어야 했다.
+  // 집계를 화면 코드에 두면 화면마다 숫자가 어긋난다. 여기 한 곳에서 계산한다.
+  const money=n=>Number(n||0);
+  const formatMoney=n=>money(n).toLocaleString('ko-KR');
+  const isSpent=sp=>sp?.status==='spent';
+  function budgetSummary(state){
+    const items=state.budget?.items||[],spends=state.spends||[];
+    const known=new Set(items.map(it=>it.id));
+    const byItem=new Map(items.map(it=>[it.id,[]]));
+    const orphan=[];
+    spends.forEach(sp=>{(known.has(sp.itemId)?byItem.get(sp.itemId):orphan).push(sp)});
+    // 예산항목 → 행사 → 업체. 사용자가 말한 그 순서다.
+    // 행사·업체가 비어 있는 지출도 묶음으로 세운다. 빠뜨리면 합계가 맞지 않는다.
+    const group=list=>{
+      const pm=new Map();
+      list.forEach(sp=>{
+        const pk=sp.projectId||'';
+        if(!pm.has(pk))pm.set(pk,{projectId:sp.projectId||null,project:project(state,sp.projectId)||null,spent:0,planned:0,vendors:new Map()});
+        const g=pm.get(pk),vk=sp.vendorId||'';
+        if(!g.vendors.has(vk))g.vendors.set(vk,{vendorId:sp.vendorId||null,vendor:vendor(state,sp.vendorId)||null,spent:0,planned:0,spends:[]});
+        const vg=g.vendors.get(vk),amt=money(sp.amount);
+        if(isSpent(sp)){g.spent+=amt;vg.spent+=amt}else{g.planned+=amt;vg.planned+=amt}
+        vg.spends.push(sp);
+      });
+      return [...pm.values()].map(g=>({...g,total:g.spent+g.planned,
+        vendors:[...g.vendors.values()].map(v=>({...v,total:v.spent+v.planned,
+          spends:v.spends.slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')))}))
+          .sort((a,b)=>b.total-a.total)}))
+        .sort((a,b)=>b.total-a.total);
+    };
+    const sumOf=list=>({
+      spent:list.filter(isSpent).reduce((n,sp)=>n+money(sp.amount),0),
+      planned:list.filter(sp=>!isSpent(sp)).reduce((n,sp)=>n+money(sp.amount),0)});
+    const rateOf=(amount,spent,planned)=>({
+      spentRate:amount?Math.min(100,spent/amount*100):0,
+      plannedRate:amount?Math.max(0,Math.min(100,(spent+planned)/amount*100)-Math.min(100,spent/amount*100)):0});
+    const rows=items.map(it=>{
+      const list=byItem.get(it.id)||[],{spent,planned}=sumOf(list),amount=money(it.amount);
+      return {item:it,amount,spent,planned,remain:amount-spent-planned,...rateOf(amount,spent,planned),
+        over:amount>0&&spent+planned>amount,count:list.length,projects:group(list)};
+    });
+    const oh=sumOf(orphan);
+    const amount=items.reduce((n,it)=>n+money(it.amount),0);
+    // 총계는 예산항목에 붙지 않은 지출까지 센다. 숨기면 총계가 거짓말이 된다.
+    const all=sumOf(spends);
+    return {
+      total:{amount,spent:all.spent,planned:all.planned,remain:amount-all.spent-all.planned,
+        ...rateOf(amount,all.spent,all.planned),over:amount>0&&all.spent+all.planned>amount},
+      items:rows,
+      unassigned:orphan.length?{...oh,total:oh.spent+oh.planned,count:orphan.length,projects:group(orphan)}:null,
+    };
+  }
+  /** 이 일정·절차에 걸린 지출. 상세 모달이 쓴다. */
+  function spendsOfRecord(state,kind,id){return (state.spends||[]).filter(sp=>sp.recordKind===kind&&sp.recordId===id)}
   function ddayLabel(a,b){
     const r=asRange(a,b);
     switch(phaseOf(r)){
@@ -554,7 +648,7 @@
     if(moved)await saveState(state);
     return moved;
   }
-  window.WorkCore={KEY,STATE_VERSION,seed,defaultTerms,defaultVendorFields,labels,josa,demoData,hasDemoData,clone,uid,todayISO,parse,iso,addDays,diffDays,pretty,esc,isTauri,nativeFiles,migrate,normalizeState,initStorage,saveState,watchState,readState,vendor,project,currentStep,eventRecords,dueCards,ddayLabel,ddayClass,horizonDays,horizonLabel,vendorSummaries,isPeriod,periodDays,spansDay,phaseOf,sortDate,endOf,projectBands,projectFromTemplate,completeEvent,reopenEvent,
+  window.WorkCore={KEY,STATE_VERSION,seed,defaultTerms,defaultVendorFields,labels,josa,demoData,hasDemoData,clone,uid,todayISO,parse,iso,addDays,diffDays,pretty,esc,isTauri,nativeFiles,migrate,normalizeState,initStorage,saveState,watchState,readState,vendor,project,currentStep,eventRecords,dueCards,ddayLabel,ddayClass,horizonDays,horizonLabel,vendorSummaries,budgetSummary,spendsOfRecord,formatMoney,isPeriod,periodDays,spansDay,phaseOf,sortDate,endOf,projectBands,projectFromTemplate,completeEvent,reopenEvent,
     putAttachment,readAttachment,deleteAttachment,attachmentsOf,purgeAttachments,revealAttachment,migrateAttachmentsToDisk,formatBytes,
     buildBackup,readBackup,restoreBackup,writeBackupFile,listBackups,readBackupFile,rotateBackups,revealBackups,maybeAutoBackup};
 })();

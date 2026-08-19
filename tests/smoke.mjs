@@ -86,7 +86,7 @@ console.log('\n[1] 최초 실행 — 예시 데이터 없이 빈 상태');
   const state = await page.evaluate(() => window.WorkCore.readState().then((s) => ({ p: s.projects.length, m: s.manualEvents.length, v: s.vendorTemplates.length, w: s.workTemplates.length, ver: s.version })));
   check('가짜 공사/일정이 저장되지 않는다', state.p === 0 && state.m === 0, `projects=${state.p} events=${state.m}`);
   check('업체·업무 템플릿(기준정보)은 제공된다', state.v > 0 && state.w > 0);
-  check('상태 버전이 7로 올라간다', state.ver === 7, `version=${state.ver}`);
+  check('상태 버전이 8로 올라간다', state.ver === 8, `version=${state.ver}`);
   check('빈 상태 안내가 보인다', (await page.innerText('#dueList')).includes('등록된 업무가 없습니다'));
   check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
   await ctx.close();
@@ -746,9 +746,13 @@ console.log('\n[24] v6 -> v7 이관 — 담당자·연락처 값이 보존된다
       legacyKept: { person: v.person, contact: v.contact, memo: v.memo },
       projects: s.projects.length, steps: s.projects[0]?.steps.length,
       terms: s.terms,
+      budget: s.budget, spends: s.spends,
     };
   });
-  check('버전이 7로 올라간다', m.version === 7, `version=${m.version}`);
+  check('버전이 8로 올라간다', m.version === 8, `version=${m.version}`);
+  check('예산이 빈 상태로 만들어진다', !!m.budget && Array.isArray(m.budget.items) && m.budget.items.length === 0, JSON.stringify(m.budget));
+  check('지출 원장이 빈 배열로 만들어진다', Array.isArray(m.spends) && m.spends.length === 0);
+  check('예산 용어 기본값도 채워진다', m.terms.budgetItem === '예산항목' && m.terms.spend === '지출', JSON.stringify(m.terms));
   check('기본 항목 3개가 생긴다', JSON.stringify(m.fieldLabels) === JSON.stringify(['담당자', '연락처', '메모']), m.fieldLabels.join(','));
   check('담당자 값이 옮겨진다', m.values['vf-person'] === '홍길동', JSON.stringify(m.values));
   check('연락처 값이 옮겨진다', m.values['vf-contact'] === '010-9999-8888');
@@ -1140,6 +1144,191 @@ console.log('\n[28] 업체·업무·일정 일괄 등록 — 화면 세 곳을 �
   const toastText = await page.innerText('#toast');
   check('무엇이 등록됐는지 알려준다', toastText.includes('들녘유통') && toastText.includes('2건'), toastText);
   check('새 업체가 캘린더·레일에 바로 나타난다', (await page.innerText('#dueList')).includes('들녘유통'));
+
+  check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
+console.log('\n[29] 예산 — 예산항목 → 행사 → 업체로 점점 좁혀 본다');
+{
+  const { ctx, page, errors } = await open();
+
+  // 합본예산서를 손으로 넣는다
+  await page.click('[data-board="budget"]');
+  await page.waitForSelector('#budgetBoard:not(.hidden)');
+  check('예산이 세 번째 축으로 붙는다', await page.$eval('#calendarScroll', (e) => e.classList.contains('hidden')));
+  check('예산에서도 왼쪽 급한 일정 레일은 남는다', await page.$$eval('#dueList .due-card', (e) => e.length) > 0);
+  check('예산 항목이 없으면 그렇게 말한다', (await page.innerText('#budgetBoard')).includes('없습니다'));
+
+  await page.click('#editBudgetBtn');
+  await page.waitForSelector('#budgetModal.show');
+  await page.fill('#bTitle', '2026년 농특산물 유통 본예산');
+  await page.fill('#bYear', '2026');
+  await page.fill('#budgetItems [data-bi-code="0"]', '301-01');
+  await page.fill('#budgetItems [data-bi-name="0"]', '행사운영비');
+  await page.fill('#budgetItems [data-bi-amount="0"]', '50000000');
+  await page.click('#bAddItem');
+  await page.fill('#budgetItems [data-bi-code="1"]', '301-02');
+  await page.fill('#budgetItems [data-bi-name="1"]', '홍보비');
+  await page.fill('#budgetItems [data-bi-amount="1"]', '20000000');
+  await page.click('#bAddItem');   // 빈 줄 — 무시돼야 한다
+  await page.click('#saveBudgetBtn');
+  await page.waitForTimeout(400);
+
+  const b1 = await page.evaluate(() => window.WorkCore.readState());
+  check('예산 항목이 저장된다 (빈 줄은 무시)', b1.budget.items.length === 2, JSON.stringify(b1.budget.items.map((i) => i.name)));
+  check('예산액이 숫자로 저장된다', b1.budget.items[0].amount === 50000000, `${b1.budget.items[0].amount}`);
+  check('예산서 이름과 연도가 남는다', b1.budget.title.includes('2026년') && b1.budget.year === 2026);
+  const rows = await page.$$eval('#budgetBoard .bg-row', (e) => e.length);
+  check('항목 줄이 두 개 선다', rows === 2, `${rows}`);
+  check('총예산이 합산된다', (await page.innerText('.bt-v')).includes('70,000,000'), await page.innerText('.bt-v'));
+
+  // 지출을 등록한다 — 예산 화면에서
+  const itemIds = b1.budget.items.map((i) => i.id);
+  await page.click('#addSpendBtn');
+  await page.waitForSelector('#spendModal.show');
+  await page.selectOption('#spItem', itemIds[0]);
+  await page.selectOption('#spProject', 'demo-p1');
+  await page.selectOption('#spVendor', 'v-daehan');
+  await page.fill('#spName', '무대 설치 대금');
+  await page.fill('#spAmount', '12000000');
+  await page.selectOption('#spStatus', 'spent');
+  await page.click('#saveSpendBtn');
+  await page.waitForTimeout(400);
+
+  await page.click('#addSpendBtn');
+  await page.waitForSelector('#spendModal.show');
+  await page.selectOption('#spItem', itemIds[0]);
+  await page.selectOption('#spProject', 'demo-p1');
+  await page.selectOption('#spVendor', 'v-mirae');
+  await page.fill('#spName', '음향 임차');
+  await page.fill('#spAmount', '3000000');
+  await page.selectOption('#spStatus', 'planned');
+  await page.click('#saveSpendBtn');
+  await page.waitForTimeout(400);
+
+  // 금액 없이는 막는다
+  await page.click('#addSpendBtn');
+  await page.fill('#spName', '금액없음');
+  await page.click('#saveSpendBtn');
+  await page.waitForTimeout(250);
+  check('금액 없이 저장하면 막는다', await page.$eval('#spendModal', (e) => e.classList.contains('show')));
+  await page.click('#spendModal .close');
+
+  // 예산항목 미지정 지출도 총계에 들어간다
+  await page.click('#addSpendBtn');
+  await page.waitForSelector('#spendModal.show');
+  await page.selectOption('#spItem', '');
+  await page.fill('#spName', '분류 전 집행');
+  await page.fill('#spAmount', '500000');
+  await page.click('#saveSpendBtn');
+  await page.waitForTimeout(400);
+
+  // 세 단계 합계가 서로 맞는가 — 이 앱에서 가장 중요한 숫자다
+  const agree = await page.evaluate(async () => {
+    const C = window.WorkCore, s = await C.readState(), sum = C.budgetSummary(s);
+    const itemSum = sum.items.reduce((n, r) => n + r.spent + r.planned, 0) + (sum.unassigned?.total || 0);
+    const projSum = [...sum.items.map((r) => r.projects), sum.unassigned?.projects || []].flat()
+      .reduce((n, g) => n + g.total, 0);
+    const vendSum = [...sum.items.map((r) => r.projects), sum.unassigned?.projects || []].flat()
+      .flatMap((g) => g.vendors).reduce((n, v) => n + v.total, 0);
+    const ledger = s.spends.reduce((n, sp) => n + Number(sp.amount), 0);
+    return { total: sum.total.spent + sum.total.planned, itemSum, projSum, vendSum, ledger,
+      remain: sum.total.remain, amount: sum.total.amount,
+      firstItem: { spent: sum.items[0].spent, planned: sum.items[0].planned, remain: sum.items[0].remain } };
+  });
+  check('항목 합계 = 행사 합계 = 업체 합계 = 지출 원장 합계',
+    agree.itemSum === agree.ledger && agree.projSum === agree.ledger && agree.vendSum === agree.ledger,
+    JSON.stringify(agree));
+  check('총계가 예산항목 미지정 지출까지 센다', agree.total === agree.ledger && agree.ledger === 15500000, JSON.stringify(agree));
+  check('잔액 = 예산 − 기지출 − 지출예정', agree.remain === agree.amount - agree.total, JSON.stringify(agree));
+  check('항목별 기지출·지출예정이 갈린다',
+    agree.firstItem.spent === 12000000 && agree.firstItem.planned === 3000000 && agree.firstItem.remain === 35000000,
+    JSON.stringify(agree.firstItem));
+
+  // 드릴다운 — 항목 → 행사 → 업체
+  check('처음에는 접혀 있다', await page.$$eval('#budgetBoard .bg-row.open', (e) => e.length) === 0);
+  await page.click('#budgetBoard .bg-row .bg-head');
+  await page.waitForSelector('#budgetBoard .bg-row.open .bg-project');
+  check('펼치면 행사별 소계가 나온다', (await page.innerText('#budgetBoard .bg-row.open')).includes('배수로 정비공사'));
+  await page.click('#budgetBoard .bg-row.open .bp-head');
+  await page.waitForSelector('#budgetBoard .bg-project.open .bg-vendor');
+  const drill = await page.innerText('#budgetBoard .bg-project.open');
+  check('다시 펼치면 업체별 지출이 나온다', drill.includes('대한건설') && drill.includes('미래토건'), drill.slice(0, 160));
+  check('기지출과 지출예정이 구분돼 보인다', drill.includes('기지출') && drill.includes('지출예정'));
+
+  // 지출 줄을 누르면 편집이 열리고, 삭제도 된다
+  await page.click('#budgetBoard .bg-project.open .bg-spend');
+  await page.waitForSelector('#spendModal.show');
+  check('지출 줄을 누르면 편집이 열린다', await page.$eval('#spName', (e) => e.value.length) > 0);
+  check('편집일 때만 삭제 버튼이 보인다', await page.$eval('#deleteSpendBtn', (e) => !e.classList.contains('hidden')));
+  await page.fill('#spAmount', '13000000');
+  await page.click('#saveSpendBtn');
+  await page.waitForTimeout(400);
+  const edited = await page.evaluate(async () => (await window.WorkCore.readState()).spends.find((x) => x.name === '무대 설치 대금').amount);
+  check('금액 수정이 반영된다', edited === 13000000, `${edited}`);
+
+  // 업체별 보드의 총지출이 예산 화면과 같은 숫자다
+  await page.click('[data-board="vendor"]');
+  await page.waitForSelector('#vendorBoard:not(.hidden) .board-row');
+  const vendorMoney = await page.evaluate(async () => {
+    const C = window.WorkCore, s = await C.readState();
+    const row = C.vendorSummaries(s).find((r) => r.vendor?.name === '대한건설');
+    const mine = s.spends.filter((sp) => sp.vendorId === row.vendorId).reduce((n, sp) => n + Number(sp.amount), 0);
+    return { board: row.spent + row.planned, ledger: mine, shown: !!document.querySelector('.bh-money') };
+  });
+  check('업체별 보드의 총지출이 원장과 같다', vendorMoney.board === vendorMoney.ledger && vendorMoney.board === 13000000, JSON.stringify(vendorMoney));
+  check('업체 줄에 지출이 표시된다', vendorMoney.shown);
+
+  // 상세에서 바로 지출을 적는다
+  await page.click('[data-board="calendar"]');
+  await page.click('.due-card');
+  await page.waitForSelector('#detailModal.show');
+  await page.click('#detailAddSpend');
+  await page.waitForSelector('#spendModal.show');
+  check('상세에서 열면 업체가 미리 채워진다', (await page.$eval('#spVendor', (e) => e.value)).length > 0);
+  await page.fill('#spName', '준공 대금');
+  await page.fill('#spAmount', '2000000');
+  await page.selectOption('#spItem', itemIds[1]);
+  await page.click('#saveSpendBtn');
+  await page.waitForTimeout(500);
+  const linked = await page.evaluate(async () => {
+    const s = await window.WorkCore.readState();
+    const sp = s.spends.find((x) => x.name === '준공 대금');
+    return { kind: sp?.recordKind, id: !!sp?.recordId, item: sp?.itemId };
+  });
+  check('상세에서 등록한 지출이 그 건에 걸린다', !!linked.kind && linked.id, JSON.stringify(linked));
+  check('고른 예산항목에 들어간다', linked.item === itemIds[1], JSON.stringify(linked));
+  // 상세를 열어 둔 채 적었으면 그 자리에서 바로 보여야 한다
+  const detailNow = await page.innerText('#detailBody');
+  check('상세의 지출 목록이 곧바로 갱신된다', detailNow.includes('준공 대금') && detailNow.includes('2,000,000'), detailNow.slice(-200));
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+
+  // 예산 모드가 저장된다
+  await page.click('[data-board="budget"]');
+  await page.waitForTimeout(300);
+  await page.reload();
+  await page.waitForSelector('#budgetBoard:not(.hidden)');
+  check('예산 모드가 새로고침 후에도 유지된다', await page.$eval('#budgetBoard', (e) => !e.classList.contains('hidden')));
+
+  // 용어를 바꿔도 예산 문구가 따라온다
+  const terms = await page.evaluate(() => {
+    const L = window.WorkCore.labels({ vendor: '거래처', project: '계약건', budgetItem: '세목', spend: '집행' });
+    return { tab: L.fBudgetItem, caption: L.budgetCaption, empty: L.budgetEmptyItem, add: L.addSpend };
+  });
+  check('예산항목 용어가 바뀐다', terms.tab === '세목', terms.tab);
+  check('예산 문구에 하드코딩이 남지 않는다', !/업체|업무|예산항목|지출/.test(terms.caption + terms.add), terms.caption + ' | ' + terms.add);
+  check('조사가 맞는다 (집행이 없습니다)', terms.empty === '아직 집행이 없습니다.', terms.empty);
+
+  const tiny = await page.evaluate(measure);
+  check('예산 화면에 13px 미만 텍스트가 없다', tiny.length === 0, tiny.join(' | '));
+  for (const vp of [{ width: 1280, height: 720 }, { width: 1920, height: 1080 }]) {
+    await page.setViewportSize(vp);
+    await page.waitForTimeout(120);
+    const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    check(`예산 화면 ${vp.width}px 에서 가로 스크롤이 없다`, over <= 1, `${over}px`);
+  }
 
   check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
   await ctx.close();

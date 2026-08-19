@@ -31,7 +31,7 @@
     else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
   });
   async function persist(msg){await C.saveState(state);render();if(msg)toast(msg)}
-  function render(){L=C.labels(state.terms);applyStaticLabels();renderHorizon();renderDue();renderCalendar();renderBoard();applyBoardMode();fillSelects();renderTemplatePanes();}
+  function render(){L=C.labels(state.terms);applyStaticLabels();renderHorizon();renderDue();renderCalendar();renderBoard();renderBudget();applyBoardMode();fillSelects();renderTemplatePanes();}
   // 정적 HTML 의 data-t 를 사전 값으로 채운다. 마크업이 들어가는 문구만 innerHTML 로 넣는다.
   function applyStaticLabels(){document.title=L.app;qa('[data-t]').forEach(el=>{const v=L[el.dataset.t];if(typeof v==='string')el.textContent=v})}
   function renderHorizon(){const s=state.settings;$('horizonSelect').value=s.horizon;$('horizonCustom').value=s.customHorizon;$('horizonCustom').classList.toggle('hidden',s.horizon!=='custom')}
@@ -39,21 +39,24 @@
   // ── 업체별 요약 ──────────────────────────────────────────────────────────
   // 캘린더와 같은 자리를 쓰는 두 번째 축이다. 좌측 D-day 레일은 두 모드에서 모두 남는다 —
   // "뭐가 급한가"는 어느 화면을 보고 있든 사라지면 안 된다(발주서 §5.3).
-  const boardMode=()=>state.settings.boardView==='vendor'?'vendor':'calendar';
+  const BOARD_MODES=['calendar','vendor','budget'];
+  const boardMode=()=>BOARD_MODES.includes(state.settings.boardView)?state.settings.boardView:'calendar';
   let expandedVendors=new Set();   // 펼침은 화면 상태다. 저장하지 않는다.
+  let expandedItems=new Set(),expandedProjects=new Set();
   function applyBoardMode(){
-    const vendorView=boardMode()==='vendor';
-    $('calendarScroll').classList.toggle('hidden',vendorView);
-    $('vendorBoard').classList.toggle('hidden',!vendorView);
-    $('calNav').classList.toggle('hidden',vendorView);   // 월 이동은 업체별에서 의미가 없다
-    $('calHint').textContent=vendorView?L.boardCaption:L.calHint;
-    qa('[data-board]').forEach(b=>{const on=b.dataset.board===(vendorView?'vendor':'calendar');b.classList.toggle('active',on);b.setAttribute('aria-selected',String(on))});
+    const mode=boardMode();
+    $('calendarScroll').classList.toggle('hidden',mode!=='calendar');
+    $('vendorBoard').classList.toggle('hidden',mode!=='vendor');
+    $('budgetBoard').classList.toggle('hidden',mode!=='budget');
+    $('calNav').classList.toggle('hidden',mode!=='calendar');   // 월 이동은 캘린더에서만 의미가 있다
+    $('calHint').textContent=mode==='vendor'?L.boardCaption:mode==='budget'?L.budgetCaption:L.calHint;
+    qa('[data-board]').forEach(b=>{const on=b.dataset.board===mode;b.classList.toggle('active',on);b.setAttribute('aria-selected',String(on))});
   }
   async function setBoardMode(mode){
     if(boardMode()===mode)return;
     state.settings.boardView=mode;
     await C.saveState(state);          // 다시 켰을 때 보던 화면이 그대로 있어야 한다
-    renderBoard();applyBoardMode();
+    renderBoard();renderBudget();applyBoardMode();
   }
   function boardItemRow(it){
     const dday=it.completed?'완료':(it.date?C.ddayLabel(it):L.boardNoDate);
@@ -78,7 +81,7 @@
       return `<section class="board-row${open?' open':''}" data-vendor="${C.esc(b.vendorId||'')}">
         <button class="board-head" aria-expanded="${open}">
           <span class="bh-id"><span class="bh-name">${C.esc(b.vendor?.name||L.noVendor)}</span>${info?`<span class="bh-info">${C.esc(info)}</span>`:''}</span>
-          <span class="bh-stat"><span class="bh-counts">${C.esc(L.boardOpen)} <b>${b.openCount}</b> · ${C.esc(L.boardDone)} <b>${b.doneCount}</b>${b.overdueCount?` <span class="bh-late">${C.esc(L.boardOverdue)} ${b.overdueCount}</span>`:''}</span><span class="bh-bar" role="img" aria-label="${C.esc(L.boardProgress)} ${pct}%"><i style="width:${pct}%"></i></span></span>
+          <span class="bh-stat"><span class="bh-counts">${C.esc(L.boardOpen)} <b>${b.openCount}</b> · ${C.esc(L.boardDone)} <b>${b.doneCount}</b>${b.overdueCount?` <span class="bh-late">${C.esc(L.boardOverdue)} ${b.overdueCount}</span>`:''}${(b.spent||b.planned)?` <span class="bh-money">${C.esc(L.vendorSpendLine(C.formatMoney(b.spent+b.planned)))}</span>`:''}</span><span class="bh-bar" role="img" aria-label="${C.esc(L.boardProgress)} ${pct}%"><i style="width:${pct}%"></i></span></span>
           <span class="bh-next">${next?`<span class="bn-name">${C.esc(next.name)}</span><span class="bn-date">${spanText(next)}</span>`:`<span class="bn-name muted">${C.esc(L.boardEmpty)}</span>`}</span>
           <span class="bh-dday ${next?C.ddayClass(next):'undated'}">${next?C.ddayLabel(next):'—'}</span>
         </button>
@@ -101,6 +104,172 @@
   }
   // 날짜 문구는 한 곳에서 만든다. 기간이면 시작~종료, 아니면 지금까지와 같다.
   const spanText=r=>C.isPeriod(r)?`${C.pretty(r.date)} ~ ${C.pretty(r.endDate)}`:C.pretty(r.date);
+  // ── 예산 ─────────────────────────────────────────────────────────────────
+  // 합본예산서와 집행 현황이 앱 밖에 있어, "이 행사에 얼마 썼나"를 답하려면 다른 파일을
+  // 열어야 했다. 업체별 보드에서 만든 아코디언 조작 언어를 그대로 쓴다 — 줄을 누르면
+  // 펼쳐지고, 맨 아래 줄을 누르면 편집이 열린다. 새로 배울 게 없다.
+  const won=n=>`${C.formatMoney(n)}원`;
+  function budgetBar(r){
+    // 기지출 초록(집행 완료) · 지출예정 파랑(예정) · 잔액 회색 · 초과 빨강. 새 색을 만들지 않는다.
+    return `<span class="bg-bar${r.over?' over':''}" role="img" aria-label="${C.esc(L.budgetSpent)} ${won(r.spent)}, ${C.esc(L.budgetPlanned)} ${won(r.planned)}"><i class="s" style="width:${r.spentRate}%"></i><i class="p" style="width:${r.plannedRate}%"></i></span>`;
+  }
+  function budgetFigures(r){
+    return `<span class="bg-figs"><span class="fig s"><em>${C.esc(L.budgetSpent)}</em><b>${won(r.spent)}</b></span>`
+      +`<span class="fig p"><em>${C.esc(L.budgetPlanned)}</em><b>${won(r.planned)}</b></span>`
+      +`<span class="fig r${r.remain<0?' neg':''}"><em>${C.esc(r.remain<0?L.budgetOver:L.budgetRemain)}</em><b>${won(Math.abs(r.remain))}</b></span></span>`;
+  }
+  function spendRows(g){
+    return g.vendors.map(v=>`<div class="bg-vendor"><div class="bv-head"><span class="bv-name">${C.esc(v.vendor?.name||L.noVendor)}</span><span class="bv-total">${won(v.total)}</span></div>`
+      +v.spends.map(sp=>`<button class="bg-spend" data-spend="${C.esc(sp.id)}"><span class="bs-name">${C.esc(sp.name)}</span><span class="bs-date">${sp.date?C.pretty(sp.date):''}</span><span class="bs-status ${sp.status==='spent'?'spent':'planned'}">${C.esc(sp.status==='spent'?L.statusSpent:L.statusPlanned)}</span><span class="bs-amount">${won(sp.amount)}</span></button>`).join('')
+      +`</div>`).join('');
+  }
+  function budgetGroups(key,projects){
+    return projects.map(g=>{
+      const pk=`${key}:${g.projectId||''}`,open=expandedProjects.has(pk);
+      return `<div class="bg-project${open?' open':''}" data-bgproject="${C.esc(pk)}">
+        <button class="bp-head"><span class="bp-name">${C.esc(g.project?.name||L.noProjectGroup)}</span><span class="bp-figs"><span>${C.esc(L.budgetSpent)} ${won(g.spent)}</span><span>${C.esc(L.budgetPlanned)} ${won(g.planned)}</span></span><span class="bp-total">${won(g.total)}</span></button>
+        <div class="bp-body">${spendRows(g)}</div></div>`;
+    }).join('');
+  }
+  // 상세에서 바로 지출을 적을 수 있어야 한다. 계약·준공 단계에서 예산 화면을 따로
+  // 찾아가야 한다면 그것도 또 하나의 일이다.
+  function spendSection(rec){
+    const list=C.spendsOfRecord(state,rec.kind,rec.id);
+    const total=list.reduce((n,sp)=>n+Number(sp.amount||0),0);
+    return `<section class="worklog-section"><div class="section-headline"><div><b>${C.esc(L.detailSpendTitle)}</b><span>${C.esc(L.detailSpendSub)}</span></div><button class="btn" id="detailAddSpend">${C.esc(L.addSpendHere)}</button></div>`
+      +(list.length
+        ?`<div class="bg-vendor" style="margin-top:8px">${list.map(sp=>`<button class="bg-spend" data-spend="${C.esc(sp.id)}"><span class="bs-name">${C.esc(sp.name)}</span><span class="bs-date">${sp.date?C.pretty(sp.date):''}</span><span class="bs-status ${sp.status==='spent'?'spent':'planned'}">${C.esc(sp.status==='spent'?L.statusSpent:L.statusPlanned)}</span><span class="bs-amount">${won(sp.amount)}</span></button>`).join('')}<div class="bv-head" style="padding-top:6px"><span>합계</span><span class="bv-total">${won(total)}</span></div></div>`
+        :`<div class="empty">${C.esc(L.budgetEmptyItem)}</div>`)
+      +`</section>`;
+  }
+  // 상세를 열어 둔 채 지출을 적었으면 그 자리에서 바로 보여야 한다.
+  // persist -> render 는 상세 본문까지 다시 그리지는 않는다.
+  function refreshOpenDetail(){
+    if(!selectedRecord||!$('detailModal').classList.contains('show'))return;
+    openRecord(selectedRecord.kind,selectedRecord.id);
+  }
+  function renderBudget(){
+    const sum=C.budgetSummary(state),host=$('budgetBoard'),t=sum.total;
+    const strip=`<div class="bg-summary">
+      <div class="bg-total"><span class="bt-k">${C.esc(L.budgetTotal)}</span><span class="bt-v">${won(t.amount)}</span></div>
+      ${budgetFigures(t)}${budgetBar(t)}
+      <div class="bg-actions"><button class="btn" id="editBudgetBtn">${C.esc(L.editBudget)}</button><button class="btn primary" id="addSpendBtn">${C.esc(L.addSpend)}</button></div>
+      ${state.budget.title||state.budget.year?`<div class="bg-title">${C.esc([state.budget.title,String(state.budget.year||'')].filter(x=>x&&!String(state.budget.title).includes(x)||x===state.budget.title).join(' · '))}</div>`:''}
+    </div>`;
+    const row=(key,name,r,projects,extra='')=>{
+      const open=expandedItems.has(key);
+      return `<section class="bg-row${open?' open':''}" data-bgitem="${C.esc(key)}">
+        <button class="bg-head" aria-expanded="${open}">
+          <span class="bg-id"><span class="bg-name">${C.esc(name)}</span>${extra?`<span class="bg-code">${C.esc(extra)}</span>`:''}</span>
+          <span class="bg-amount">${won(r.amount??r.total)}</span>
+          <span class="bg-mid">${budgetBar(r)}</span>
+          ${budgetFigures(r)}
+        </button>
+        <div class="bg-body">${projects.length?budgetGroups(key,projects):`<div class="empty">${C.esc(L.budgetEmptyItem)}</div>`}</div>
+      </section>`;
+    };
+    const items=sum.items.map(r=>row(r.item.id,r.item.name,r,r.projects,r.item.code||'')).join('');
+    // 예산항목에 붙지 않은 지출을 숨기면 총계가 거짓말이 된다. 맨 아래 묶음으로 세운다.
+    const un=sum.unassigned?row('__un__',L.unassignedItem,{...sum.unassigned,amount:sum.unassigned.total,remain:0,spentRate:sum.unassigned.total?sum.unassigned.spent/sum.unassigned.total*100:0,plannedRate:sum.unassigned.total?sum.unassigned.planned/sum.unassigned.total*100:0,over:false},sum.unassigned.projects):'';
+    host.innerHTML=strip+(sum.items.length||un?`<div class="bg-list">${items}${un}</div>`:`<div class="empty">${L.budgetEmpty}</div>`);
+    q('#editBudgetBtn',host)?.addEventListener('click',openBudget);
+    q('#addSpendBtn',host)?.addEventListener('click',()=>openSpend(null));
+    qa('.bg-head',host).forEach(h=>h.addEventListener('click',()=>{
+      const k=h.closest('.bg-row').dataset.bgitem;
+      if(expandedItems.has(k))expandedItems.delete(k);else expandedItems.add(k);
+      renderBudget();
+    }));
+    qa('.bp-head',host).forEach(h=>h.addEventListener('click',()=>{
+      const k=h.closest('.bg-project').dataset.bgproject;
+      if(expandedProjects.has(k))expandedProjects.delete(k);else expandedProjects.add(k);
+      renderBudget();
+    }));
+    qa('[data-spend]',host).forEach(b=>b.addEventListener('click',()=>openSpend(b.dataset.spend)));
+  }
+
+  // ── 합본예산서 ────────────────────────────────────────────────────────────
+  let budgetDraft=[];
+  const blankBudgetRow=()=>({id:C.uid('bi'),code:'',name:'',amount:''});
+  function renderBudgetItems(){
+    const host=$('budgetItems');
+    host.innerHTML=budgetDraft.map((it,i)=>`<div class="ev-row bi-row"><input data-bi-code="${i}" value="${C.esc(it.code||'')}" placeholder="${C.esc(L.budgetCode)}" autocomplete="off"><input data-bi-name="${i}" value="${C.esc(it.name||'')}" placeholder="${C.esc(L.budgetItemName)}" autocomplete="off"><input data-bi-amount="${i}" type="number" min="0" step="1000" value="${C.esc(String(it.amount??''))}" placeholder="${C.esc(L.budgetAmount)}"><button type="button" class="remove" data-bi-remove="${i}">삭제</button></div>`).join('');
+    qa('[data-bi-code]',host).forEach(el=>el.addEventListener('input',()=>budgetDraft[+el.dataset.biCode].code=el.value));
+    qa('[data-bi-name]',host).forEach(el=>el.addEventListener('input',()=>budgetDraft[+el.dataset.biName].name=el.value));
+    qa('[data-bi-amount]',host).forEach(el=>el.addEventListener('input',()=>budgetDraft[+el.dataset.biAmount].amount=el.value));
+    qa('[data-bi-remove]',host).forEach(b=>b.addEventListener('click',()=>{
+      const i=+b.dataset.biRemove,it=budgetDraft[i];
+      const used=(state.spends||[]).filter(sp=>sp.itemId===it.id).length;
+      if(used&&!confirm(`'${it.name||L.budgetItemName}' 에 걸린 ${L.detailSpendTitle} ${used}건이 ${L.unassignedItem} 으로 남습니다.\n삭제할까요?`))return;
+      budgetDraft.splice(i,1);if(!budgetDraft.length)budgetDraft.push(blankBudgetRow());renderBudgetItems();
+    }));
+  }
+  function openBudget(){
+    budgetDraft=(state.budget.items||[]).map(it=>({...it}));
+    if(!budgetDraft.length)budgetDraft.push(blankBudgetRow());
+    $('bTitle').value=state.budget.title||'';
+    $('bYear').value=state.budget.year||'';
+    $('bAddItem').textContent=L.addBudgetItem;
+    $('budgetItemsHead').innerHTML=`<span>${C.esc(L.budgetCode)}</span><span>${C.esc(L.budgetItemName)}</span><span>${C.esc(L.budgetAmount)}</span><span></span>`;
+    $('budgetItemsHint').textContent=`${L.budgetItemName}과 예산액만 있으면 됩니다. 코드는 비워도 됩니다.`;
+    renderBudgetItems();show('budgetModal');
+  }
+  async function saveBudget(){
+    const rows=budgetDraft.filter(it=>String(it.name||'').trim());
+    // 감액은 실제로 일어난다. 막지 않고 알린 뒤 사용자가 정하게 한다.
+    const sum=C.budgetSummary(state);
+    const shrink=rows.filter(it=>{
+      const cur=sum.items.find(r=>r.item.id===it.id);
+      return cur&&Number(it.amount||0)<cur.spent+cur.planned;
+    }).length;
+    if(shrink&&!confirm(L.budgetShrinkWarn(shrink)))return;
+    state.budget.title=$('bTitle').value.trim();
+    state.budget.year=$('bYear').value?Number($('bYear').value):null;
+    state.budget.items=rows.map(it=>({id:it.id,code:String(it.code||'').trim(),name:it.name.trim(),amount:Number(it.amount||0)}));
+    hide('budgetModal');await persist(L.savedBudget);
+  }
+
+  // ── 지출 ─────────────────────────────────────────────────────────────────
+  let editingSpendId=null;
+  function openSpend(id,preset={}){
+    editingSpendId=id;
+    const sp=id?(state.spends||[]).find(x=>x.id===id):null;
+    const src={...(sp||{itemId:'',projectId:null,vendorId:null,name:'',amount:'',status:'spent',date:C.todayISO(),memo:''}),...(sp?{}:preset)};
+    $('spItem').innerHTML=`<option value="">${C.esc(L.unassignedItem)}</option>`+(state.budget.items||[]).map(it=>`<option value="${C.esc(it.id)}">${C.esc(it.code?`${it.code} · ${it.name}`:it.name)}</option>`).join('');
+    $('spProject').innerHTML=`<option value="">${C.esc(L.noProjectGroup)}</option>`+state.projects.map(p=>`<option value="${C.esc(p.id)}">${C.esc(p.name)}</option>`).join('');
+    $('spVendor').innerHTML=`<option value="">${C.esc(L.noVendor)}</option>`+state.vendorTemplates.map(v=>`<option value="${C.esc(v.id)}">${C.esc(v.name)}</option>`).join('');
+    $('spStatus').innerHTML=`<option value="spent">${C.esc(L.statusSpent)}</option><option value="planned">${C.esc(L.statusPlanned)}</option>`;
+    $('spItem').value=src.itemId||'';$('spProject').value=src.projectId||'';$('spVendor').value=src.vendorId||'';
+    $('spName').value=src.name||'';$('spAmount').value=src.amount===''?'':String(src.amount);
+    $('spStatus').value=src.status||'spent';$('spDate').value=src.date||C.todayISO();$('spMemo').value=src.memo||'';
+    $('deleteSpendBtn').classList.toggle('hidden',!id);
+    $('spendModal').dataset.preset=JSON.stringify(sp?{}:preset);
+    show('spendModal');setTimeout(()=>$('spName').focus(),0);
+  }
+  async function saveSpend(){
+    const name=$('spName').value.trim(),amount=Number($('spAmount').value||0);
+    if(!name||!amount){toast(L.needSpendFields);return}
+    const preset=JSON.parse($('spendModal').dataset.preset||'{}');
+    const row={
+      itemId:$('spItem').value||null,projectId:$('spProject').value||null,vendorId:$('spVendor').value||null,
+      name,amount,status:$('spStatus').value==='planned'?'planned':'spent',
+      date:$('spDate').value||C.todayISO(),memo:$('spMemo').value.trim(),
+      recordKind:preset.recordKind||null,recordId:preset.recordId||null,
+    };
+    if(editingSpendId){
+      const i=(state.spends||[]).findIndex(x=>x.id===editingSpendId);
+      if(i>=0)state.spends[i]={...state.spends[i],...row};
+    }else{
+      state.spends.push({id:C.uid('sp'),...row});
+    }
+    hide('spendModal');await persist(L.savedSpend);
+    refreshOpenDetail();
+  }
+  async function deleteSpend(){
+    if(!editingSpendId||!confirm(L.confirmDeleteSpend))return;
+    state.spends=(state.spends||[]).filter(x=>x.id!==editingSpendId);
+    hide('spendModal');await persist(L.deletedSpend);
+    refreshOpenDetail();
+  }
   function allEventRecords(){return C.eventRecords(state)}
   function renderCalendar(){const y=currentMonth.getFullYear(),m=currentMonth.getMonth();$('monthTitle').textContent=`${y}년 ${m+1}월`;$('monthGrid').innerHTML='';const first=new Date(y,m,1),before=first.getDay(),days=new Date(y,m+1,0).getDate(),cells=Math.ceil((before+days)/7)*7,events=allEventRecords(),bands=C.projectBands(state);for(let i=0;i<cells;i++){const d=new Date(y,m,1-before+i),ds=C.iso(d),inMonth=d.getMonth()===m,isToday=ds===C.todayISO(),rows=events.filter(e=>C.spansDay(e,ds)).sort((a,b)=>Number(a.completed)-Number(b.completed)),dayBands=bands.filter(b=>C.spansDay(b,ds));const cell=document.createElement('div');cell.className=`day ${inMonth?'':'out'} ${[0,6].includes(d.getDay())?'weekend':''} ${isToday?'today':''}`;cell.dataset.date=ds;cell.innerHTML=`<div class="day-head"><span class="day-num">${d.getDate()}</span>${isToday?'<span class="today-label">TODAY</span>':''}</div>${dayBands.length?`<div class="day-bands">${dayBands.map(b=>`<span class="day-band ${edgeClass(b,ds)}" title="${C.esc(b.name)} · ${spanText(b)}">${b.date===ds||d.getDay()===0?C.esc(b.name):''}</span>`).join('')}</div>`:''}<div class="events">${rows.map(r=>{const v=C.vendor(state,r.vendorId);return `<button class="event ${r.completed?'done':''} ${r.kind==='manual'?'manual':''} ${!r.completed?C.ddayClass(r):''} ${edgeClass(r,ds)}" data-event-kind="${r.kind}" data-event-id="${r.id}" title="${C.esc(v?.name||'')} · ${C.esc(r.name)} · ${spanText(r)}">${r.completed?'✓ ':''}${C.esc(v?.name||L.noVendor)} · ${C.esc(r.name)}${C.isPeriod(r)&&r.date===ds?` (${C.periodDays(r)}일)`:''}</button>`}).join('')}</div>${inMonth?`<span class="add-hint">+ ${C.esc(state.terms.event)}</span>`:''}`;if(inMonth)cell.addEventListener('click',e=>{if(e.target.closest('[data-event-id]'))return;openSchedule(ds)});$('monthGrid').appendChild(cell)}qa('[data-event-id]',$('monthGrid')).forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();openRecord(b.dataset.eventKind,b.dataset.eventId)}))}
   function fillSelects(){
@@ -207,9 +376,12 @@
     <div class="current-box"><div class="current-label">${C.esc(selectedRecord.kind==='manual'?state.terms.event:L.selectedStep)}</div><div class="current-title">${C.esc(selectedRecord.name)}</div><div class="current-date">${C.isPeriod(selectedRecord)?C.esc(L.periodSpan(C.pretty(selectedRecord.date),C.pretty(selectedRecord.endDate),C.periodDays(selectedRecord))):C.pretty(selectedRecord.date)}${selectedRecord.memo?` · ${C.esc(selectedRecord.memo)}`:''}</div></div>
     ${vendorInfoRow(v)}
     <section class="worklog-section"><div class="section-headline"><div><b>${C.esc(L.worklog)}</b><span>진행 경과, 통화·협의 내용, 전달사항을 계속 남길 수 있습니다.</span></div></div><div class="log-compose"><textarea id="workLogText" placeholder="예: 업체 담당자와 통화. 평가서 보완본을 8/14 오전까지 제출하기로 함."></textarea><button class="btn primary" id="addWorkLogBtn">기록 추가</button></div><div class="worklog-list">${logs.length?logs.map(l=>`<div class="worklog-item"><div class="worklog-time">${new Intl.DateTimeFormat('ko-KR',{year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(l.time))}</div><div class="worklog-text">${C.esc(l.text)}</div><button class="tiny-link danger" data-delete-log="${l.id}">삭제</button></div>`).join(''):'<div class="section-empty">아직 기록이 없습니다.</div>'}</div></section>
+    ${spendSection(selectedRecord)}
     <section class="attachment-section"><div class="section-headline"><div><b>첨부파일</b><span>이 일정과 관련된 문서·사진을 로컬에 보관합니다.</span></div><label class="btn file-btn" for="detailFiles">+ 파일 첨부</label><input id="detailFiles" type="file" multiple hidden></div><div class="attachment-list">${files.length?files.map(f=>`<div class="attachment-item"><span class="file-icon">↳</span><span class="attachment-main"><b>${C.esc(f.name)}</b><small>${C.formatBytes(f.size)}</small></span><button class="tiny-link" data-download-file="${f.id}">열기/저장</button><button class="tiny-link danger" data-delete-file="${f.id}">삭제</button></div>`).join(''):'<div class="section-empty">첨부된 파일이 없습니다.</div>'}</div><div class="attachment-note">첨부파일은 이 PC/브라우저의 로컬 저장소에 보관됩니다. 다른 PC로 옮길 때는 파일 백업 기능을 별도로 추가하는 것이 안전합니다.</div></section>
     ${p?`<div class="steps"><div class="steps-head"><div><div class="steps-title">${C.esc(L.allSteps)}</div><div class="steps-sub">완료된 단계와 아직 오지 않은 단계까지 모두 표시합니다.</div></div><button class="link" id="editProjectSteps">${C.esc(L.editSteps)}</button></div>${steps.map((s,i)=>{const st=stepStatus(p,s);return `<div class="step ${st.key}"><span class="step-mark">${s.completed?'✓':C.currentStep(p)?.id===s.id?'●':i+1}</span><span class="step-name">${C.esc(s.name)}</span><span class="step-status ${st.key}">${C.esc(st.label)}</span></div>`}).join('')}</div>`:''}`;
-    show('detailModal');q('#editProjectSteps')?.addEventListener('click',()=>{hide('detailModal');openProjectSteps(p.id)});q('#addWorkLogBtn')?.addEventListener('click',addWorkLog);q('#workLogText')?.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();addWorkLog()}});q('#detailFiles')?.addEventListener('change',addAttachments);qa('[data-delete-log]',$('detailBody')).forEach(b=>b.addEventListener('click',()=>deleteWorkLog(b.dataset.deleteLog)));qa('[data-download-file]',$('detailBody')).forEach(b=>b.addEventListener('click',()=>downloadAttachment(b.dataset.downloadFile)));qa('[data-delete-file]',$('detailBody')).forEach(b=>b.addEventListener('click',()=>deleteAttachment(b.dataset.deleteFile)))
+    show('detailModal');q('#editProjectSteps')?.addEventListener('click',()=>{hide('detailModal');openProjectSteps(p.id)});q('#addWorkLogBtn')?.addEventListener('click',addWorkLog);q('#workLogText')?.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();addWorkLog()}});q('#detailFiles')?.addEventListener('change',addAttachments);
+    q('#detailAddSpend')?.addEventListener('click',()=>openSpend(null,{recordKind:selectedRecord.kind,recordId:selectedRecord.id,vendorId:selectedRecord.vendorId,projectId:selectedRecord.projectId,name:selectedRecord.name}));
+    qa('[data-spend]',$('detailBody')).forEach(b=>b.addEventListener('click',()=>openSpend(b.dataset.spend)));qa('[data-delete-log]',$('detailBody')).forEach(b=>b.addEventListener('click',()=>deleteWorkLog(b.dataset.deleteLog)));qa('[data-download-file]',$('detailBody')).forEach(b=>b.addEventListener('click',()=>downloadAttachment(b.dataset.downloadFile)));qa('[data-delete-file]',$('detailBody')).forEach(b=>b.addEventListener('click',()=>deleteAttachment(b.dataset.deleteFile)))
   }
   async function refreshDetail(msg){const k=selectedRecord?.kind,id=selectedRecord?.id;await C.saveState(state);render();if(k&&id)openRecord(k,id);if(msg)toast(msg)}
   async function addWorkLog(){const entity=recordEntity(selectedRecord),text=q('#workLogText')?.value.trim();if(!entity||!text)return;entity.logs=Array.isArray(entity.logs)?entity.logs:[];entity.logs.push({id:C.uid('log'),time:new Date().toISOString(),text});await refreshDetail('업무 내용을 기록했습니다.')}
@@ -313,6 +485,8 @@
         <div class="field"><label>진행 단위 · 기본 “업무”</label><input data-term="project" value="${C.esc(t.project)}"></div>
         <div class="field"><label>절차 · 기본 “절차”</label><input data-term="step" value="${C.esc(t.step)}"></div>
         <div class="field"><label>일정 · 기본 “일정”</label><input data-term="event" value="${C.esc(t.event)}"></div>
+        <div class="field"><label>예산 항목 · 기본 “예산항목”</label><input data-term="budgetItem" value="${C.esc(t.budgetItem)}"></div>
+        <div class="field"><label>지출 · 기본 “지출”</label><input data-term="spend" value="${C.esc(t.spend)}"></div>
       </div>
       <div class="terms-preview" id="termsPreview"></div>
       <div class="editor-head" style="margin-top:16px"><div class="editor-title">${C.esc(t.vendor)} 항목</div></div>
@@ -428,6 +602,10 @@
   $('prevMonth').addEventListener('click',()=>{currentMonth=new Date(currentMonth.getFullYear(),currentMonth.getMonth()-1,1);renderCalendar()});$('nextMonth').addEventListener('click',()=>{currentMonth=new Date(currentMonth.getFullYear(),currentMonth.getMonth()+1,1);renderCalendar()});$('todayBtn').addEventListener('click',()=>{const d=C.parse(C.todayISO());currentMonth=new Date(d.getFullYear(),d.getMonth(),1);renderCalendar();setTimeout(()=>q('.day.today')?.scrollIntoView({block:'center',behavior:'smooth'}),10)});
   $('addScheduleBtn').addEventListener('click',()=>openSchedule());$('saveScheduleBtn').addEventListener('click',saveSchedule);$('sVendor').addEventListener('change',updateProjectSelect);$('addWorkBtn').addEventListener('click',openWork);$('saveWorkBtn').addEventListener('click',saveWork);$('wVendor').addEventListener('change',applyWorkMode);$('wTemplate').addEventListener('change',applyWorkMode);$('wAddEvent').addEventListener('click',()=>{bundleDraft.push(blankBundleRow());renderBundleEvents()});$('templateBtn').addEventListener('click',openTemplates);$('settingsBtn').addEventListener('click',openSettings);$('helperBtn').addEventListener('click',openHelper);$('settingsOpenHelper').addEventListener('click',openHelper);$('alwaysOnTop').addEventListener('change',setTop);$('autostart').addEventListener('change',setAutostart);$('completeBtn').addEventListener('click',completeSelected);$('changeDateBtn').addEventListener('click',openDateModal);$('saveDateBtn').addEventListener('click',saveSelectedDate);$('reopenBtn').addEventListener('click',reopenSelected);$('deleteEventBtn').addEventListener('click',deleteSelected);$('demoToggleBtn').addEventListener('click',toggleDemo);$('backupNowBtn').addEventListener('click',backupNow);$('backupFolderBtn').addEventListener('click',async()=>{if(!await C.revealBackups())toast('이 환경에서는 폴더를 열 수 없습니다.')});$('restoreBtn').addEventListener('click',restoreFromList);$('restoreFile').addEventListener('change',restoreFromFile);$('projectAddStep').addEventListener('click',()=>{projectStepsDraft.push({id:null,name:'새 단계',offset:1,dueDate:null,completed:false,completedAt:null});renderProjectSteps()});$('saveProjectSteps').addEventListener('click',saveProjectSteps);
   qa('[data-board]').forEach(b=>b.addEventListener('click',()=>setBoardMode(b.dataset.board)));
+  $('bAddItem').addEventListener('click',()=>{budgetDraft.push(blankBudgetRow());renderBudgetItems()});
+  $('saveBudgetBtn').addEventListener('click',saveBudget);
+  $('saveSpendBtn').addEventListener('click',saveSpend);
+  $('deleteSpendBtn').addEventListener('click',deleteSpend);
   qa('[data-template-tab]').forEach(b=>b.addEventListener('click',()=>{templateTab=b.dataset.templateTab;qa('[data-template-tab]').forEach(x=>x.classList.toggle('active',x===b));$('vendorTemplatePane').classList.toggle('hidden',templateTab!=='vendor');$('workTemplatePane').classList.toggle('hidden',templateTab!=='work');$('termsPane').classList.toggle('hidden',templateTab!=='terms')}));qa('[data-close]').forEach(b=>b.addEventListener('click',()=>hide(b.dataset.close)));qa('.modal-bg').forEach(bg=>bg.addEventListener('mousedown',e=>{if(e.target===bg)hide(bg.id)}));document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modalStack.length)hide(modalStack[modalStack.length-1].id)});
   await C.watchState(v=>{state=v;render();consumePendingSelection()});
   const d=C.parse(C.todayISO());currentMonth=new Date(d.getFullYear(),d.getMonth(),1);render();consumePendingSelection();  // 사용자가 버튼을 눌러야 보호된다면 그건 또 하나의 업무다. 시작할 때 조용히 처리한다.

@@ -17,9 +17,10 @@
     <div class="due-list" id="dueList"></div>
   </aside>
   <section class="panel calendar-panel">
-    <div class="cal-toolbar"><div class="tabs seg" role="tablist" aria-label="대시보드 보기"><button class="tab active" role="tab" data-board="calendar" data-t="viewCalendar"></button><button class="tab" role="tab" data-board="vendor" data-t="viewVendor"></button></div><div class="cal-nav" id="calNav"><button class="btn icon" id="prevMonth" aria-label="이전 달"><svg class="ico" aria-hidden="true"><use href="#i-chevron-left"/></svg></button><div class="month-title" id="monthTitle"></div><button class="btn icon" id="nextMonth" aria-label="다음 달"><svg class="ico" aria-hidden="true"><use href="#i-chevron-right"/></svg></button><button class="btn" id="todayBtn">Today</button></div><div class="cal-spacer"></div><span class="hint" id="calHint"></span></div>
+    <div class="cal-toolbar"><div class="tabs seg" role="tablist" aria-label="대시보드 보기"><button class="tab active" role="tab" data-board="calendar" data-t="viewCalendar"></button><button class="tab" role="tab" data-board="vendor" data-t="viewVendor"></button><button class="tab" role="tab" data-board="budget" data-t="viewBudget"></button></div><div class="cal-nav" id="calNav"><button class="btn icon" id="prevMonth" aria-label="이전 달"><svg class="ico" aria-hidden="true"><use href="#i-chevron-left"/></svg></button><div class="month-title" id="monthTitle"></div><button class="btn icon" id="nextMonth" aria-label="다음 달"><svg class="ico" aria-hidden="true"><use href="#i-chevron-right"/></svg></button><button class="btn" id="todayBtn">Today</button></div><div class="cal-spacer"></div><span class="hint" id="calHint"></span></div>
     <div class="calendar-scroll" id="calendarScroll"><div class="weekdays"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div><div class="month-grid" id="monthGrid"></div></div>
     <div class="vendor-board hidden" id="vendorBoard"></div>
+    <div class="budget-board hidden" id="budgetBoard"></div>
   </section>
 </main></div>
 
@@ -56,5 +57,23 @@
   <div class="setting-row"><div class="setting-copy"><b>백업에서 복원</b><span>복원 직전 현재 데이터를 한 벌 자동으로 남깁니다.</span></div><div class="setting-actions"><select id="backupPick" class="hidden" aria-label="복원할 백업 선택"></select><button class="btn hidden" id="restoreBtn">복원</button><label class="btn hidden" for="restoreFile" id="restoreFileLabel">백업 파일 선택</label><input id="restoreFile" type="file" accept=".zip,application/zip" hidden></div></div>
   <div class="setting-row"><div class="setting-copy"><b>예시 데이터</b><span id="demoCopy" data-t="demoCopy"></span></div><button class="btn" id="demoToggleBtn">예시 데이터 불러오기</button></div>
 </div><div class="modal-foot"><button class="btn" data-close="settingsModal">닫기</button></div></section></div>
+<div class="modal-bg" id="budgetModal"><section class="modal wide" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="budgetModalTitle"><div class="modal-head"><h2 id="budgetModalTitle" data-t="budgetModalTitle"></h2><button class="close" data-close="budgetModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body">
+  <div class="form-grid"><div class="field"><label for="bTitle" data-t="budgetTitleLabel"></label><input id="bTitle" placeholder="예: 2026년 본예산" autocomplete="off"></div><div class="field"><label for="bYear" data-t="budgetYear"></label><input id="bYear" type="number" min="2000" max="2100" placeholder="2026"></div></div>
+  <div class="bi-head" id="budgetItemsHead"></div>
+  <div class="ev-list" id="budgetItems" style="margin-top:6px"></div>
+  <button class="btn" id="bAddItem" style="margin-top:8px"></button>
+  <div class="field-note" id="budgetItemsHint"></div>
+</div><div class="modal-foot"><button class="btn" data-close="budgetModal">취소</button><button class="btn primary" id="saveBudgetBtn">저장</button></div></section></div>
+
+<div class="modal-bg" id="spendModal"><section class="modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="spendModalTitle"><div class="modal-head"><h2 id="spendModalTitle" data-t="spendModalTitle"></h2><button class="close" data-close="spendModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body"><div class="form-grid">
+  <div class="field full"><label for="spItem" data-t="fBudgetItem"></label><select id="spItem"></select></div>
+  <div class="field"><label for="spProject" data-t="fLinkedProject"></label><select id="spProject"></select></div>
+  <div class="field"><label for="spVendor" data-t="fVendor"></label><select id="spVendor"></select></div>
+  <div class="field full"><label for="spName" data-t="fSpendName"></label><input id="spName" autocomplete="off" placeholder="예: 무대 설치 대금, 홍보물 인쇄"></div>
+  <div class="field"><label for="spAmount" data-t="fAmount"></label><input id="spAmount" type="number" min="0" step="1000" inputmode="numeric"></div>
+  <div class="field"><label for="spStatus" data-t="fStatus"></label><select id="spStatus"></select></div>
+  <div class="field"><label for="spDate" data-t="fSpendDate"></label><input id="spDate" type="date"></div>
+  <div class="field"><label for="spMemo">메모</label><input id="spMemo" placeholder="선택"></div>
+</div></div><div class="modal-foot"><button class="btn danger hidden" id="deleteSpendBtn" data-t="deleteSpend"></button><button class="btn" data-close="spendModal">취소</button><button class="btn primary" id="saveSpendBtn" data-t="saveSpend"></button></div></section></div>
 <div class="toast" id="toast"></div>
 <script src="zip.js"></script><script src="core.js"></script><script src="app.js"></script></body></html>
