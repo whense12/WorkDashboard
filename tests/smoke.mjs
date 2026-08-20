@@ -95,7 +95,7 @@ console.log('\n[1] 최초 실행 — 예시 데이터 없이 빈 상태');
   const state = await page.evaluate(() => window.WorkCore.readState().then((s) => ({ p: s.projects.length, m: s.manualEvents.length, v: s.vendorTemplates.length, w: s.workTemplates.length, ver: s.version })));
   check('가짜 공사/일정이 저장되지 않는다', state.p === 0 && state.m === 0, `projects=${state.p} events=${state.m}`);
   check('업체·업무 템플릿(기준정보)은 제공된다', state.v > 0 && state.w > 0);
-  check('상태 버전이 8로 올라간다', state.ver === 8, `version=${state.ver}`);
+  check('상태 버전이 9로 올라간다', state.ver === 9, `version=${state.ver}`);
   check('빈 상태 안내가 보인다', (await page.innerText('#dueList')).includes('등록된 업무가 없습니다'));
   check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
   await ctx.close();
@@ -762,9 +762,12 @@ console.log('\n[24] v6 -> v7 이관 — 담당자·연락처 값이 보존된다
       projects: s.projects.length, steps: s.projects[0]?.steps.length,
       terms: s.terms,
       budget: s.budget, spends: s.spends,
+      groups: s.groups, groupIds: s.projects.map((p) => p.groupId),
     };
   });
-  check('버전이 8로 올라간다', m.version === 8, `version=${m.version}`);
+  check('버전이 9로 올라간다', m.version === 9, `version=${m.version}`);
+  check('행사 목록이 빈 상태로 만들어진다', Array.isArray(m.groups) && m.groups.length === 0, JSON.stringify(m.groups));
+  check('기존 업무에 행사 칸이 생기고 비어 있다', m.groupIds.every((g) => g === null), JSON.stringify(m.groupIds));
   check('예산이 빈 상태로 만들어진다', !!m.budget && Array.isArray(m.budget.items) && m.budget.items.length === 0, JSON.stringify(m.budget));
   check('지출 원장이 빈 배열로 만들어진다', Array.isArray(m.spends) && m.spends.length === 0);
   check('예산 용어 기본값도 채워진다', m.terms.budgetItem === '예산항목' && m.terms.spend === '지출', JSON.stringify(m.terms));
@@ -1504,6 +1507,107 @@ console.log('\n[31] 되돌리기 — 물어보는 대신 되돌릴 기회를 준
   check('남은 확인창은 되돌려도 복구가 안 되는 것들이다',
     risky.every((k) => src.includes(k)), risky.filter((k) => !src.includes(k)).join(','));
 
+  check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
+console.log('\n[32] 행사 — 한 행사에 여러 업체가 붙고, 중간에 더 넣을 수 있다');
+{
+  const { ctx, page, errors } = await open();
+  const st = () => page.evaluate(() => window.WorkCore.readState());
+  const d = (n) => page.evaluate((k) => window.WorkCore.addDays(window.WorkCore.todayISO(), k), n);
+
+  // 행사를 만들면서 첫 참여업체를 붙인다
+  await page.click('#addWorkBtn');
+  await page.waitForSelector('#workModal.show');
+  await combo(page, 'wGroup', '가을 농특산물 대축제');
+  await combo(page, 'wVendor', '대한건설');
+  await page.selectOption('#wTemplate', 'wt-simple');
+  await page.fill('#wProject', '가을 농특산물 대축제');
+  await page.fill('#wFirstDate', await d(1));
+  await page.fill('#wStart', await d(10));
+  await page.fill('#wEnd', await d(40));
+  await page.click('#saveWorkBtn');
+  await page.waitForTimeout(500);
+
+  let s1 = await st();
+  const gid = s1.groups.find((g) => g.name === '가을 농특산물 대축제')?.id;
+  check('행사가 만들어진다', !!gid, JSON.stringify(s1.groups));
+  check('참여 건이 행사에 붙는다', s1.projects.filter((p) => p.groupId === gid).length === 1);
+  check('행사 기간이 첫 참여 건에서 채워진다', !!s1.groups.find((g) => g.id === gid)?.startDate);
+
+  // 중간에 업체를 더 붙인다 — 행사별 화면에서 바로
+  await page.click('[data-board="group"]');
+  await page.waitForSelector('#groupBoard:not(.hidden) .board-row');
+  check('행사별이 네 번째 축으로 붙는다', await page.$eval('#vendorBoard', (e) => e.classList.contains('hidden')));
+  await page.click('#groupBoard .board-head');
+  await page.waitForSelector('[data-group-add]');
+  await page.click('[data-group-add]');
+  await page.waitForSelector('#workModal.show');
+  check('행사에서 열면 행사가 미리 골라져 있다', (await page.$eval('#wGroup', (e) => e.value)) === gid);
+  check('행사 기간이 참여기간 기본값으로 들어온다', (await page.inputValue('#wStart')).length === 10);
+
+  // 목록에 없는 업체를 그 자리에서 만들어 붙인다 — 사용자가 말한 그 흐름
+  await combo(page, 'wVendor', '솔뫼농산');
+  await page.selectOption('#wTemplate', 'wt-simple');
+  await page.fill('#wFirstDate', await d(2));
+  await page.click('#saveWorkBtn');
+  await page.waitForTimeout(500);
+
+  let s2 = await st();
+  const parts = s2.projects.filter((p) => p.groupId === gid);
+  check('중간에 새 업체를 만들어 행사에 붙일 수 있다', parts.length === 2, `${parts.length}`);
+  check('새로 만든 업체가 그 참여 건의 주인이다',
+    parts.some((p) => s2.vendorTemplates.find((v) => v.id === p.vendorId)?.name === '솔뫼농산'));
+
+  // 업체마다 참여기간을 줄인다 — AB는 한 달, C는 2주
+  await page.click('[data-board="group"]');
+  await page.waitForSelector('#groupBoard:not(.hidden)');
+  const shorter = await page.evaluate(async (args) => {
+    const C = window.WorkCore, s = await C.readState();
+    const ps = s.projects.filter((p) => p.groupId === args.gid);
+    ps[1].startDate = args.a; ps[1].endDate = args.b;      // 한 곳만 2주로
+    await C.saveState(s);
+    const g = C.groupSummaries(s).find((x) => x.group.id === args.gid);
+    return { members: g.members.map((m) => [m.vendor?.name, m.startDate, m.endDate]),
+      groupStart: g.group.startDate, groupEnd: g.group.endDate };
+  }, { gid, a: await d(10), b: await d(23) });
+  check('업체마다 참여기간을 다르게 둘 수 있다',
+    new Set(shorter.members.map((m) => m[2])).size === 2, JSON.stringify(shorter.members));
+  check('한 업체를 줄여도 행사 기간은 그대로다', shorter.groupEnd === await d(40), `${shorter.groupEnd}`);
+
+  // 캘린더 띠는 업체 수와 무관하게 한 줄
+  await page.click('[data-board="calendar"]');
+  await page.waitForTimeout(200);
+  const bands = await page.evaluate(() => {
+    const names = [...document.querySelectorAll('.day-band')].map((e) => e.getAttribute('title'));
+    return { total: names.length, festival: names.filter((t) => t && t.includes('대축제')).length,
+      perDay: Math.max(...[...document.querySelectorAll('.day')].map((d) => d.querySelectorAll('.day-band').length)) };
+  });
+  check('행사 띠는 업체가 몇 곳이든 하루에 한 줄이다', bands.perDay === 1, JSON.stringify(bands));
+  check('띠에 참여 업체 수가 적힌다',
+    await page.$eval('.day-band', (e) => /참여/.test(e.getAttribute('title'))));
+
+  // 예산의 '행사별' 이 행사 단위로 묶이고 총계는 그대로
+  const budget = await page.evaluate(async (g) => {
+    const C = window.WorkCore, s = await C.readState();
+    const ps = s.projects.filter((p) => p.groupId === g);
+    s.budget = { title: '', year: null, items: [{ id: 'bi-1', code: '', name: '행사운영비', amount: 10000000 }] };
+    s.spends = ps.map((p, i) => ({ id: `sp-${i}`, itemId: 'bi-1', projectId: p.id, vendorId: p.vendorId,
+      name: `대금 ${i}`, amount: 1000000, status: 'spent', date: C.todayISO(), memo: '', recordKind: null, recordId: null }));
+    const sum = C.budgetSummary(s);
+    return { groups: sum.items[0].projects.length, isGroup: sum.items[0].projects[0].isGroup,
+      name: sum.items[0].projects[0].project?.name,
+      vendors: sum.items[0].projects[0].vendors.length,
+      total: sum.total.spent, ledger: s.spends.reduce((n, x) => n + x.amount, 0) };
+  }, gid);
+  check('예산 2단이 행사 하나로 묶인다', budget.groups === 1 && budget.isGroup === true, JSON.stringify(budget));
+  check('그 아래에 업체 2곳이 갈린다', budget.vendors === 2, `${budget.vendors}`);
+  check('행사 이름으로 묶인다', budget.name === '가을 농특산물 대축제', budget.name);
+  check('묶어도 총계는 달라지지 않는다', budget.total === budget.ledger, JSON.stringify(budget));
+
+  const tiny = await page.evaluate(measure);
+  check('행사 화면에 13px 미만 텍스트가 없다', tiny.length === 0, tiny.join(' | '));
   check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
   await ctx.close();
 }

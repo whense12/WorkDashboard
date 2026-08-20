@@ -30,7 +30,7 @@
   const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
   const uid=p=>`${p}-${Date.now()}-${Math.random().toString(16).slice(2,8)}`;
   const clone=x=>JSON.parse(JSON.stringify(x));
-  const STATE_VERSION=8;
+  const STATE_VERSION=9;
 
   // ── 용어 ─────────────────────────────────────────────────────────────────
   // 발주서 §1: 도메인 규칙을 하드코딩하지 말 것. 시드 절차명은 예시일 뿐 정책이 아니다.
@@ -62,7 +62,17 @@
       app:T.app,
       addProject:`${P} 추가`, addEvent:`${E} 추가`,
       upcoming:`다가오는 ${E}`,
-      viewCalendar:'캘린더', viewVendor:`${V}별`,
+      viewCalendar:'캘린더', viewVendor:`${V}별`, viewGroup:'행사별',
+      fGroup:'행사(선택)', groupName:'행사명',
+      createGroupRow:n=>`‘${n}’ 새 행사로 만들기`,
+      createdGroup:n=>`새 행사를 만들었습니다: ${n}`,
+      noGroup:'행사 없음',
+      groupCaption:`행사 하나에 참여하는 ${V} 전부를 한 줄로 봅니다. 줄을 누르면 참여 ${V} 목록이 펼쳐집니다.`,
+      groupEmpty:'등록된 행사가 없습니다.<br><b>'+P+' 추가</b>에서 행사를 만들면 여기에 모입니다.',
+      groupVendors:n=>`참여 ${V} ${n}곳`,
+      addGroupMember:`+ 참여 ${V} 추가`,
+      groupPeriodNote:`행사 기간이 기본값입니다. ${V}마다 참여기간을 줄일 수 있습니다.`,
+      memberPeriod:`참여기간`,
       boardCaption:`${V}별로 지금 어디까지 왔는지 보여줍니다. 줄을 누르면 ${P} 목록이 펼쳐집니다.`,
       boardOpen:`진행 중 ${P}`, boardDone:`완료 ${P}`, boardOverdue:'지연',
       boardNoDate:'날짜 미정', boardProgress:`${S} 진행`,
@@ -155,6 +165,7 @@
     terms:{app:'업체별 업무 일정',vendor:'업체',project:'업무',step:'절차',event:'일정',budgetItem:'예산항목',spend:'지출'},
     budget:{title:'',year:null,items:[]},
     spends:[],
+    groups:[],
     vendorFields:[{id:'vf-person',label:'담당자',type:'text'},{id:'vf-contact',label:'연락처',type:'tel'},{id:'vf-memo',label:'메모',type:'multiline'}],
     vendorTemplates:[
       {id:'v-daehan',name:'대한건설',values:{'vf-person':'김OO','vf-contact':'010-1111-1111','vf-memo':''}},
@@ -238,6 +249,15 @@
       if(!Array.isArray(s.spends))s.spends=[];
       v=8;
     }
+    if(v<9){
+      // v8 -> v9: 행사(그룹)가 생긴다.
+      // project.vendorId 가 업체 한 곳이라 '한 행사에 업체 10곳'을 담을 수 없었다.
+      // 업무는 그대로 '업체 × 행사' 참여 건으로 두고, 그 위에 행사를 얹는다.
+      // 기존 필드는 하나도 건드리지 않는다 — 행사를 안 쓰면 v8 과 똑같이 돈다.
+      if(!Array.isArray(s.groups))s.groups=[];
+      (Array.isArray(s.projects)?s.projects:[]).forEach(p=>{if(!('groupId' in p))p.groupId=null});
+      v=9;
+    }
     s.version=v;
     return s;
   }
@@ -256,6 +276,8 @@
     s.budget={title:'',year:null,...(s.budget||{})};
     s.budget.items=Array.isArray(s.budget.items)?s.budget.items:[];
     s.spends=Array.isArray(s.spends)?s.spends:[];
+    s.groups=Array.isArray(s.groups)?s.groups:[];
+    s.projects.forEach(p=>{if(!('groupId' in p))p.groupId=null});
     s.projects.forEach(p=>{
       p.steps=Array.isArray(p.steps)?p.steps:[];
       p.steps.forEach(st=>{st.logs=Array.isArray(st.logs)?st.logs:[];st.attachments=Array.isArray(st.attachments)?st.attachments:[];st.memo=st.memo||''});
@@ -368,6 +390,9 @@
   async function readState(){if(store){return normalizeState((await store.get('state'))||clone(seed))}try{return normalizeState(JSON.parse(localStorage.getItem(KEY)||'null')||clone(memoryState))}catch(e){return clone(memoryState)}}
   function vendor(state,id){return state.vendorTemplates.find(v=>v.id===id)}
   function project(state,id){return state.projects.find(p=>p.id===id)}
+  function group(state,id){return (state.groups||[]).find(g=>g.id===id)}
+  /** 그 행사의 참여 건(업무)들. 업무 하나가 '업체 × 행사' 한 칸이다. */
+  const projectsOfGroup=(state,gid)=>state.projects.filter(p=>p.groupId===gid);
   function currentStep(p){return p?.steps?.find(s=>!s.completed)||null}
   function eventRecords(state){
     const rows=[];
@@ -453,11 +478,13 @@
     spends.forEach(sp=>{(known.has(sp.itemId)?byItem.get(sp.itemId):orphan).push(sp)});
     // 예산항목 → 행사 → 업체. 사용자가 말한 그 순서다.
     // 행사·업체가 비어 있는 지출도 묶음으로 세운다. 빠뜨리면 합계가 맞지 않는다.
-    const group=list=>{
+    const groupRows=list=>{
       const pm=new Map();
       list.forEach(sp=>{
-        const pk=sp.projectId||'';
-        if(!pm.has(pk))pm.set(pk,{projectId:sp.projectId||null,project:project(state,sp.projectId)||null,spent:0,planned:0,vendors:new Map()});
+        // 행사가 있으면 행사 단위로 묶는다. 없으면 지금처럼 업무 단위. 총계는 달라지지 않는다.
+        const p0=project(state,sp.projectId),g0=p0?.groupId?group(state,p0.groupId):null;
+        const pk=g0?`g:${g0.id}`:(sp.projectId||'');
+        if(!pm.has(pk))pm.set(pk,{projectId:sp.projectId||null,project:g0?{id:g0.id,name:g0.name}:(p0||null),isGroup:!!g0,spent:0,planned:0,vendors:new Map()});
         const g=pm.get(pk),vk=sp.vendorId||'';
         if(!g.vendors.has(vk))g.vendors.set(vk,{vendorId:sp.vendorId||null,vendor:vendor(state,sp.vendorId)||null,spent:0,planned:0,spends:[]});
         const vg=g.vendors.get(vk),amt=money(sp.amount);
@@ -479,7 +506,7 @@
     const rows=items.map(it=>{
       const list=byItem.get(it.id)||[],{spent,planned}=sumOf(list),amount=money(it.amount);
       return {item:it,amount,spent,planned,remain:amount-spent-planned,...rateOf(amount,spent,planned),
-        over:amount>0&&spent+planned>amount,count:list.length,projects:group(list)};
+        over:amount>0&&spent+planned>amount,count:list.length,projects:groupRows(list)};
     });
     const oh=sumOf(orphan);
     const amount=items.reduce((n,it)=>n+money(it.amount),0);
@@ -489,11 +516,48 @@
       total:{amount,spent:all.spent,planned:all.planned,remain:amount-all.spent-all.planned,
         ...rateOf(amount,all.spent,all.planned),over:amount>0&&all.spent+all.planned>amount},
       items:rows,
-      unassigned:orphan.length?{...oh,total:oh.spent+oh.planned,count:orphan.length,projects:group(orphan)}:null,
+      unassigned:orphan.length?{...oh,total:oh.spent+oh.planned,count:orphan.length,projects:groupRows(orphan)}:null,
     };
   }
   /** 이 일정·절차에 걸린 지출. 상세 모달이 쓴다. */
   function spendsOfRecord(state,kind,id){return (state.spends||[]).filter(sp=>sp.recordKind===kind&&sp.recordId===id)}
+  /** 행사별 요약. 업체별·예산과 같은 모양으로 만들어 화면이 합계를 들고 있지 않게 한다. */
+  function groupSummaries(state){
+    const spendsBy=new Map();
+    (state.spends||[]).forEach(sp=>{
+      const p=project(state,sp.projectId),key=p?.groupId||null;
+      if(!key)return;
+      const cur=spendsBy.get(key)||{spent:0,planned:0};
+      if(isSpent(sp))cur.spent+=money(sp.amount);else cur.planned+=money(sp.amount);
+      spendsBy.set(key,cur);
+    });
+    return (state.groups||[]).map(g=>{
+      const parts=projectsOfGroup(state,g.id);
+      let stepsDone=0,stepsTotal=0,openCount=0,doneCount=0,overdueCount=0,next=null;
+      const members=parts.map(p=>{
+        const steps=p.steps||[],done=steps.filter(x=>x.completed).length;
+        stepsDone+=done;stepsTotal+=steps.length;
+        const cur=currentStep(p);
+        if(cur)openCount++;else doneCount++;
+        const rec=steps.find(x=>!x.completed&&x.dueDate);
+        return {project:p,vendor:vendor(state,p.vendorId)||null,
+          // 참여기간은 업체마다 다를 수 있다. 행사 기간이 기본값일 뿐이다.
+          startDate:p.startDate||g.startDate||null,endDate:p.endDate||g.endDate||null,
+          stepName:cur?cur.name:null,stepsDone:done,stepsTotal:steps.length,completed:!cur,
+          date:rec?rec.dueDate:null,record:rec?{kind:'step',id:rec.id}:null};
+      });
+      eventRecords(state).filter(e=>!e.completed&&e.date).forEach(e=>{
+        const p=project(state,e.projectId);if(p?.groupId!==g.id)return;
+        if(phaseOf(e)==='after')overdueCount++;
+        if(!next||sortDate(e)<sortDate(next))next=e;
+      });
+      const m=spendsBy.get(g.id)||{spent:0,planned:0};
+      members.sort((a,b)=>(a.completed?1:0)-(b.completed?1:0)||String(a.date||'~').localeCompare(String(b.date||'~')));
+      return {group:g,members,openCount,doneCount,stepsDone,stepsTotal,overdueCount,next,
+        spent:m.spent,planned:m.planned,vendorCount:parts.length};
+    }).sort((a,b)=>String(a.group.startDate||'~').localeCompare(String(b.group.startDate||'~'))
+      ||String(a.group.name).localeCompare(String(b.group.name)));
+  }
   function ddayLabel(a,b){
     const r=asRange(a,b);
     switch(phaseOf(r)){
@@ -510,10 +574,21 @@
     // '진행중'은 지금 벌어지고 있는 일이므로 '오늘' 자리에 놓는다. 글자가 달라 구분된다.
     return ph==='after'?'overdue':(ph==='on'||ph==='during')?'today':'';
   }
-  /** 캘린더 상단 띠로 그릴 행사 기간. "이 날 할 일"과 "이 행사가 도는 중"은 층위가 다르다. */
+  /** 캘린더 상단 띠. "이 날 할 일"과 "이 행사가 도는 중"은 층위가 다르다.
+   *  행사가 있으면 **행사 하나로** 그린다. 업체 10곳이 참여해도 띠는 한 줄이다. */
   function projectBands(state){
-    return (state.projects||[]).filter(p=>p.startDate).map(p=>({
-      id:p.id,vendorId:p.vendorId,name:p.name,date:p.startDate,endDate:p.endDate||p.startDate}));
+    const bands=[];
+    (state.groups||[]).forEach(g=>{
+      if(!g.startDate)return;
+      bands.push({kind:'group',id:g.id,name:g.name,date:g.startDate,endDate:g.endDate||g.startDate,
+        count:projectsOfGroup(state,g.id).length});
+    });
+    (state.projects||[]).forEach(p=>{
+      if(!p.startDate||p.groupId)return;          // 행사에 속한 건은 행사 띠가 대신한다
+      bands.push({kind:'project',id:p.id,vendorId:p.vendorId,name:p.name,
+        date:p.startDate,endDate:p.endDate||p.startDate,count:0});
+    });
+    return bands;
   }
   function projectFromTemplate(template,vendorId,name,firstDate,memo=''){
     const id=uid('p');return {id,vendorId,name,memo,templateId:template.id,steps:template.steps.map((s,i)=>({id:uid(`${id}s`),name:s.name,offset:Number(s.offset||0),dueDate:i===0?firstDate:null,completed:false,completedAt:null,memo:'',logs:[],attachments:[]}))};
@@ -652,7 +727,7 @@
     if(moved)await saveState(state);
     return moved;
   }
-  window.WorkCore={KEY,STATE_VERSION,seed,defaultTerms,defaultVendorFields,labels,josa,demoData,hasDemoData,clone,uid,todayISO,parse,iso,addDays,diffDays,pretty,esc,isTauri,nativeFiles,migrate,normalizeState,initStorage,saveState,watchState,readState,vendor,project,currentStep,eventRecords,dueCards,ddayLabel,ddayClass,horizonDays,horizonLabel,vendorSummaries,budgetSummary,spendsOfRecord,formatMoney,isPeriod,periodDays,spansDay,phaseOf,sortDate,endOf,projectBands,projectFromTemplate,completeEvent,reopenEvent,
+  window.WorkCore={KEY,STATE_VERSION,seed,defaultTerms,defaultVendorFields,labels,josa,demoData,hasDemoData,clone,uid,todayISO,parse,iso,addDays,diffDays,pretty,esc,isTauri,nativeFiles,migrate,normalizeState,initStorage,saveState,watchState,readState,vendor,project,currentStep,eventRecords,dueCards,ddayLabel,ddayClass,horizonDays,horizonLabel,vendorSummaries,groupSummaries,group,projectsOfGroup,budgetSummary,spendsOfRecord,formatMoney,isPeriod,periodDays,spansDay,phaseOf,sortDate,endOf,projectBands,projectFromTemplate,completeEvent,reopenEvent,
     putAttachment,readAttachment,deleteAttachment,attachmentsOf,purgeAttachments,revealAttachment,migrateAttachmentsToDisk,formatBytes,
     buildBackup,readBackup,restoreBackup,writeBackupFile,listBackups,readBackupFile,rotateBackups,revealBackups,maybeAutoBackup};
 })();

@@ -91,6 +91,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .board-item{width:100%;text-align:left;border:1px solid var(--line);border-radius:9px;background:var(--sub);padding:8px 10px;display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:9px}
 .board-item:hover{background:#f0f1f3}
 .board-item.flat{background:#fff;border-style:dashed}
+.board-item.add{background:#fff;border-style:dashed;color:var(--accent);font-weight:800;justify-items:start;display:block;text-align:left}
+.board-item.add:hover{background:var(--accent-soft)}
 .bi-name{display:block;font-size:var(--fs-sm);font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bi-sub{display:block;font-size:var(--fs-xs);color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bi-steps{font-size:var(--fs-xs);color:var(--muted);font-weight:800;font-variant-numeric:tabular-nums}

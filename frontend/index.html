@@ -17,9 +17,10 @@
     <div class="due-list" id="dueList"></div>
   </aside>
   <section class="panel calendar-panel">
-    <div class="cal-toolbar"><div class="tabs seg" role="tablist" aria-label="대시보드 보기"><button class="tab active" role="tab" data-board="calendar" data-t="viewCalendar"></button><button class="tab" role="tab" data-board="vendor" data-t="viewVendor"></button><button class="tab" role="tab" data-board="budget" data-t="viewBudget"></button></div><div class="cal-nav" id="calNav"><button class="btn icon" id="prevMonth" aria-label="이전 달"><svg class="ico" aria-hidden="true"><use href="#i-chevron-left"/></svg></button><div class="month-title" id="monthTitle"></div><button class="btn icon" id="nextMonth" aria-label="다음 달"><svg class="ico" aria-hidden="true"><use href="#i-chevron-right"/></svg></button><button class="btn" id="todayBtn">Today</button></div><div class="cal-spacer"></div><span class="hint" id="calHint"></span></div>
+    <div class="cal-toolbar"><div class="tabs seg" role="tablist" aria-label="대시보드 보기"><button class="tab active" role="tab" data-board="calendar" data-t="viewCalendar"></button><button class="tab" role="tab" data-board="vendor" data-t="viewVendor"></button><button class="tab" role="tab" data-board="group" data-t="viewGroup"></button><button class="tab" role="tab" data-board="budget" data-t="viewBudget"></button></div><div class="cal-nav" id="calNav"><button class="btn icon" id="prevMonth" aria-label="이전 달"><svg class="ico" aria-hidden="true"><use href="#i-chevron-left"/></svg></button><div class="month-title" id="monthTitle"></div><button class="btn icon" id="nextMonth" aria-label="다음 달"><svg class="ico" aria-hidden="true"><use href="#i-chevron-right"/></svg></button><button class="btn" id="todayBtn">Today</button></div><div class="cal-spacer"></div><span class="hint" id="calHint"></span></div>
     <div class="calendar-scroll" id="calendarScroll"><div class="weekdays"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div><div class="month-grid" id="monthGrid"></div></div>
     <div class="vendor-board hidden" id="vendorBoard"></div>
+    <div class="vendor-board hidden" id="groupBoard"></div>
     <div class="budget-board hidden" id="budgetBoard"></div>
   </section>
 </main></div>
@@ -33,7 +34,8 @@
 </div></div><div class="modal-foot"><button class="btn" data-close="scheduleModal">취소</button><button class="btn primary" id="saveScheduleBtn" data-t="saveEvent"></button></div></section></div>
 
 <div class="modal-bg" id="workModal"><section class="modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="workTitle"><div class="modal-head"><h2 id="workTitle" data-t="projectModalTitle"></h2><button class="close" data-close="workModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body"><div class="form-grid">
-  <div class="field"><label for="wVendor" data-t="fVendor"></label><select id="wVendor"></select></div><div class="field"><label for="wTemplate" data-t="fWorkTemplate"></label><select id="wTemplate"></select></div>
+  <div class="field"><label for="wVendor" data-t="fVendor"></label><select id="wVendor"></select></div><div class="field"><label for="wGroup" data-t="fGroup"></label><select id="wGroup"></select></div>
+  <div class="field full"><label for="wTemplate" data-t="fWorkTemplate"></label><select id="wTemplate"></select></div>
   <div class="field full" id="wProjectBox"><label for="wProject" data-t="fProjectName"></label><input id="wProject" placeholder="예: ○○배수로 정비공사"></div>
   <div class="field" id="wFirstDateBox"><label for="wFirstDate" data-t="fFirstDate"></label><input id="wFirstDate" type="date"></div><div class="field"><label for="wMemo">메모</label><input id="wMemo" placeholder="선택"></div>
   <div class="field full" id="wPeriodBox"><span class="label" data-t="fProjectPeriod"></span><div class="ev-row two"><input id="wStart" type="date" aria-label="시작일"><input id="wEnd" type="date" aria-label="종료일"></div></div>
