@@ -181,7 +181,7 @@
         <button class="board-head" aria-expanded="${open}">
           <span class="bh-id"><span class="bh-name">${C.esc(g.group.name)}</span><span class="bh-info">${C.esc(period)}</span></span>
           <span class="bh-stat"><span class="bh-counts">${C.esc(L.groupVendors(g.vendorCount))} · ${C.esc(L.boardDone)} <b>${g.doneCount}</b>${g.overdueCount?` <span class="bh-late">${C.esc(L.boardOverdue)} ${g.overdueCount}</span>`:''}${money}</span><span class="bh-bar" role="img" aria-label="${C.esc(L.boardProgress)} ${pct}%"><i style="width:${pct}%"></i></span></span>
-          <span class="bh-next">${g.next?`<span class="bn-name">${C.esc(g.next.name)}</span><span class="bn-date">${spanText(g.next)}</span>`:`<span class="bn-name muted">${C.esc(L.boardEmpty)}</span>`}</span>
+          <span class="bh-next">${g.next?`<span class="bn-name">${C.esc(g.next.name)}</span><span class="bn-date">${spanText(g.next)}</span>`:`<span class="bn-name muted">${C.esc(L.noUpcoming)}</span>`}</span>
           <span class="bh-dday ${g.next?C.ddayClass(g.next):'undated'}">${g.next?C.ddayLabel(g.next):'—'}</span>
         </button>
         <div class="board-items">
@@ -195,7 +195,7 @@
               ? `<button class="board-item ${cls}" data-due-kind="${m.record.kind}" data-due-id="${m.record.id}">${body}</button>`
               : `<div class="board-item flat ${cls}">${body}</div>`;
           }).join('')}
-          <button class="board-item add" data-group-add="${C.esc(g.group.id)}">+ ${C.esc(L.addGroupMember)}</button>
+          <button class="board-item add" data-group-add="${C.esc(g.group.id)}">${C.esc(L.addGroupMember)}</button>
         </div>
       </section>`;
     }).join('');
@@ -210,6 +210,13 @@
   }
   // 상세에서 바로 지출을 적을 수 있어야 한다. 계약·준공 단계에서 예산 화면을 따로
   // 찾아가야 한다면 그것도 또 하나의 일이다.
+  // 공통 일정에서 갈라져 나온 건임을 알려 준다. 묶여 있지는 않다 — 여기서 고쳐도 나머지는 그대로다.
+  function batchNote(rec){
+    const b=rec.kind==='manual'&&state.manualEvents.find(x=>x.id===rec.id)?.batchId;
+    if(!b)return '';
+    const n=state.manualEvents.filter(x=>x.batchId===b).length;
+    return n>1?` <span class="batch-note">${C.esc(`함께 만든 ${state.terms.vendor} ${n}곳 중 이 건`)}</span>`:'';
+  }
   function spendSection(rec){
     const list=C.spendsOfRecord(state,rec.kind,rec.id);
     const total=list.reduce((n,sp)=>n+Number(sp.amount||0),0);
@@ -381,13 +388,83 @@
     toast(L.createdVendor(nm));
     return id;
   }
-  function updateProjectSelect(){const vid=$('sVendor').value;const rows=state.projects.filter(p=>p.vendorId===vid);$('sProject').innerHTML=`<option value="">${C.esc(L.genericEvent)}</option>`+rows.map(p=>`<option value="${p.id}">${C.esc(p.name)}</option>`).join('')}
-  function openSchedule(date=C.todayISO()){selectedRecord=null;$('scheduleTitle').textContent=L.eventModalTitle;$('sDate').value=date;$('sEnd').value='';fillSelects();$('sName').value='';$('sMemo').value='';show('scheduleModal');setTimeout(()=>$('sName').focus(),0)}
-  async function saveSchedule(){const date=$('sDate').value,endDate=$('sEnd').value||null,vendorId=$('sVendor').value,name=$('sName').value.trim();
-    if(!date||!vendorId||!name){toast(L.needEventFields);return}
-    if(endDate&&endDate<date){toast(L.badEndDate);return}
-    state.manualEvents.push({id:C.uid('m'),vendorId,projectId:$('sProject').value||null,date,endDate,name,memo:$('sMemo').value.trim(),completed:false,completedAt:null,logs:[],attachments:[]});
-    hide('scheduleModal');await persist(L.savedEvent)}
+  function updateProjectSelect(){
+    const ids=new Set(pickedVendors.length?pickedVendors.map(v=>v.id):[$('sVendor').value]);
+    const rows=state.projects.filter(p=>ids.has(p.vendorId));
+    // 같은 행사의 참여 건이 여럿이면 이름이 겹친다. 업체명을 붙여 구분한다.
+    const seen=new Map();rows.forEach(p=>seen.set(p.name,(seen.get(p.name)||0)+1));
+    setOptions($('sProject'),`<option value="">${C.esc(L.genericEvent)}</option>`
+      +rows.map(p=>`<option value="${p.id}">${C.esc(seen.get(p.name)>1?`${p.name} · ${C.vendor(state,p.vendorId)?.name||''}`:p.name)}</option>`).join(''));
+  }
+  // ── 여러 업체에 같은 일정을, 업체별로 개별 조정 ──────────────────────────
+  // '전 참여업체 서류제출 9/10' 을 업체 수만큼 되풀이 입력하고 있었다.
+  // 한 번에 걸되 묶어서 잠그지는 않는다 — 한 달짜리 행사에 A·B 는 한 달 쭉,
+  // C 는 2주만 참여할 수 있어야 한다. 저장하면 업체마다 별개의 일정이 생기고
+  // 완료·기록·첨부·삭제가 전부 따로 된다.
+  let pickedVendors=[];          // [{id, date, endDate}] — date/endDate 가 null 이면 공통값
+  const commonRange=()=>({date:$('sDate').value,endDate:$('sEnd').value||null});
+  function renderVendorPicks(){
+    const chips=$('sVendorChips');
+    chips.innerHTML=pickedVendors.map(v=>`<span class="chip">${C.esc(C.vendor(state,v.id)?.name||L.noVendor)}<button type="button" data-chip="${C.esc(v.id)}" aria-label="${C.esc(L.removeChip)}">×</button></span>`).join('');
+    qa('[data-chip]',chips).forEach(b=>b.addEventListener('click',()=>{
+      pickedVendors=pickedVendors.filter(v=>v.id!==b.dataset.chip);renderVendorPicks();
+    }));
+    // 업체가 둘 이상일 때만 개별 조정 줄을 낸다. 한 곳이면 예전과 똑같은 화면이다.
+    const many=pickedVendors.length>1;
+    $('sPerVendorBox').classList.toggle('hidden',!many);
+    $('sPerVendorLabel').textContent=L.perVendorTitle(state.terms.vendor);
+    $('sPerVendorNote').textContent=L.perVendorNote(state.terms.vendor,state.terms.event);
+    $('sAddVendor').textContent=L.addAnotherVendor(state.terms.vendor);
+    if(!many){$('sPerVendor').innerHTML='';return}
+    const c=commonRange();
+    $('sPerVendor').innerHTML=pickedVendors.map((v,i)=>{
+      const custom=v.date!==null||v.endDate!==null;
+      return `<div class="pv-row${custom?' custom':''}"><span class="pv-name">${C.esc(C.vendor(state,v.id)?.name||L.noVendor)}</span>`
+        +`<input data-pv-start="${i}" type="date" value="${C.esc(v.date??c.date??'')}" aria-label="${C.esc(L.fStartDate)}">`
+        +`<input data-pv-end="${i}" type="date" value="${C.esc(v.endDate??c.endDate??'')}" aria-label="${C.esc(L.fEndDate)}">`
+        +`<button type="button" class="pv-reset" data-pv-reset="${i}"${custom?'':' disabled'}>${C.esc(custom?L.resetToCommon:L.sameAsCommon)}</button></div>`;
+    }).join('');
+    qa('[data-pv-start]',$('sPerVendor')).forEach(el=>el.addEventListener('input',()=>{pickedVendors[+el.dataset.pvStart].date=el.value||null;renderVendorPicks()}));
+    qa('[data-pv-end]',$('sPerVendor')).forEach(el=>el.addEventListener('input',()=>{pickedVendors[+el.dataset.pvEnd].endDate=el.value||null;renderVendorPicks()}));
+    qa('[data-pv-reset]',$('sPerVendor')).forEach(b=>b.addEventListener('click',()=>{
+      const v=pickedVendors[+b.dataset.pvReset];v.date=null;v.endDate=null;renderVendorPicks();
+    }));
+  }
+  function addPickedVendor(id){
+    if(!id||pickedVendors.some(v=>v.id===id))return;
+    pickedVendors.push({id,date:null,endDate:null});renderVendorPicks();
+  }
+  function openSchedule(date=C.todayISO()){
+    selectedRecord=null;$('scheduleTitle').textContent=L.eventModalTitle;
+    $('sDate').value=date;$('sEnd').value='';fillSelects();$('sName').value='';$('sMemo').value='';
+    pickedVendors=[];
+    const first=state.vendorTemplates[0]?.id;
+    if(first){$('sVendor').value=first;addPickedVendor(first)}else renderVendorPicks();
+    show('scheduleModal');setTimeout(()=>$('sName').focus(),0);
+  }
+  async function saveSchedule(){
+    const c=commonRange(),name=$('sName').value.trim(),memo=$('sMemo').value.trim();
+    if(!pickedVendors.length&&$('sVendor').value)addPickedVendor($('sVendor').value);
+    if(!c.date||!pickedVendors.length||!name){toast(L.needEventFields);return}
+    const rows=pickedVendors.map(v=>({vendorId:v.id,date:v.date??c.date,endDate:v.endDate??c.endDate}));
+    for(const r of rows)if(r.endDate&&r.endDate<r.date){toast(L.badEndDate);return}
+    // 여럿이면 같은 batchId 를 달아 '공통 일정에서 온 건'임만 알린다. 묶어서 잠그지 않는다.
+    const batchId=rows.length>1?C.uid('b'):null;
+    const linked=$('sProject').value||null;
+    rows.forEach(r=>{
+      // 업체마다 그 행사의 자기 참여 건에 붙인다. 고른 업무가 그 업체 것이 아니면 찾아서 맞춘다.
+      let projectId=linked;
+      const lp=C.project(state,linked);
+      if(lp&&lp.vendorId!==r.vendorId){
+        const mine=lp.groupId?state.projects.find(p=>p.groupId===lp.groupId&&p.vendorId===r.vendorId):null;
+        projectId=mine?mine.id:null;
+      }
+      state.manualEvents.push({id:C.uid('m'),vendorId:r.vendorId,projectId,date:r.date,endDate:r.endDate,
+        name,memo,batchId,completed:false,completedAt:null,logs:[],attachments:[]});
+    });
+    hide('scheduleModal');
+    await persist(rows.length>1?L.savedEventsFor(rows.length,state.terms.event):L.savedEvent);
+  }
   // ── 업체·업무·일정 일괄 등록 ─────────────────────────────────────────────
   // 업체는 템플릿 화면, 업무는 여기, 일정은 또 다른 모달 — 새 업체 한 곳을 들이려면
   // 화면 세 곳을 오가야 했다. 실제 업무는 "업체가 새로 들어왔고 그 업체 일정이 여러 건"이
@@ -476,7 +553,7 @@
     $('detailTitle').textContent=L.detailTitle;$('deleteEventBtn').classList.toggle('hidden',kind!=='manual');$('completeBtn').classList.toggle('hidden',selectedRecord.completed);$('changeDateBtn').classList.toggle('hidden',selectedRecord.completed);$('reopenBtn').classList.toggle('hidden',!selectedRecord.completed);const steps=p?.steps||[];
     const logs=(entity?.logs||[]).slice().sort((a,b)=>String(b.time).localeCompare(String(a.time))),files=entity?.attachments||[];
     $('detailBody').innerHTML=`<div class="detail-hero"><div><div class="detail-vendor">${C.esc(v?.name||'업체')}</div><div class="detail-project">${C.esc(p?.name||L.genericEvent)}</div></div><div class="detail-dday ${selectedRecord.completed?'done':C.ddayClass(selectedRecord)}">${selectedRecord.completed?'완료':C.ddayLabel(selectedRecord)}</div></div>
-    <div class="current-box"><div class="current-label">${C.esc(selectedRecord.kind==='manual'?state.terms.event:L.selectedStep)}</div><div class="current-title">${C.esc(selectedRecord.name)}</div><div class="current-date">${C.isPeriod(selectedRecord)?C.esc(L.periodSpan(C.pretty(selectedRecord.date),C.pretty(selectedRecord.endDate),C.periodDays(selectedRecord))):C.pretty(selectedRecord.date)}${selectedRecord.memo?` · ${C.esc(selectedRecord.memo)}`:''}</div></div>
+    <div class="current-box"><div class="current-label">${C.esc(selectedRecord.kind==='manual'?state.terms.event:L.selectedStep)}${batchNote(selectedRecord)}</div><div class="current-title">${C.esc(selectedRecord.name)}</div><div class="current-date">${C.isPeriod(selectedRecord)?C.esc(L.periodSpan(C.pretty(selectedRecord.date),C.pretty(selectedRecord.endDate),C.periodDays(selectedRecord))):C.pretty(selectedRecord.date)}${selectedRecord.memo?` · ${C.esc(selectedRecord.memo)}`:''}</div></div>
     ${vendorInfoRow(v)}
     <section class="worklog-section"><div class="section-headline"><div><b>${C.esc(L.worklog)}</b><span>진행 경과, 통화·협의 내용, 전달사항을 계속 남길 수 있습니다.</span></div></div><div class="log-compose"><textarea id="workLogText" placeholder="예: 업체 담당자와 통화. 평가서 보완본을 8/14 오전까지 제출하기로 함."></textarea><button class="btn primary" id="addWorkLogBtn">기록 추가</button></div><div class="worklog-list">${logs.length?logs.map(l=>`<div class="worklog-item"><div class="worklog-time">${new Intl.DateTimeFormat('ko-KR',{year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(l.time))}</div><div class="worklog-text">${C.esc(l.text)}</div><button class="tiny-link danger" data-delete-log="${l.id}">삭제</button></div>`).join(''):'<div class="section-empty">아직 기록이 없습니다.</div>'}</div></section>
     ${spendSection(selectedRecord)}
@@ -713,7 +790,8 @@
   async function setAutostart(){const enabled=$('autostart').checked;state.settings.autostart=enabled;await C.saveState(state);if(C.isTauri())try{await window.__TAURI__.core.invoke('set_autostart',{enabled})}catch(e){toast('자동실행 설정을 적용하지 못했습니다.')}}
   $('horizonSelect').addEventListener('change',async e=>{state.settings.horizon=e.target.value;$('horizonCustom').classList.toggle('hidden',e.target.value!=='custom');await persist()});$('horizonCustom').addEventListener('change',async e=>{state.settings.customHorizon=Math.max(1,Number(e.target.value||1));await persist()});
   $('prevMonth').addEventListener('click',()=>{currentMonth=new Date(currentMonth.getFullYear(),currentMonth.getMonth()-1,1);renderCalendar()});$('nextMonth').addEventListener('click',()=>{currentMonth=new Date(currentMonth.getFullYear(),currentMonth.getMonth()+1,1);renderCalendar()});$('todayBtn').addEventListener('click',()=>{const d=C.parse(C.todayISO());currentMonth=new Date(d.getFullYear(),d.getMonth(),1);renderCalendar();setTimeout(()=>q('.day.today')?.scrollIntoView({block:'center',behavior:'smooth'}),10)});
-  $('addScheduleBtn').addEventListener('click',()=>openSchedule());$('saveScheduleBtn').addEventListener('click',saveSchedule);$('sVendor').addEventListener('change',updateProjectSelect);$('addWorkBtn').addEventListener('click',openWork);$('saveWorkBtn').addEventListener('click',saveWork);$('wVendor').addEventListener('change',applyWorkMode);$('wTemplate').addEventListener('change',applyWorkMode);
+  $('addScheduleBtn').addEventListener('click',()=>openSchedule());$('saveScheduleBtn').addEventListener('click',saveSchedule);$('sVendor').addEventListener('change',()=>{updateProjectSelect();addPickedVendor($('sVendor').value)});
+  $('sAddVendor').addEventListener('click',()=>{document.getElementById('sVendorInput')?.focus()});$('addWorkBtn').addEventListener('click',openWork);$('saveWorkBtn').addEventListener('click',saveWork);$('wVendor').addEventListener('change',applyWorkMode);$('wTemplate').addEventListener('change',applyWorkMode);
   $('wGroup').addEventListener('change',()=>{
     const g=C.group(state,$('wGroup').value);if(!g)return;
     if(!$('wProject').value.trim())$('wProject').value=g.name;

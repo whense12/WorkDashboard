@@ -1612,6 +1612,104 @@ console.log('\n[32] 행사 — 한 행사에 여러 업체가 붙고, 중간에 
   await ctx.close();
 }
 
+console.log('\n[33] 공통 일정 — 여러 업체에 한 번에, 업체별로 다르게');
+{
+  const { ctx, page, errors } = await open();
+  const d = (n) => page.evaluate((k) => window.WorkCore.addDays(window.WorkCore.todayISO(), k), n);
+  const mine = (name) => page.evaluate(async (nm) => {
+    const s = await window.WorkCore.readState();
+    return s.manualEvents.filter((m) => m.name === nm)
+      .map((m) => ({ id: m.id, v: s.vendorTemplates.find((x) => x.id === m.vendorId)?.name,
+        date: m.date, endDate: m.endDate, batchId: m.batchId, completed: m.completed }));
+  }, name);
+
+  // 한 곳만 고르면 예전과 똑같다
+  await page.click('#addScheduleBtn');
+  await page.waitForSelector('#scheduleModal.show');
+  check('처음에는 업체 한 곳이 칩으로 들어와 있다', await page.$$eval('#sVendorChips .chip', (e) => e.length) === 1);
+  check('한 곳이면 업체별 조정 줄이 안 나온다', await page.$eval('#sPerVendorBox', (e) => e.classList.contains('hidden')));
+  await page.fill('#sName', '단독 일정');
+  await page.fill('#sDate', await d(3));
+  await page.click('#saveScheduleBtn');
+  await page.waitForTimeout(400);
+  const one = await mine('단독 일정');
+  check('한 곳이면 한 건만 생긴다', one.length === 1, JSON.stringify(one));
+  check('한 곳이면 묶음 표시가 붙지 않는다', one[0].batchId === null, `${one[0].batchId}`);
+
+  // 세 곳에 한 번에 — 그중 한 곳만 기간을 줄인다
+  await page.click('#addScheduleBtn');
+  await page.waitForSelector('#scheduleModal.show');
+  await page.fill('#sName', '행사 부스 운영');
+  await page.fill('#sDate', await d(10));
+  await page.fill('#sEnd', await d(40));
+  await combo(page, 'sVendor', '미래토건');
+  await combo(page, 'sVendor', '동성건설');
+  check('고른 업체가 칩으로 쌓인다', await page.$$eval('#sVendorChips .chip', (e) => e.length) === 3);
+  check('둘 이상이면 업체별 조정 줄이 나온다', await page.$eval('#sPerVendorBox', (e) => !e.classList.contains('hidden')));
+  const pvRows = await page.$$eval('#sPerVendor .pv-row', (e) => e.length);
+  check('업체 수만큼 조정 줄이 선다', pvRows === 3, `${pvRows}`);
+  check('처음에는 전부 공통값이다', await page.$$eval('#sPerVendor .pv-row.custom', (e) => e.length) === 0);
+  check('공통값이 각 줄에 채워져 있다', (await page.inputValue('#sPerVendor [data-pv-start="0"]')) === await d(10));
+
+  // 세 번째 업체만 2주로
+  await page.fill('#sPerVendor [data-pv-end="2"]', await d(23));
+  await page.waitForTimeout(80);
+  check('고친 줄만 다르게 표시된다', await page.$$eval('#sPerVendor .pv-row.custom', (e) => e.length) === 1);
+  await page.click('#saveScheduleBtn');
+  await page.waitForTimeout(500);
+
+  const three = await mine('행사 부스 운영');
+  check('업체 수만큼 일정이 만들어진다', three.length === 3, JSON.stringify(three.map((x) => x.v)));
+  check('같은 묶음 표시를 단다', new Set(three.map((x) => x.batchId)).size === 1 && !!three[0].batchId);
+  const ends = three.map((x) => x.endDate);
+  const spread = ends.reduce((m, e) => ((m[e] = (m[e] || 0) + 1), m), {});
+  check('두 곳은 한 달, 한 곳은 2주다',
+    Object.keys(spread).length === 2 && Object.values(spread).sort().join(',') === '1,2',
+    JSON.stringify(three.map((x) => [x.v, x.date, x.endDate])));
+  check('시작일은 셋 다 공통값이다', new Set(three.map((x) => x.date)).size === 1);
+
+  // 저장 뒤에도 한 건만 따로 고칠 수 있다
+  const target = three.find((x) => x.endDate !== three[0].endDate) || three[2];
+  await page.evaluate(async (id) => {
+    const C = window.WorkCore, s = await C.readState();
+    const m = s.manualEvents.find((x) => x.id === id);
+    m.endDate = C.addDays(m.date, 2);
+    await C.saveState(s);
+  }, three[0].id);
+  const afterEdit = await mine('행사 부스 운영');
+  check('한 건을 고쳐도 나머지는 그대로다',
+    afterEdit.filter((x) => x.id !== three[0].id).every((x) => x.endDate === three.find((y) => y.id === x.id).endDate),
+    JSON.stringify(afterEdit.map((x) => [x.v, x.endDate])));
+
+  // 완료도 따로 된다
+  await page.reload();
+  await page.waitForSelector('.due-card');
+  await page.evaluate(async (id) => {
+    const C = window.WorkCore, s = await C.readState();
+    s.manualEvents.find((x) => x.id === id).completed = true;
+    await C.saveState(s);
+  }, three[1].id);
+  const afterDone = await mine('행사 부스 운영');
+  check('한 건만 완료해도 나머지는 진행 중이다',
+    afterDone.filter((x) => x.completed).length === 1, JSON.stringify(afterDone.map((x) => [x.v, x.completed])));
+
+  // 상세에 '함께 만든 건' 표시
+  await page.evaluate(async (id) => {
+    const C = window.WorkCore, s = await C.readState();
+    s.pendingSelection = { kind: 'manual', id };
+    await C.saveState(s);
+  }, three[0].id);
+  await page.reload();
+  await page.waitForSelector('#detailModal.show');
+  check('상세가 묶음에서 온 건임을 알린다',
+    (await page.innerText('#detailBody')).includes('함께 만든'), (await page.innerText('#detailBody')).slice(0, 120));
+
+  const tiny = await page.evaluate(measure);
+  check('13px 미만 텍스트가 없다', tiny.length === 0, tiny.join(' | '));
+  check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 await browser.close();
 server.close();
