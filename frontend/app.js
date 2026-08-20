@@ -1,7 +1,39 @@
 (async function(){
   const C=window.WorkCore;let state=await C.initStorage();let currentMonth=new Date(2026,7,1);let selectedRecord=null;let selectedProjectId=null;let templateTab='vendor';let selectedVendorTemplateId=null;let selectedWorkTemplateId=null;let projectStepsDraft=[];
   let L=C.labels(state.terms);const $=id=>document.getElementById(id);const q=(s,r=document)=>r.querySelector(s);const qa=(s,r=document)=>[...r.querySelectorAll(s)];
-  function toast(t){const el=$('toast');el.textContent=t;el.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),1700)}
+  function toast(text,action){
+    const el=$('toast');
+    el.innerHTML='';
+    const span=document.createElement('span');span.textContent=text;el.appendChild(span);
+    if(action){
+      const b=document.createElement('button');b.className='toast-undo';b.id='undoBtn';b.textContent=action.label;
+      b.addEventListener('click',()=>{clearTimeout(toast.t);el.classList.remove('show');action.run()});
+      el.appendChild(b);
+    }
+    el.classList.add('show');
+    clearTimeout(toast.t);
+    toast.t=setTimeout(()=>{el.classList.remove('show');el.querySelector('.toast-undo')?.remove();action?.onExpire?.()},action?(action.delay||6500):1700);
+  }
+  // ── 되돌리기 ─────────────────────────────────────────────────────────────
+  // 확인창이 11곳이었고 되돌리기는 하나도 없었다. NN/g: "확인창을 남발하면 사람이
+  // 읽지 않고 누르게 된다." 되돌리기를 기본으로 두고, 되돌려도 복구가 안 되는 것에만
+  // 확인창을 남긴다(절차 단계 삭제·백업 복원·용어 기본값).
+  //
+  // 첨부 실물 삭제는 되돌리기 창이 닫힌 뒤에 한다. 먼저 지우면 되돌려도 파일이 없다.
+  let pendingPurge=null;
+  function flushPurge(){const p=pendingPurge;pendingPurge=null;if(p)Promise.resolve(p()).catch(e=>console.warn('첨부 정리 실패',e))}
+  async function withUndo(message,mutate,{purge=null}={}){
+    flushPurge();                       // 앞서 대기 중이던 정리를 먼저 확정한다
+    const before=C.clone(state);
+    await mutate();
+    await C.saveState(state);render();
+    pendingPurge=purge;
+    toast(message,{label:L.undo,onExpire:flushPurge,run:async()=>{
+      pendingPurge=null;                // 되돌리면 실물도 지우지 않는다
+      state=before;await C.saveState(state);render();
+      toast(L.undone);
+    }});
+  }
   // ── 모달 포커스 관리 (발주서 §17.2-4) ────────────────────────────────────
   // 열린 순서를 스택으로 들고 있어야 한다. 이전에는 Escape 가 DOM 순서상 마지막 모달을
   // 닫아서, 상세 위에 다른 모달이 떠 있으면 엉뚱한 창이 닫혔다.
@@ -266,9 +298,10 @@
     refreshOpenDetail();
   }
   async function deleteSpend(){
-    if(!editingSpendId||!confirm(L.confirmDeleteSpend))return;
-    state.spends=(state.spends||[]).filter(x=>x.id!==editingSpendId);
-    hide('spendModal');await persist(L.deletedSpend);
+    if(!editingSpendId)return;
+    const id=editingSpendId;
+    hide('spendModal');
+    await withUndo(L.deletedSpend,()=>{state.spends=(state.spends||[]).filter(x=>x.id!==id)});
     refreshOpenDetail();
   }
   function allEventRecords(){return C.eventRecords(state)}
@@ -397,7 +430,13 @@
       toast(String(e?.message)==='ATTACHMENT_MISSING'?`${meta.name}: 저장된 파일을 찾을 수 없습니다. 목록에서 지우려면 삭제를 누르세요.`:'파일을 열지 못했습니다.');
     }
   }
-  async function deleteAttachment(id){const entity=recordEntity(selectedRecord),meta=attachmentMeta(id);if(!entity||!meta)return;if(!confirm('이 첨부파일을 삭제할까요?'))return;entity.attachments=(entity.attachments||[]).filter(x=>x.id!==id);await C.deleteAttachment(meta);await refreshDetail('첨부파일을 삭제했습니다.')}
+  async function deleteAttachment(id){
+    const entity=recordEntity(selectedRecord),meta=attachmentMeta(id);if(!entity||!meta)return;
+    await withUndo('첨부파일을 삭제했습니다.',
+      ()=>{entity.attachments=(entity.attachments||[]).filter(x=>x.id!==id)},
+      {purge:()=>C.deleteAttachment(meta)});
+    refreshOpenDetail();
+  }
   async function completeSelected(){if(!selectedRecord)return;const next=C.completeEvent(state,selectedRecord,C.todayISO());hide('detailModal');await persist(next?`완료 · 다음 일정 ${next.name} ${C.pretty(next.dueDate)}`:'완료 처리했습니다.')}
   // 날짜 변경은 네이티브 prompt() 대신 앱 안의 date 입력으로 받는다.
   function openDateModal(){if(!selectedRecord||selectedRecord.completed)return;
@@ -414,15 +453,18 @@
     hide('dateModal');hide('detailModal');await persist(L.changedDate)}
   // 완료 취소 — 잘못 누른 `OK 완료` 를 되돌리는 경로. 기록·첨부·완료일 외 데이터는 그대로 둔다.
   async function reopenSelected(){if(!selectedRecord||!selectedRecord.completed)return;
-    if(!confirm('완료를 취소하고 이 일정을 다시 진행 중으로 되돌릴까요?\n업무 기록과 첨부파일은 그대로 유지됩니다.'))return;
-    const r=C.reopenEvent(state,selectedRecord);if(!r)return;hide('detailModal');
-    await persist(r.kept?`완료를 취소했습니다. 다음 단계 ${r.kept.name}의 날짜(${C.pretty(r.kept.dueDate)})는 그대로 두었습니다.`:'완료를 취소했습니다.');}
+    // 이것 자체가 되돌리기다. 되돌리기에 확인창을 붙이면 되돌릴 마음이 사라진다.
+    let kept=null;
+    hide('detailModal');
+    await withUndo('완료를 취소했습니다.',()=>{const r=C.reopenEvent(state,selectedRecord);kept=r?.kept||null});
+    if(kept)toast(`다음 단계 ${kept.name}의 날짜(${C.pretty(kept.dueDate)})는 그대로 두었습니다.`);}
   async function deleteSelected(){if(!selectedRecord||selectedRecord.kind!=='manual')return;
-    const m=state.manualEvents.find(x=>x.id===selectedRecord.id);const files=C.attachmentsOf([m]);
-    if(!confirm(files.length?`${L.confirmDeleteEvent}\n첨부파일 ${files.length}개도 함께 삭제됩니다.`:L.confirmDeleteEvent))return;
-    state.manualEvents=state.manualEvents.filter(x=>x.id!==selectedRecord.id);
-    await C.purgeAttachments(files); // 메타데이터만 지우면 IndexedDB 에 blob 이 영구히 남는다.
-    hide('detailModal');await persist(L.deletedEvent)}
+    const id=selectedRecord.id,files=C.attachmentsOf([state.manualEvents.find(x=>x.id===id)]);
+    hide('detailModal');
+    // 메타데이터만 지우면 blob 이 영구히 남는다. 다만 되돌리기 창이 닫힌 뒤에 지운다.
+    await withUndo(files.length?`${L.deletedEvent} (첨부 ${files.length}개 포함)`:L.deletedEvent,
+      ()=>{state.manualEvents=state.manualEvents.filter(x=>x.id!==id)},
+      {purge:()=>C.purgeAttachments(files)});}
   // 업체 정보는 사용자 정의 항목에서 그린다. 값이 있는 항목만 보여 상세를 어지럽히지 않는다.
   function vendorInfoRow(v){
     const rows=(state.vendorFields||[]).map(f=>({f,val:(v?.values||{})[f.id]||''})).filter(x=>x.val);
@@ -462,8 +504,9 @@
     qa('[data-vfremove]',host).forEach(b=>b.addEventListener('click',()=>{
       const i=+b.dataset.vfremove,f=vfDraft[i];
       const used=state.vendorTemplates.filter(v=>(v.values||{})[f.id]).length;
-      if(used&&!confirm(`'${f.label}' 항목을 지우면 ${used}개 ${state.terms.vendor}에 입력된 값도 함께 사라집니다.\n삭제할까요?`))return;
       vfDraft.splice(i,1);renderVendorFieldEditor();
+      // 편집 중인 초안이라 저장 전에는 아무것도 사라지지 않는다. 무엇이 걸려 있는지만 알린다.
+      if(used)toast(`'${f.label}' 을(를) 뺐습니다. 저장하면 ${used}개 ${state.terms.vendor}의 값도 사라집니다.`);
     }));
     const move=(i,d)=>{const j=i+d;if(j<0||j>=vfDraft.length)return;[vfDraft[i],vfDraft[j]]=[vfDraft[j],vfDraft[i]];renderVendorFieldEditor()};
     qa('[data-vfup]',host).forEach(b=>b.addEventListener('click',()=>move(+b.dataset.vfup,-1)));
@@ -577,11 +620,11 @@
   async function toggleDemo(){
     const isDemo=x=>String(x.id).startsWith('demo-');
     if(C.hasDemoData(state)){
-      if(!confirm('예시 데이터를 지울까요?\n직접 등록한 업무·일정은 그대로 유지됩니다.'))return;
       const dropped=[...state.projects.filter(isDemo).flatMap(p=>p.steps),...state.manualEvents.filter(isDemo)];
-      state.projects=state.projects.filter(p=>!isDemo(p));state.manualEvents=state.manualEvents.filter(m=>!isDemo(m));
-      await C.purgeAttachments(C.attachmentsOf(dropped));
-      renderDemoRow();await persist('예시 데이터를 지웠습니다.');
+      await withUndo('예시 데이터를 지웠습니다.',()=>{
+        state.projects=state.projects.filter(p=>!isDemo(p));state.manualEvents=state.manualEvents.filter(m=>!isDemo(m));
+      },{purge:()=>C.purgeAttachments(C.attachmentsOf(dropped))});
+      renderDemoRow();
     }else{
       const d=C.demoData();state.projects.push(...d.projects);state.manualEvents.push(...d.manualEvents);
       renderDemoRow();await persist('예시 데이터를 불러왔습니다.');

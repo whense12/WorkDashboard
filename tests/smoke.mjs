@@ -548,15 +548,21 @@ console.log('\n[18] 첨부 삭제 — 메타데이터와 실물이 함께 사라
 
   await page.click('[data-delete-file]');
   await page.waitForTimeout(400);
-  const after = await page.evaluate(async (m) => {
+  const probe = (m) => page.evaluate(async (mm) => {
     const C = window.WorkCore, s = await C.readState();
     const left = s.projects.find((p) => p.id === 'demo-p1').steps.flatMap((x) => x.attachments).length;
     let physical = 'gone';
-    try { await C.readAttachment(m); physical = 'still-there'; } catch (e) { physical = String(e.message); }
+    try { await C.readAttachment(mm); physical = 'still-there'; } catch (e) { physical = String(e.message); }
     return { left, physical };
-  }, meta);
+  }, m);
+  const after = await probe(meta);
   check('메타데이터가 사라진다', after.left === 0);
-  check('실물도 사라진다', after.physical === 'ATTACHMENT_MISSING', after.physical);
+  // 실물은 되돌리기 창이 닫힌 뒤에 지운다. 먼저 지우면 되돌려도 파일이 없다.
+  check('되돌릴 수 있는 동안에는 실물이 남아 있다', after.physical === 'still-there', after.physical);
+  check('되돌리기 버튼이 떠 있다', await page.$$eval('#undoBtn', (e) => e.length) === 1);
+  await page.waitForTimeout(7000);
+  const later = await probe(meta);
+  check('되돌리기 창이 닫히면 실물도 사라진다', later.physical === 'ATTACHMENT_MISSING', later.physical);
   check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
   await ctx.close();
 }
@@ -1409,6 +1415,94 @@ console.log('\n[30] 검색되는 선택 칸 — 치면 걸러지고, 없으면 �
   await page.waitForTimeout(80);
   check('다른 모달에서도 같은 업체가 검색된다',
     (await page.$$eval('#workModal .cb-opt', (e) => e.map((x) => x.textContent))).some((t) => t.includes('솔뫼농산')));
+
+  check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
+console.log('\n[31] 되돌리기 — 물어보는 대신 되돌릴 기회를 준다');
+{
+  const { ctx, page, errors, dialogs } = await open();
+  const count = () => page.evaluate(async () => {
+    const s = await window.WorkCore.readState();
+    return { events: s.manualEvents.length, projects: s.projects.length, spends: (s.spends || []).length };
+  });
+
+  // 일정 삭제 → 되돌리기
+  const before = await count();
+  await page.click('.event.manual');
+  await page.waitForSelector('#detailModal.show');
+  await page.click('#deleteEventBtn');
+  await page.waitForSelector('#undoBtn');
+  check('확인창을 띄우지 않는다', dialogs.length === 0, JSON.stringify(dialogs));
+  const gone = await count();
+  check('먼저 지운다', gone.events === before.events - 1, `${before.events} -> ${gone.events}`);
+  await page.click('#undoBtn');
+  await page.waitForTimeout(400);
+  const back = await count();
+  check('되돌리면 그대로 돌아온다', back.events === before.events, `${back.events}`);
+  check('되돌렸다고 알린다', (await page.innerText('#toast')).includes('되돌'), await page.innerText('#toast'));
+
+  // 되돌리기 창이 닫히면 확정된다
+  await page.click('.event.manual');
+  await page.waitForSelector('#detailModal.show');
+  await page.click('#deleteEventBtn');
+  await page.waitForSelector('#undoBtn');
+  await page.waitForTimeout(7000);
+  check('시간이 지나면 되돌리기가 사라진다', await page.$$eval('#undoBtn', (e) => e.length) === 0);
+  await page.reload();
+  await page.waitForSelector('.due-card');
+  check('확정된 삭제는 새로고침 후에도 유지된다', (await count()).events === before.events - 1);
+
+  // 완료 취소도 되돌리기다 — 되돌리기에 확인창을 붙이지 않는다
+  await page.click('.due-card');
+  await page.waitForSelector('#detailModal.show');
+  await page.click('#completeBtn');
+  await page.waitForTimeout(400);
+  const dlgBefore = dialogs.length;
+  await page.click('.due-card');
+  await page.waitForSelector('#detailModal.show');
+  const canReopen = await page.$eval('#reopenBtn', (e) => !e.classList.contains('hidden'));
+  if (canReopen) {
+    await page.click('#reopenBtn');
+    await page.waitForTimeout(400);
+    check('완료 취소에 확인창을 붙이지 않는다', dialogs.length === dlgBefore, JSON.stringify(dialogs.slice(dlgBefore)));
+  } else {
+    await page.keyboard.press('Escape');
+    check('완료 취소에 확인창을 붙이지 않는다', true);
+  }
+
+  // 지출 삭제도 되돌린다
+  await page.evaluate(async () => {
+    const C = window.WorkCore, s = await C.readState();
+    s.budget = { title: '', year: null, items: [{ id: 'bi-x', code: '', name: '행사비', amount: 1000000 }] };
+    s.spends = [{ id: 'sp-x', itemId: 'bi-x', projectId: null, vendorId: 'v-daehan', name: '임차료',
+      amount: 300000, status: 'spent', date: C.todayISO(), memo: '', recordKind: null, recordId: null }];
+    s.settings.boardView = 'budget';
+    await C.saveState(s);
+  });
+  await page.reload();
+  await page.waitForSelector('#budgetBoard:not(.hidden) .bg-row');
+  await page.click('#budgetBoard .bg-head');
+  await page.waitForSelector('.bg-project');
+  await page.click('#budgetBoard .bp-head');
+  await page.waitForSelector('.bg-spend');
+  await page.click('.bg-spend');
+  await page.waitForSelector('#spendModal.show');
+  await page.click('#deleteSpendBtn');
+  await page.waitForSelector('#undoBtn');
+  check('지출도 물어보지 않고 지운다', (await count()).spends === 0);
+  await page.click('#undoBtn');
+  await page.waitForTimeout(400);
+  check('지출 삭제도 되돌아온다', (await count()).spends === 1);
+
+  // 되돌려도 복구가 안 되는 것에만 확인창을 남긴다. 다시 늘어나면 여기서 잡힌다.
+  const src = await readFile(join(root, 'frontend/app.js'), 'utf8');
+  const confirms = (src.match(/confirm\(/g) || []).length;
+  check('확인창이 5곳만 남았다 (원래 11곳)', confirms === 5, `${confirms}곳`);
+  const risky = ['budgetShrinkWarn', '기본값으로 되돌릴까요', '단계를 삭제하면', '백업 시점으로 되돌립니다'];
+  check('남은 확인창은 되돌려도 복구가 안 되는 것들이다',
+    risky.every((k) => src.includes(k)), risky.filter((k) => !src.includes(k)).join(','));
 
   check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
   await ctx.close();
