@@ -48,6 +48,15 @@ const check = (name, cond, detail = '') => {
 
 const browser = await chromium.launch();
 
+/** 검색되는 선택 칸을 사람처럼 조작한다: 치고 → 걸러진 첫 줄을 Enter. */
+async function combo(page, id, text) {
+  await page.click(`#${id}Input`);
+  await page.fill(`#${id}Input`, text);
+  await page.waitForTimeout(80);
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(60);
+}
+
 /** 매번 깨끗한 상태에서 시작한다. 앱을 열고, 필요하면 예시 데이터를 넣는다. */
 async function open({ demo = true, viewport = { width: 1440, height: 900 }, confirms = 'accept' } = {}) {
   const ctx = await browser.newContext({ viewport });
@@ -1074,35 +1083,22 @@ console.log('\n[28] 업체·업무·일정 일괄 등록 — 화면 세 곳을 �
   await page.click('#addWorkBtn');
   await page.waitForSelector('#workModal.show');
   check('일정 행이 한 줄 준비돼 있다', await page.$$eval('#wEvents .ev-row', (e) => e.length) === 1);
-  check('새 업체 직접 입력 선택지가 있다', await page.$$eval('#wVendor option[value="__new__"]', (e) => e.length) === 1);
-  check('업체명 칸은 기본으로 접혀 있다', await page.$eval('#wNewVendorBox', (e) => e.classList.contains('hidden')));
-
-  await page.selectOption('#wVendor', '__new__');
-  check('새 업체를 고르면 업체명 칸이 펼쳐진다', await page.$eval('#wNewVendorBox', (e) => !e.classList.contains('hidden')));
-  const vfCount = await page.$$eval('#wNewVendorFields [data-vf]', (e) => e.length);
-  check('업체 커스텀 항목이 그대로 따라온다', vfCount === 3, `${vfCount}`);
+  check('업체는 검색되는 칸으로 고른다', await page.$$eval('#wVendorInput', (e) => e.length) === 1);
 
   // 템플릿 '없음' 이면 업무 칸이 사라진다
   await page.selectOption('#wTemplate', '');
   check('템플릿 없음이면 업무명 칸이 숨는다', await page.$eval('#wProjectBox', (e) => e.classList.contains('hidden')));
   check('템플릿 없음이면 행사 기간 칸도 숨는다', await page.$eval('#wPeriodBox', (e) => e.classList.contains('hidden')));
 
-  // 업체명을 비우면 막는다
-  await page.click('#saveWorkBtn');
-  await page.waitForTimeout(250);
-  check('업체명 없이 저장하면 막는다', await page.$eval('#workModal', (e) => e.classList.contains('show')));
-
-  // 업체 + 일정 1건만 등록 (업무 없이)
-  await page.fill('#wNewVendorName', '한빛푸드');
-  await page.fill('#wNewVendorFields [data-vf="vf-person"]', '정OO');
+  // 업체 + 일정 1건만 등록 (업무 없이). 업체는 목록에 없으니 그 자리에서 만든다.
+  await combo(page, 'wVendor', '한빛푸드');
   await page.fill('#wEvents [data-ev-name="0"]', '납품 확인');
   await page.fill('#wEvents [data-ev-start="0"]', await page.evaluate(() => window.WorkCore.addDays(window.WorkCore.todayISO(), 4)));
   await page.click('#saveWorkBtn');
   await page.waitForTimeout(500);
   const a = await st();
   const hanbit = a.vendorTemplates.find((v) => v.name === '한빛푸드');
-  check('업무 없이 업체만 새로 만들어진다', !!hanbit, JSON.stringify(a.vendorTemplates.map((v) => v.name)));
-  check('업체 커스텀 항목 값이 함께 저장된다', hanbit?.values['vf-person'] === '정OO', JSON.stringify(hanbit?.values));
+  check('목록에 없는 업체가 그 자리에서 만들어진다', !!hanbit, JSON.stringify(a.vendorTemplates.map((v) => v.name)));
   const ev1 = a.manualEvents.find((m) => m.name === '납품 확인');
   check('일정이 그 업체로 등록된다', ev1?.vendorId === hanbit?.id);
   check('업무를 안 만들었으면 일정도 업무에 걸리지 않는다', ev1?.projectId === null, JSON.stringify(ev1?.projectId));
@@ -1110,8 +1106,7 @@ console.log('\n[28] 업체·업무·일정 일괄 등록 — 화면 세 곳을 �
   // 새 업체 + 업무 + 기간 + 일정 2건을 한 번에
   await page.click('#addWorkBtn');
   await page.waitForSelector('#workModal.show');
-  await page.selectOption('#wVendor', '__new__');
-  await page.fill('#wNewVendorName', '들녘유통');
+  await combo(page, 'wVendor', '들녘유통');
   await page.selectOption('#wTemplate', 'wt-simple');
   await page.fill('#wProject', '가을 직거래장터');
   const d = (n) => page.evaluate((k) => window.WorkCore.addDays(window.WorkCore.todayISO(), k), n);
@@ -1187,9 +1182,9 @@ console.log('\n[29] 예산 — 예산항목 → 행사 → 업체로 점점 좁�
   const itemIds = b1.budget.items.map((i) => i.id);
   await page.click('#addSpendBtn');
   await page.waitForSelector('#spendModal.show');
-  await page.selectOption('#spItem', itemIds[0]);
-  await page.selectOption('#spProject', 'demo-p1');
-  await page.selectOption('#spVendor', 'v-daehan');
+  await combo(page, 'spItem', '행사운영비');
+  await combo(page, 'spProject', '배수로 정비공사');
+  await combo(page, 'spVendor', '대한건설');
   await page.fill('#spName', '무대 설치 대금');
   await page.fill('#spAmount', '12000000');
   await page.selectOption('#spStatus', 'spent');
@@ -1198,9 +1193,9 @@ console.log('\n[29] 예산 — 예산항목 → 행사 → 업체로 점점 좁�
 
   await page.click('#addSpendBtn');
   await page.waitForSelector('#spendModal.show');
-  await page.selectOption('#spItem', itemIds[0]);
-  await page.selectOption('#spProject', 'demo-p1');
-  await page.selectOption('#spVendor', 'v-mirae');
+  await combo(page, 'spItem', '행사운영비');
+  await combo(page, 'spProject', '배수로 정비공사');
+  await combo(page, 'spVendor', '미래토건');
   await page.fill('#spName', '음향 임차');
   await page.fill('#spAmount', '3000000');
   await page.selectOption('#spStatus', 'planned');
@@ -1218,7 +1213,7 @@ console.log('\n[29] 예산 — 예산항목 → 행사 → 업체로 점점 좁�
   // 예산항목 미지정 지출도 총계에 들어간다
   await page.click('#addSpendBtn');
   await page.waitForSelector('#spendModal.show');
-  await page.selectOption('#spItem', '');
+  await combo(page, 'spItem', '예산항목 미지정');
   await page.fill('#spName', '분류 전 집행');
   await page.fill('#spAmount', '500000');
   await page.click('#saveSpendBtn');
@@ -1289,7 +1284,7 @@ console.log('\n[29] 예산 — 예산항목 → 행사 → 업체로 점점 좁�
   check('상세에서 열면 업체가 미리 채워진다', (await page.$eval('#spVendor', (e) => e.value)).length > 0);
   await page.fill('#spName', '준공 대금');
   await page.fill('#spAmount', '2000000');
-  await page.selectOption('#spItem', itemIds[1]);
+  await combo(page, 'spItem', '홍보비');
   await page.click('#saveSpendBtn');
   await page.waitForTimeout(500);
   const linked = await page.evaluate(async () => {
@@ -1329,6 +1324,91 @@ console.log('\n[29] 예산 — 예산항목 → 행사 → 업체로 점점 좁�
     const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     check(`예산 화면 ${vp.width}px 에서 가로 스크롤이 없다`, over <= 1, `${over}px`);
   }
+
+  check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
+console.log('\n[30] 검색되는 선택 칸 — 치면 걸러지고, 없으면 그 자리에서 만든다');
+{
+  const { ctx, page, errors } = await open();
+  await page.click('#addScheduleBtn');
+  await page.waitForSelector('#scheduleModal.show');
+
+  // 역할·속성 (W3C APG 콤보박스)
+  const aria = await page.evaluate(() => {
+    const i = document.getElementById('sVendorInput');
+    return { role: i.getAttribute('role'), expanded: i.getAttribute('aria-expanded'),
+      controls: i.getAttribute('aria-controls'), list: !!document.getElementById(i.getAttribute('aria-controls')),
+      nativeHidden: document.getElementById('sVendor').getAttribute('aria-hidden') };
+  });
+  check('role=combobox 로 노출된다', aria.role === 'combobox' && aria.list, JSON.stringify(aria));
+  check('원래 select 는 값의 주인으로만 남는다', aria.nativeHidden === 'true');
+  check('처음에는 닫혀 있다', aria.expanded === 'false');
+  check('고른 값이 글자로 보인다', (await page.inputValue('#sVendorInput')).length > 0);
+
+  // 치면 걸러진다
+  await page.click('#sVendorInput');
+  check('누르면 열린다', await page.$eval('#sVendorInput', (e) => e.getAttribute('aria-expanded') === 'true'));
+  const all = await page.$$eval('#scheduleModal .cb-opt', (e) => e.length);
+  await page.fill('#sVendorInput', '미래');
+  await page.waitForTimeout(80);
+  const hits = await page.$$eval('#scheduleModal .cb-opt', (e) => e.map((x) => x.textContent));
+  check('치면 걸러진다', hits.length < all && hits.some((t) => t.includes('미래토건')), `${all} -> ${JSON.stringify(hits)}`);
+
+  // 이미 있는 이름이면 만들기 줄이 나오지 않는다
+  await page.fill('#sVendorInput', '미래토건');
+  await page.waitForTimeout(80);
+  check('같은 이름이 있으면 새로 만들기가 안 나온다', await page.$$eval('#scheduleModal .cb-opt.create', (e) => e.length) === 0);
+
+  // 없는 이름이면 만들기 줄
+  await page.fill('#sVendorInput', '솔뫼농산');
+  await page.waitForTimeout(80);
+  const createRow = await page.$$eval('#scheduleModal .cb-opt.create', (e) => e.map((x) => x.textContent));
+  check('목록에 없으면 새로 만들기가 나온다', createRow.length === 1 && createRow[0].includes('솔뫼농산'), JSON.stringify(createRow));
+
+  // 키보드만으로 이동·선택
+  const act = await page.$eval('#sVendorInput', (e) => e.getAttribute('aria-activedescendant'));
+  check('활성 항목을 aria 로 알린다', !!act, `${act}`);
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(300);
+  const made = await page.evaluate(async () => {
+    const s = await window.WorkCore.readState();
+    return { names: s.vendorTemplates.map((v) => v.name), picked: document.getElementById('sVendor').value };
+  });
+  check('Enter 로 새 업체가 만들어진다', made.names.includes('솔뫼농산'), made.names.join(','));
+  check('만들자마자 골라져 있다', made.names.includes('솔뫼농산') && !!made.picked);
+  check('만든 이름이 칸에 남는다', (await page.inputValue('#sVendorInput')) === '솔뫼농산');
+  check('만들면 닫힌다', await page.$eval('#sVendorInput', (e) => e.getAttribute('aria-expanded') === 'false'));
+
+  // Esc 는 되돌린다
+  await page.click('#sVendorInput');
+  await page.fill('#sVendorInput', '아무거나입력');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(80);
+  check('Esc 는 원래 글자로 되돌린다', (await page.inputValue('#sVendorInput')) === '솔뫼농산');
+  check('Esc 로 목록만 닫히고 모달은 남는다', await page.$eval('#scheduleModal', (e) => e.classList.contains('show')));
+
+  // ↑↓ 로 고른다
+  await page.click('#sVendorInput');
+  await page.fill('#sVendorInput', '');
+  await page.waitForTimeout(80);
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  const activeText = await page.$eval('#scheduleModal .cb-opt.active', (e) => e.textContent);
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(80);
+  check('↑↓ 와 Enter 만으로 고를 수 있다', (await page.inputValue('#sVendorInput')) === activeText, `${activeText}`);
+
+  // 만든 업체가 다른 모달에도 그대로 있다
+  await page.click('#scheduleModal .close');
+  await page.click('#addWorkBtn');
+  await page.waitForSelector('#workModal.show');
+  await page.click('#wVendorInput');
+  await page.fill('#wVendorInput', '솔뫼');
+  await page.waitForTimeout(80);
+  check('다른 모달에서도 같은 업체가 검색된다',
+    (await page.$$eval('#workModal .cb-opt', (e) => e.map((x) => x.textContent))).some((t) => t.includes('솔뫼농산')));
 
   check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
   await ctx.close();
