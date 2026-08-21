@@ -224,6 +224,7 @@ fn toggle_piece(app: &tauri::AppHandle, label: &str) {
 /// 실측해서, 닿지 않으면 즉시 원래 자리(아이콘 위·항상 아래)로 되돌린다 —
 /// 바닥처럼 보이는 것보다 눌렀을 때 반응하는 것이 먼저다.
 #[cfg(windows)]
+#[allow(dead_code)]
 mod floor {
     use windows_sys::Win32::Foundation::{HWND, LPARAM, POINT, RECT};
     use windows_sys::Win32::UI::WindowsAndMessaging::{
@@ -308,6 +309,7 @@ mod floor {
 /// 조각들을 아이콘 뒤 바닥에 붙여 본다. 하나라도 클릭이 안 닿으면 전부 원래
 /// 자리(아이콘 위)로 두고 항상-아래를 다시 건다 — 반쯤 섞인 상태를 만들지 않는다.
 #[cfg(windows)]
+#[allow(dead_code)]
 fn embed_pieces(app: &tauri::AppHandle) {
     let handles: Vec<(tauri::WebviewWindow, isize)> = PIECES
         .iter()
@@ -337,7 +339,11 @@ fn embed_pieces(app: &tauri::AppHandle) {
     }
 }
 #[cfg(not(windows))]
+#[allow(dead_code)]
 fn embed_pieces(_app: &tauri::AppHandle) {}
+
+/// embed_pieces 를 부르지 않는 이유를 코드 자리에 남기기 위한 자리표시.
+fn embed_pieces_disabled_note() {}
 
 /// 설치·업데이트 뒤에도 이전 버전 프로세스가 숨은 채 살아 있으면, 새 실행이
 /// 단일 인스턴스 규칙에 밀려 이전(구버전) 화면만 다시 보게 된다. 사용자에게
@@ -454,10 +460,14 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            // 창들이 아직 숨어 있는 지금 배치하고, 바탕화면 아이콘 뒤 바닥에 붙인다 —
-            // 뜬 뒤에 움직이면 화면이 튄다.
+            // 창들이 아직 숨어 있는 지금 배치한다 — 뜬 뒤에 움직이면 화면이 튄다.
             layout_pieces(app.handle());
-            embed_pieces(app.handle());
+            // 바닥 모드(embed_pieces: 아이콘 뒤 배경화면 계층에 붙이기)는 걸지 않는다.
+            // 투명 창을 그 계층의 자식으로 만들면 화면 합성이 깨져 조각이 검게 나오거나
+            // 보이지 않는 환경이 있고, 그려지는지 여부는 자동 검사로 확인할 수 없다.
+            // 실제 화면에서 그려진다고 확인된 구성(아이콘 위·항상 아래)만 쓴다.
+            // 코드는 남겨 둔다 — 픽셀 검증 수단이 생기면 그때 다시 시도한다.
+            let _ = embed_pieces_disabled_note();
 
             // 화면 스크립트가 어떤 이유로든 piece_ready 를 못 보내면 앱이 보이지 않는 채로
             // 남으므로 안전망을 둔다.
