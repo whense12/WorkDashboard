@@ -1,21 +1,19 @@
-use tauri::{Manager, WebviewWindow, WindowEvent};
+use tauri::{
+    menu::{Menu, MenuItem, PredefinedMenuItem},
+    tray::TrayIconBuilder,
+    Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
+};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_window_state::StateFlags;
 
-/// 이번 실행이 자동 실행(도우미만)인지. 본체를 언제 띄울지 판단하는 데만 쓴다.
-struct Launch {
-    helper_only: bool,
-}
+/// 이 앱에는 메인 창이 없다. 세 조각이 각각 무장식·투명·작업표시줄 없음·항상 아래
+/// (= 바탕화면 악세사리) 창으로 상주하고, 입력 폼만 pop 창으로 잠깐 열렸다 닫힌다.
+/// 종료와 조각 보이기/숨기기는 트레이가 맡는다.
+const PIECES: [&str; 3] = ["cal", "mini", "status"];
 
 fn win(app: &tauri::AppHandle, label: &str) -> Result<WebviewWindow, String> {
     app.get_webview_window(label)
         .ok_or_else(|| format!("{label} window not found"))
-}
-
-fn is_visible(app: &tauri::AppHandle, label: &str) -> bool {
-    app.get_webview_window(label)
-        .and_then(|w| w.is_visible().ok())
-        .unwrap_or(false)
 }
 
 /// WebView2 는 숨겼다 다시 띄운 창을 곧바로 다시 그리지 않고 검은 사각형으로 남겨 두는 일이 있다.
@@ -27,49 +25,97 @@ fn repaint(window: &WebviewWindow) {
     }
 }
 
-fn reveal(window: &WebviewWindow) -> Result<(), String> {
-    window.show().map_err(|e| e.to_string())?;
+/// 조각은 바탕화면 레벨이다. 띄울 때 포커스를 뺏지 않는다 — 악세사리가 갑자기
+/// 앞으로 튀어나오면 그게 곧 '창'이 되어 버린다.
+fn reveal_piece(window: &WebviewWindow) {
+    let _ = window.show();
     let _ = window.unminimize();
     repaint(window);
-    window.set_focus().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-fn show_helper(app: tauri::AppHandle) -> Result<(), String> {
-    reveal(&win(&app, "helper")?)
-}
-
-/// 도우미의 × 는 악세사리를 치우는 동작이다. 다만 본체까지 숨어 있으면 화면에 아무것도
-/// 남지 않아 다시 부를 방법이 없다. 그때는 앱을 끝낸다 — 유령 프로세스를 남기지 않는다.
-#[tauri::command]
-fn hide_helper(app: tauri::AppHandle) -> Result<(), String> {
-    win(&app, "helper")?.hide().map_err(|e| e.to_string())?;
-    if !is_visible(&app, "main") {
-        app.exit(0);
+fn reveal_all(app: &tauri::AppHandle) {
+    for label in PIECES {
+        if let Some(w) = app.get_webview_window(label) {
+            reveal_piece(&w);
+        }
     }
-    Ok(())
 }
 
-#[tauri::command]
-fn show_main(app: tauri::AppHandle) -> Result<(), String> {
-    reveal(&win(&app, "main")?)
-}
-
-/// 본체 화면이 첫 렌더를 마쳤다고 알려 온다. 창은 `visible: false` 로 만들어 두고
+/// 조각 창이 첫 렌더를 마쳤다고 알려 온다. 창은 `visible: false` 로 만들어 두고
 /// 이 시점에 띄운다 — 빈 WebView2 가 먼저 뜨면 검은 사각형으로 보인다.
 #[tauri::command]
-fn main_ready(app: tauri::AppHandle, launch: tauri::State<'_, Launch>) -> Result<(), String> {
-    if launch.helper_only {
-        return Ok(());
+fn piece_ready(window: WebviewWindow) {
+    if PIECES.contains(&window.label()) {
+        reveal_piece(&window);
     }
-    reveal(&win(&app, "main")?)
 }
 
+/// pop 창 안에서 첫 모달이 열렸다고 알려 온다. 이때 띄워야 빈 창이 번쩍이지 않는다.
 #[tauri::command]
-fn set_helper_always_on_top(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
-    win(&app, "helper")?
-        .set_always_on_top(enabled)
-        .map_err(|e| e.to_string())
+fn pop_ready(window: WebviewWindow) {
+    if window.label() == "pop" {
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
+/// pop 창은 마지막 모달이 닫히면 스스로 이 명령을 불러 사라진다.
+#[tauri::command]
+fn close_pop(window: WebviewWindow) {
+    if window.label() == "pop" {
+        let _ = window.close();
+    }
+}
+
+/// URL 쿼리에 안전하게 넣기 위한 최소 퍼센트 인코딩.
+fn urlenc(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() * 3);
+    for b in s.as_bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(*b as char)
+            }
+            _ => out.push_str(&format!("%{:02X}", b)),
+        }
+    }
+    out
+}
+
+/// 조각 창에서 입력 폼을 pop 창으로 연다. 폼 이름은 화이트리스트로만 받는다 —
+/// 사용자 입력이 URL 로 흘러들지 않게 한다. payload 는 JSON 문자열 그대로
+/// 퍼센트 인코딩되어 넘어가고, 화면 쪽이 다시 파싱한다.
+#[tauri::command]
+fn open_form(app: tauri::AppHandle, form: String, payload: String) -> Result<(), String> {
+    let (w, h) = match form.as_str() {
+        "schedule" => (620.0, 720.0),
+        "work" => (620.0, 740.0),
+        "detail" => (740.0, 780.0),
+        "spend" => (620.0, 700.0),
+        "budget" => (820.0, 680.0),
+        "template" => (840.0, 720.0),
+        "settings" => (620.0, 560.0),
+        _ => return Err(format!("unknown form: {form}")),
+    };
+    // 한 번에 하나. 이미 떠 있으면 닫고 새로 연다 — 폼이 겹겹이 쌓이면 그게 또 창이다.
+    if let Some(existing) = app.get_webview_window("pop") {
+        let _ = existing.close();
+    }
+    let url = format!("index.html?w=pop&form={}&payload={}", form, urlenc(&payload));
+    WebviewWindowBuilder::new(&app, "pop", WebviewUrl::App(url.into()))
+        .title("입력")
+        .inner_size(w, h)
+        .center()
+        .decorations(false)
+        .transparent(true)
+        .shadow(false)
+        .skip_taskbar(true)
+        .resizable(true)
+        .maximizable(false)
+        .visible(false) // pop_ready 가 올 때 띄운다
+        .focused(true)
+        .build()
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -87,30 +133,33 @@ fn is_autostart_enabled(app: tauri::AppHandle) -> Result<bool, String> {
     app.autolaunch().is_enabled().map_err(|e| e.to_string())
 }
 
+fn toggle_piece(app: &tauri::AppHandle, label: &str) {
+    if let Ok(w) = win(app, label) {
+        if matches!(w.is_visible(), Ok(true)) {
+            let _ = w.hide();
+        } else {
+            reveal_piece(&w);
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         // 자동 실행으로 한 번, 바탕화면 아이콘으로 또 한 번 — 두 벌이 동시에 뜨면
-        // 같은 저장소를 두 프로세스가 쓰고 제목이 같은 창이 둘 생긴다.
-        // 두 번째 실행은 기존 창을 앞으로 불러오고 끝낸다. 반드시 첫 플러그인이어야 한다.
+        // 같은 저장소를 두 프로세스가 쓴다. 두 번째 실행은 조각들을 다시 보이고 끝낸다.
+        // 반드시 첫 플러그인이어야 한다.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            if let Some(w) = app.get_webview_window("main") {
-                let _ = reveal(&w);
-            } else if let Some(w) = app.get_webview_window("helper") {
-                let _ = reveal(&w);
-            }
+            reveal_all(app);
         }))
         .plugin(tauri_plugin_store::Builder::default().build())
-        .plugin(tauri_plugin_autostart::init(
-            MacosLauncher::LaunchAgent,
-            Some(vec!["--helper-only"]),
-        ))
-        // 위치와 크기만 기억한다. 기본값(all)은 표시 여부와 장식까지 복원해서,
-        // 숨겨 두어야 할 본체가 저장된 기하만 안고 빈 창으로 되살아나거나
-        // 무장식 도우미에 제목표시줄이 다시 붙는 일이 생긴다.
+        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
+        // 위치와 크기만 기억한다. 표시 여부까지 복원하면 visible:false 로 만들어 둔 조각이
+        // piece_ready 전에 빈 채로 되살아난다. pop 은 매번 가운데 뜨는 일회성 창이라 뺀다.
         .plugin(
             tauri_plugin_window_state::Builder::default()
                 .with_state_flags(StateFlags::SIZE | StateFlags::POSITION)
+                .with_denylist(&["pop"])
                 .build(),
         )
         // 첨부파일과 백업을 앱 전용 폴더에 실제 파일로 보관한다(발주서 §16.2).
@@ -118,51 +167,85 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .on_window_event(|window, event| {
-            if let WindowEvent::CloseRequested { api, .. } = event {
-                // 창을 닫아도 앱을 끝내지 않는다. 본체를 닫으면 도우미가 바탕화면에 남고,
-                // 거기서 '대시보드 열기'로 다시 부를 수 있어야 한다.
-                api.prevent_close();
-                let _ = window.hide();
-                let app = window.app_handle();
-                if !is_visible(app, "main") && !is_visible(app, "helper") {
-                    if window.label() == "main" {
-                        if let Some(helper) = app.get_webview_window("helper") {
-                            let _ = reveal(&helper);
-                        }
-                    } else {
-                        app.exit(0);
+            let label = window.label().to_string();
+            match event {
+                WindowEvent::CloseRequested { api, .. } => {
+                    // 조각에는 닫기 버튼이 없지만 Alt+F4 는 온다. 앱을 끝내는 대신 숨긴다 —
+                    // 트레이에서 다시 부를 수 있다. 종료는 트레이의 '종료'만 한다.
+                    if PIECES.contains(&label.as_str()) {
+                        api.prevent_close();
+                        let _ = window.hide();
                     }
                 }
+                WindowEvent::Resized(_) => {
+                    // Win+D(바탕화면 보기)는 이 창들도 최소화한다(Rainmeter 계열 공통 문제).
+                    // 바탕화면 악세사리가 '바탕화면 보기'에 사라지면 존재 이유가 없다 — 즉시 복원한다.
+                    if PIECES.contains(&label.as_str()) && matches!(window.is_minimized(), Ok(true))
+                    {
+                        let _ = window.unminimize();
+                    }
+                }
+                _ => {}
             }
         })
         .setup(|app| {
-            let helper_only = std::env::args().any(|arg| arg == "--helper-only");
-            app.manage(Launch { helper_only });
-            if helper_only {
-                if let Some(helper) = app.get_webview_window("helper") {
-                    let _ = helper.show();
-                }
-            } else {
-                // 본체는 main_ready 가 올 때 띄운다. 화면 스크립트가 어떤 이유로든
-                // 그 신호를 못 보내면 앱이 보이지 않는 채로 남으므로 안전망을 둔다.
-                let handle = app.handle().clone();
-                std::thread::spawn(move || {
-                    std::thread::sleep(std::time::Duration::from_secs(5));
-                    if let Some(main) = handle.get_webview_window("main") {
-                        if !matches!(main.is_visible(), Ok(true)) {
-                            let _ = reveal(&main);
+            // 트레이 — 창이 없는 앱의 유일한 '관리 손잡이'.
+            let cal = MenuItem::with_id(app, "toggle-cal", "달력 시트", true, None::<&str>)?;
+            let mini = MenuItem::with_id(app, "toggle-mini", "미니 대시보드", true, None::<&str>)?;
+            let status = MenuItem::with_id(app, "toggle-status", "현황", true, None::<&str>)?;
+            let show_all = MenuItem::with_id(app, "show-all", "모두 표시", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "종료", true, None::<&str>)?;
+            let menu = Menu::with_items(
+                app,
+                &[
+                    &show_all,
+                    &PredefinedMenuItem::separator(app)?,
+                    &cal,
+                    &mini,
+                    &status,
+                    &PredefinedMenuItem::separator(app)?,
+                    &quit,
+                ],
+            )?;
+            let icon = app
+                .default_window_icon()
+                .cloned()
+                .expect("app icon missing");
+            TrayIconBuilder::with_id("main-tray")
+                .icon(icon)
+                .menu(&menu)
+                .show_menu_on_left_click(true)
+                .tooltip("업체별 업무 일정 — 조각 보이기/숨기기·종료")
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "quit" => app.exit(0),
+                    "show-all" => reveal_all(app),
+                    "toggle-cal" => toggle_piece(app, "cal"),
+                    "toggle-mini" => toggle_piece(app, "mini"),
+                    "toggle-status" => toggle_piece(app, "status"),
+                    _ => {}
+                })
+                .build(app)?;
+
+            // 화면 스크립트가 어떤 이유로든 piece_ready 를 못 보내면 앱이 보이지 않는 채로
+            // 남으므로 안전망을 둔다.
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(5));
+                for label in PIECES {
+                    if let Some(w) = handle.get_webview_window(label) {
+                        if !matches!(w.is_visible(), Ok(true)) {
+                            reveal_piece(&w);
                         }
                     }
-                });
-            }
+                }
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            show_helper,
-            hide_helper,
-            show_main,
-            main_ready,
-            set_helper_always_on_top,
+            piece_ready,
+            pop_ready,
+            close_pop,
+            open_form,
             set_autostart,
             is_autostart_enabled
         ])

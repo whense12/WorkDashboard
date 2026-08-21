@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Main dashboard and D-day helper permissions",
-  "windows": ["main", "helper"],
+  "description": "세 조각 창과 pop 입력 창의 공통 권한",
+  "windows": ["cal", "mini", "status", "pop"],
   "permissions": [
     "core:default",
     "store:default",

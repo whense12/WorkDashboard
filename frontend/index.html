@@ -1,29 +1,61 @@
 <!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>업체별 업무 일정 v5</title><link rel="stylesheet" href="styles.css"></head><body>
-<svg class="sprite" aria-hidden="true"><!-- Lucide (ISC License) https://lucide.dev — 사용하는 아이콘만 추출 --><symbol id="i-calendar-days" viewBox="0 0 24 24"><path d="M8 2v3" /><path d="M16 2v3" /><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18" /><path d="M8 13h.01" /><path d="M12 13h.01" /><path d="M16 13h.01" /><path d="M8 17h.01" /><path d="M12 17h.01" /><path d="M16 17h.01" /></symbol><symbol id="i-app-window" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M10 4v4" /><path d="M2 8h20" /><path d="M6 4v4" /></symbol><symbol id="i-layout-template" viewBox="0 0 24 24"><rect width="18" height="7" x="3" y="3" rx="1" /><rect width="9" height="7" x="3" y="14" rx="1" /><rect width="5" height="7" x="16" y="14" rx="1" /></symbol><symbol id="i-settings" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" /><circle cx="12" cy="12" r="3" /></symbol><symbol id="i-folder-plus" viewBox="0 0 24 24"><path d="M12 10v6" /><path d="M9 13h6" /><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></symbol><symbol id="i-calendar-plus" viewBox="0 0 24 24"><path d="M16 18h6" /><path d="M16 2v3" /><path d="M19 15v6" /><path d="M21 11.5V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h8.3" /><path d="M3 9h18" /><path d="M8 2v3" /></symbol><symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6" /></symbol><symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" /></symbol><symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></symbol></svg>
-<div class="app">
-<header class="topbar">
-  <div class="brand"><div class="brandmark"><svg class="ico" aria-hidden="true"><use href="#i-calendar-days"/></svg></div><h1 data-t="app"></h1></div>
-  <div class="top-actions">
-    <button class="btn" id="helperBtn"><svg class="ico" aria-hidden="true"><use href="#i-app-window"/></svg><span class="label">D-day 도우미</span></button>
-    <button class="btn" id="templateBtn"><svg class="ico" aria-hidden="true"><use href="#i-layout-template"/></svg><span class="label">템플릿</span></button>
-    <button class="btn" id="settingsBtn"><svg class="ico" aria-hidden="true"><use href="#i-settings"/></svg><span class="label">설정</span></button>
-    <button class="btn" id="addWorkBtn"><svg class="ico" aria-hidden="true"><use href="#i-folder-plus"/></svg><span class="label" data-t="addProject"></span></button>
-    <button class="btn primary" id="addScheduleBtn"><svg class="ico" aria-hidden="true"><use href="#i-calendar-plus"/></svg><span class="label" data-t="addEvent"></span></button>
+<svg class="sprite" aria-hidden="true"><!-- Lucide (ISC License) https://lucide.dev — 사용하는 아이콘만 추출 --><symbol id="i-calendar-days" viewBox="0 0 24 24"><path d="M8 2v3" /><path d="M16 2v3" /><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18" /><path d="M8 13h.01" /><path d="M12 13h.01" /><path d="M16 13h.01" /><path d="M8 17h.01" /><path d="M12 17h.01" /><path d="M16 17h.01" /></symbol><symbol id="i-layout-template" viewBox="0 0 24 24"><rect width="18" height="7" x="3" y="3" rx="1" /><rect width="9" height="7" x="3" y="14" rx="1" /><rect width="5" height="7" x="16" y="14" rx="1" /></symbol><symbol id="i-settings" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" /><circle cx="12" cy="12" r="3" /></symbol><symbol id="i-folder-plus" viewBox="0 0 24 24"><path d="M12 10v6" /><path d="M9 13h6" /><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></symbol><symbol id="i-calendar-plus" viewBox="0 0 24 24"><path d="M16 18h6" /><path d="M16 2v3" /><path d="M19 15v6" /><path d="M21 11.5V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h8.3" /><path d="M3 9h18" /><path d="M8 2v3" /></symbol><symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6" /></symbol><symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" /></symbol><symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></symbol><symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></symbol></svg>
+
+<!-- 창이 없는 앱. 세 조각이 각각 바탕화면에 상주하는 무장식 창이다(도우미 방식).
+     브라우저·검사에서는 파라미터 없이 세 조각이 한 페이지에 함께 렌더된다. -->
+<div class="desk" id="desk">
+
+<!-- ① 달력 시트 — 배경화면에 심어진 월 달력. 빈 날짜 더블클릭 = 일정 추가(DesktopCal 관례). -->
+<section class="piece piece-cal" id="pieceCal">
+  <header class="sheet-head" data-tauri-drag-region>
+    <h1 class="month-title" id="monthTitle" data-tauri-drag-region></h1>
+    <div class="cal-nav" id="calNav"><button class="pbtn icon" id="prevMonth" aria-label="이전 달"><svg class="ico" aria-hidden="true"><use href="#i-chevron-left"/></svg></button><button class="pbtn icon" id="nextMonth" aria-label="다음 달"><svg class="ico" aria-hidden="true"><use href="#i-chevron-right"/></svg></button><button class="pbtn" id="todayBtn">오늘</button></div>
+    <span class="hint" id="calHint" data-tauri-drag-region></span>
+    <button class="pbtn primary" id="addScheduleBtn"><svg class="ico" aria-hidden="true"><use href="#i-calendar-plus"/></svg><span class="label" data-t="addEvent"></span></button>
+  </header>
+  <div class="weekdays"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
+  <div class="calendar-scroll" id="calendarScroll"><div class="month-grid" id="monthGrid"></div></div>
+</section>
+
+<!-- ② 미니 대시보드 — 일정순/업체별 토글 하나. 지남·오늘·예정을 따로 나누지 않는다(색으로 구분). -->
+<aside class="piece piece-mini" id="pieceMini">
+  <header class="mini-head" data-tauri-drag-region>
+    <div class="tabs seg" role="tablist" aria-label="미니 대시보드 보기"><button class="tab" role="tab" data-board="due" data-t="viewDue"></button><button class="tab" role="tab" data-board="vendor" data-t="viewVendor"></button></div>
+    <div class="horizon"><select id="horizonSelect" aria-label="D-day 기준"><option value="3">D-3</option><option value="5">D-5</option><option value="7">D-7</option><option value="14">D-14</option><option value="30">D-30</option><option value="all">무제한</option><option value="custom">직접설정</option></select><input id="horizonCustom" type="number" min="1" max="3650" class="hidden" aria-label="직접 D-day 일수"></div>
+  </header>
+  <div class="omni-box" id="omniBox">
+    <svg class="ico" aria-hidden="true"><use href="#i-search"/></svg>
+    <input id="omni" type="text" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="omniList" aria-autocomplete="list">
+    <button id="omniAdd" aria-label="일정 추가" title="일정 추가">+</button>
+    <div class="omni-list hidden" id="omniList" role="listbox"></div>
   </div>
-</header>
-<main class="workspace">
-  <aside class="panel sidebar">
-    <div class="side-head"><div class="side-row"><div class="side-title" data-t="upcoming"></div><div class="horizon">기준 <select id="horizonSelect"><option value="3">D-3</option><option value="5">D-5</option><option value="7">D-7</option><option value="14">D-14</option><option value="30">D-30</option><option value="all">무제한</option><option value="custom">직접설정</option></select><input id="horizonCustom" type="number" min="1" max="3650" class="hidden" aria-label="직접 D-day 일수"></div></div><div class="side-caption" data-t="sideCaption"></div></div>
-    <div class="due-list" id="dueList"></div>
-  </aside>
-  <section class="panel calendar-panel">
-    <div class="cal-toolbar"><div class="tabs seg" role="tablist" aria-label="대시보드 보기"><button class="tab active" role="tab" data-board="calendar" data-t="viewCalendar"></button><button class="tab" role="tab" data-board="vendor" data-t="viewVendor"></button><button class="tab" role="tab" data-board="group" data-t="viewGroup"></button><button class="tab" role="tab" data-board="budget" data-t="viewBudget"></button></div><div class="cal-nav" id="calNav"><button class="btn icon" id="prevMonth" aria-label="이전 달"><svg class="ico" aria-hidden="true"><use href="#i-chevron-left"/></svg></button><div class="month-title" id="monthTitle"></div><button class="btn icon" id="nextMonth" aria-label="다음 달"><svg class="ico" aria-hidden="true"><use href="#i-chevron-right"/></svg></button><button class="btn" id="todayBtn">Today</button></div><div class="cal-spacer"></div><span class="hint" id="calHint"></span></div>
-    <div class="calendar-scroll" id="calendarScroll"><div class="weekdays"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div><div class="month-grid" id="monthGrid"></div></div>
-    <div class="vendor-board hidden" id="vendorBoard"></div>
-    <div class="vendor-board hidden" id="groupBoard"></div>
-    <div class="budget-board hidden" id="budgetBoard"></div>
-  </section>
-</main></div>
+  <div class="due-list" id="dueList"></div>
+  <div class="vendor-board hidden" id="vendorBoard"></div>
+  <footer class="mini-tools" data-tauri-drag-region>
+    <button class="tool" id="addWorkBtn"><svg class="ico" aria-hidden="true"><use href="#i-folder-plus"/></svg><span data-t="addProject"></span></button>
+    <button class="tool" id="templateBtn"><svg class="ico" aria-hidden="true"><use href="#i-layout-template"/></svg>템플릿</button>
+    <button class="tool" id="settingsBtn"><svg class="ico" aria-hidden="true"><use href="#i-settings"/></svg>설정</button>
+  </footer>
+</aside>
+
+<!-- ③ 현황 — 행사·예산. 줄을 누르면 그 자리에서 펼쳐진다. -->
+<aside class="piece piece-status" id="pieceStatus">
+  <header class="mini-head" data-tauri-drag-region><span class="piece-title" data-tauri-drag-region>현황</span><span class="hint" id="statusHint" data-tauri-drag-region></span></header>
+  <div class="status-scroll">
+    <section class="st-sec" id="stGroupSec">
+      <button class="st-head" data-board="group" aria-expanded="false"><span class="st-title" data-t="viewGroup"></span><span class="st-sum" id="stGroupSum"></span><span class="st-caret" aria-hidden="true"></span></button>
+      <div class="st-face" id="stGroupFace"></div>
+      <div class="vendor-board hidden" id="groupBoard"></div>
+    </section>
+    <section class="st-sec" id="stBudgetSec">
+      <button class="st-head" data-board="budget" aria-expanded="false"><span class="st-title" data-t="viewBudget"></span><span class="st-sum" id="stBudgetSum"></span><span class="st-caret" aria-hidden="true"></span></button>
+      <div class="st-face" id="stBudgetFace"></div>
+      <div class="budget-board hidden" id="budgetBoard"></div>
+    </section>
+  </div>
+</aside>
+
+</div>
 
 <div class="modal-bg" id="scheduleModal"><section class="modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="scheduleTitle"><div class="modal-head"><h2 id="scheduleTitle" data-t="eventModalTitle"></h2><button class="close" data-close="scheduleModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body"><div class="form-grid">
   <div class="field full"><label for="sName" data-t="fEventName"></label><input id="sName" placeholder="예: 현장확인, 서류제출, 계약의뢰…"></div>
@@ -51,10 +83,8 @@
 
 <div class="modal-bg" id="projectStepsModal"><section class="modal wide" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="projectStepsTitle"><div class="modal-head"><h2 id="projectStepsTitle">업무 절차 편집</h2><button class="close" data-close="projectStepsModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body"><div class="proc-list" id="projectStepsList"></div><button class="btn" id="projectAddStep" style="margin-top:8px" data-t="addStep"></button></div><div class="modal-foot"><button class="btn" data-close="projectStepsModal">취소</button><button class="btn primary" id="saveProjectSteps" data-t="saveSteps"></button></div></section></div>
 
-<div class="modal-bg" id="settingsModal"><section class="modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="settingsTitle"><div class="modal-head"><h2 id="settingsTitle">도우미 설정</h2><button class="close" data-close="settingsModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body">
-  <div class="setting-row"><div class="setting-copy"><b>D-day 도우미 표시</b><span>작은 창으로 업체별 가까운 일정을 띄웁니다.</span></div><button class="btn" id="settingsOpenHelper">도우미 열기</button></div>
-  <div class="setting-row"><div class="setting-copy"><b>항상 위에 표시</b><span>데스크톱 앱에서 다른 창 위에 유지합니다.</span></div><label class="switch"><input id="alwaysOnTop" type="checkbox"><span class="slider"></span></label></div>
-  <div class="setting-row"><div class="setting-copy"><b>컴퓨터 시작 시 자동 실행</b><span>Tauri 데스크톱 앱에서 지원됩니다.</span></div><label class="switch"><input id="autostart" type="checkbox"><span class="slider"></span></label></div>
+<div class="modal-bg" id="settingsModal"><section class="modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="settingsTitle"><div class="modal-head"><h2 id="settingsTitle">설정</h2><button class="close" data-close="settingsModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body">
+  <div class="setting-row"><div class="setting-copy"><b>컴퓨터 시작 시 자동 실행</b><span>켜 두면 부팅과 함께 조각들이 바탕화면에 올라옵니다.</span></div><label class="switch"><input id="autostart" type="checkbox"><span class="slider"></span></label></div>
   <div class="setting-row"><div class="setting-copy"><b>백업</b><span id="backupCopy"></span></div><div class="setting-actions"><button class="btn" id="backupNowBtn">지금 백업</button><button class="btn hidden" id="backupFolderBtn">폴더 열기</button></div></div>
   <div class="setting-row"><div class="setting-copy"><b>백업에서 복원</b><span>복원 직전 현재 데이터를 한 벌 자동으로 남깁니다.</span></div><div class="setting-actions"><select id="backupPick" class="hidden" aria-label="복원할 백업 선택"></select><button class="btn hidden" id="restoreBtn">복원</button><label class="btn hidden" for="restoreFile" id="restoreFileLabel">백업 파일 선택</label><input id="restoreFile" type="file" accept=".zip,application/zip" hidden></div></div>
   <div class="setting-row"><div class="setting-copy"><b>예시 데이터</b><span id="demoCopy" data-t="demoCopy"></span></div><button class="btn" id="demoToggleBtn">예시 데이터 불러오기</button></div>

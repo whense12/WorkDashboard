@@ -3,11 +3,9 @@
  * frontend/ 를 단일 원본으로 삼아 단독 실행 HTML 을 생성한다.
  *
  *   frontend/index.html  + styles.css + core.js + app.js    -> web_standalone.html
- *   frontend/helper.html + styles.css + core.js + helper.js -> helper_preview.html
  *
- * 왜 필요한가: 이전에는 core.js(11KB) 가 frontend/, web_standalone.html,
- * helper_preview.html 세 곳에 그대로 복제돼 있었다. 한 곳을 고치면 나머지 둘이 조용히
- * 어긋난다. 생성물을 커밋하고 CI 에서 `git diff --exit-code` 로 드리프트를 막는다.
+ * 왜 필요한가: 이전에는 core.js(11KB) 가 여러 곳에 그대로 복제돼 있었다. 한 곳을 고치면
+ * 나머지가 조용히 어긋난다. 생성물을 커밋하고 CI 에서 `git diff --exit-code` 로 드리프트를 막는다.
  *
  *   npm run build:standalone
  */
@@ -48,7 +46,6 @@ async function inline(htmlName, scripts) {
 
 const targets = [
   ['index.html', ['zip.js', 'combobox.js', 'core.js', 'app.js'], 'web_standalone.html'],
-  ['helper.html', ['core.js', 'helper.js'], 'helper_preview.html'],
 ];
 
 for (const [src, scripts, out] of targets) {

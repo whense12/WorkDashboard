@@ -1,5 +1,31 @@
 (async function(){
-  const C=window.WorkCore;let state=await C.initStorage();let currentMonth=new Date(2026,7,1);let selectedRecord=null;let selectedProjectId=null;let templateTab='vendor';let selectedVendorTemplateId=null;let selectedWorkTemplateId=null;let projectStepsDraft=[];
+  const C=window.WorkCore;let state=await C.initStorage();let currentMonth=new Date(2026,7,1);let selectedRecord=null;
+  // ── 창 모드 ──────────────────────────────────────────────────────────────
+  // 이 앱에는 메인 창이 없다. 달력 시트·미니 대시보드·현황이 각각 무장식 창이고(도우미 방식),
+  // 입력 폼은 필요할 때만 작은 pop 창으로 열렸다 닫힌다. 브라우저·검사에서는 파라미터 없이
+  // 세 조각과 모달이 모두 한 페이지에 있다 — 동작은 완전히 같다.
+  const PARAMS=new URLSearchParams(location.search);
+  const MODE=PARAMS.get('w')||'';
+  const IS_POP=MODE==='pop';
+  if(MODE==='cal'||MODE==='mini'||MODE==='status')document.body.classList.add('win-mode','mode-'+MODE);
+  if(IS_POP)document.body.classList.add('mode-pop');
+  const hasPiece=p=>!MODE||MODE===p;   // 이 창에 그 조각이 있는가
+  /** 조각 창에서 폼을 열면 pop 창으로 내보낸다. pop 창 자신과 브라우저는 제자리에서 연다. */
+  async function popOut(form,payload){
+    if(!C.isTauri()||IS_POP)return false;
+    try{await window.__TAURI__.core.invoke('open_form',{form,payload:JSON.stringify(payload||{})});return true}
+    catch(e){console.warn('pop 창을 열지 못했습니다',e);return false}
+  }
+  // pop 창은 마지막 모달이 닫히면 스스로 사라진다. 되돌리기 토스트가 떠 있는 동안은
+  // 기다린다 — 창이 먼저 닫히면 되돌릴 기회도 함께 사라진다.
+  function closePopSoon(){
+    if(!IS_POP)return;
+    setTimeout(function check(){
+      if(modalStack.length)return;                       // 다른 모달이 이어서 열렸다
+      if(document.querySelector('.toast-undo')){setTimeout(check,500);return}
+      try{window.__TAURI__.core.invoke('close_pop')}catch(e){console.warn(e)}
+    },80);
+  }let selectedProjectId=null;let templateTab='vendor';let selectedVendorTemplateId=null;let selectedWorkTemplateId=null;let projectStepsDraft=[];
   let L=C.labels(state.terms);const $=id=>document.getElementById(id);const q=(s,r=document)=>r.querySelector(s);const qa=(s,r=document)=>[...r.querySelectorAll(s)];
   function toast(text,action){
     const el=$('toast');
@@ -40,10 +66,13 @@
   const modalStack=[];
   const FOCUSABLE='a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
   const focusables=root=>[...root.querySelectorAll(FOCUSABLE)].filter(el=>el.offsetWidth||el.offsetHeight||el.getClientRects().length);
+  let popShown=false;
   function show(id){
     const bg=$(id);if(bg.classList.contains('show'))return;
     modalStack.push({id,returnTo:document.activeElement});
     bg.classList.add('show');
+    // pop 창은 visible:false 로 태어난다. 첫 모달이 화면에 잡힌 지금 띄운다.
+    if(IS_POP&&!popShown){popShown=true;try{window.__TAURI__?.core?.invoke('pop_ready')}catch(e){}}
     window.WorkCombo?.syncAll(bg);
     (focusables(bg)[0]||bg.querySelector('.modal'))?.focus?.();
   }
@@ -53,6 +82,7 @@
     const i=modalStack.findIndex(m=>m.id===id);
     const entry=i>=0?modalStack.splice(i,1)[0]:null;
     if(entry?.returnTo?.isConnected)entry.returnTo.focus?.();
+    if(!modalStack.length)closePopSoon();
   }
   // Tab 이 모달 밖으로 새어 나가지 않게 가둔다.
   document.addEventListener('keydown',e=>{
@@ -64,34 +94,61 @@
     else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
   });
   async function persist(msg){await C.saveState(state);render();if(msg)toast(msg)}
-  function render(){L=C.labels(state.terms);applyStaticLabels();renderHorizon();renderDue();renderCalendar();renderBoard();renderGroupBoard();renderBudget();applyBoardMode();fillSelects();renderTemplatePanes();}
+  function render(){L=C.labels(state.terms);applyStaticLabels();renderHorizon();renderDue();renderCalendar();renderBoard();renderGroupBoard();renderBudget();renderStatus();applyMiniMode();applyStatus();fillSelects();renderTemplatePanes();}
   // 정적 HTML 의 data-t 를 사전 값으로 채운다. 마크업이 들어가는 문구만 innerHTML 로 넣는다.
-  function applyStaticLabels(){document.title=L.app;qa('[data-t]').forEach(el=>{const v=L[el.dataset.t];if(typeof v==='string')el.textContent=v})}
+  function applyStaticLabels(){document.title=L.app;qa('[data-t]').forEach(el=>{const v=L[el.dataset.t];if(typeof v==='string')el.textContent=v});const o=$('omni');if(o)o.placeholder=L.omniPlaceholder;$('calHint').textContent=L.calHint;$('statusHint').textContent='줄을 누르면 펼쳐집니다'}
   function renderHorizon(){const s=state.settings;$('horizonSelect').value=s.horizon;$('horizonCustom').value=s.customHorizon;$('horizonCustom').classList.toggle('hidden',s.horizon!=='custom')}
   function renderDue(){const cards=C.dueCards(state),host=$('dueList');if(!cards.length){const blank=!state.projects.length&&!state.manualEvents.length;host.innerHTML=`<div class="empty">${blank?L.emptyBlank:L.emptyHorizon}</div>`;return}host.innerHTML=cards.map(r=>{const v=C.vendor(state,r.vendorId),p=C.project(state,r.projectId);return `<button class="due-card ${C.ddayClass(r)}" data-due-kind="${r.kind}" data-due-id="${r.id}"><span><span class="due-vendor">${C.esc(v?.name||L.noVendor)}</span><span class="due-task">${C.esc(r.name)}</span><span class="due-sub">${spanText(r)}${p?` · ${C.esc(p.name)}`:''}</span>${r.extra?`<span class="due-extra">${C.esc(L.laterCount(r.extra))}</span>`:''}</span><span class="due-dday">${C.ddayLabel(r)}</span></button>`}).join('');qa('[data-due-id]',host).forEach(b=>b.addEventListener('click',()=>openRecord(b.dataset.dueKind,b.dataset.dueId)))}
-  // ── 업체별 요약 ──────────────────────────────────────────────────────────
-  // 캘린더와 같은 자리를 쓰는 두 번째 축이다. 좌측 D-day 레일은 두 모드에서 모두 남는다 —
-  // "뭐가 급한가"는 어느 화면을 보고 있든 사라지면 안 된다(발주서 §5.3).
-  const BOARD_MODES=['calendar','vendor','group','budget'];
-  const boardMode=()=>BOARD_MODES.includes(state.settings.boardView)?state.settings.boardView:'calendar';
+  // ── 미니 대시보드 토글 ───────────────────────────────────────────────────
+  // 지남/오늘/예정을 머리글로 가르지 않는다 — 색(빨강/주황/파랑)이 이미 그 일을 한다.
+  // 대신 한 토글로 '일정순'과 '업체별'을 오간다. 초안의 세그먼트 조작 언어 그대로다.
+  const MINI_MODES=['due','vendor'];
+  const miniMode=()=>MINI_MODES.includes(state.settings.miniView)?state.settings.miniView:'due';
   let expandedVendors=new Set();   // 펼침은 화면 상태다. 저장하지 않는다.
   let expandedItems=new Set(),expandedProjects=new Set();
-  function applyBoardMode(){
-    const mode=boardMode();
-    $('calendarScroll').classList.toggle('hidden',mode!=='calendar');
+  let openStatus=new Set();        // 현황 조각에서 펼쳐 둔 부(행사/예산)
+  function applyMiniMode(){
+    const mode=miniMode();
+    $('dueList').classList.toggle('hidden',mode!=='due');
     $('vendorBoard').classList.toggle('hidden',mode!=='vendor');
-    $('groupBoard').classList.toggle('hidden',mode!=='group');
-    $('budgetBoard').classList.toggle('hidden',mode!=='budget');
-    $('calNav').classList.toggle('hidden',mode!=='calendar');   // 월 이동은 캘린더에서만 의미가 있다
-    $('calHint').textContent={vendor:L.boardCaption,group:L.groupCaption,budget:L.budgetCaption}[mode]||L.calHint;
-    qa('[data-board]').forEach(b=>{const on=b.dataset.board===mode;b.classList.toggle('active',on);b.setAttribute('aria-selected',String(on))});
+    qa('.tabs [data-board]').forEach(b=>{const on=b.dataset.board===mode;b.classList.toggle('active',on);b.setAttribute('aria-selected',String(on))});
   }
-  async function setBoardMode(mode){
-    if(boardMode()===mode)return;
-    state.settings.boardView=mode;
+  async function setMiniMode(mode){
+    if(miniMode()===mode)return;
+    state.settings.miniView=mode;
     await C.saveState(state);          // 다시 켰을 때 보던 화면이 그대로 있어야 한다
-    renderBoard();renderGroupBoard();renderBudget();applyBoardMode();
+    renderDue();renderBoard();applyMiniMode();
   }
+  // ── 현황 조각 — 행사·예산 요약 겉면과 제자리 펼침 ────────────────────────
+  function applyStatus(){
+    [['group','groupBoard','stGroupFace'],['budget','budgetBoard','stBudgetFace']].forEach(([k,board,face])=>{
+      const open=openStatus.has(k);
+      $(board).classList.toggle('hidden',!open);
+      $(face).classList.toggle('hidden',open);
+      q(`.st-head[data-board="${k}"]`)?.setAttribute('aria-expanded',String(open));
+    });
+  }
+  function toggleStatus(k){
+    if(openStatus.has(k))openStatus.delete(k);else openStatus.add(k);
+    applyStatus();
+  }
+  function renderStatus(){
+    const gs=C.groupSummaries(state);
+    $('stGroupSum').textContent=gs.length?`${gs.length}건 · 진행 ${gs.reduce((n,g)=>n+g.stepsDone,0)}/${gs.reduce((n,g)=>n+g.stepsTotal,0)}`:'없음';
+    $('stGroupFace').innerHTML=gs.length?gs.slice(0,2).map(g=>{
+      const pct=g.stepsTotal?Math.round(g.stepsDone/g.stepsTotal*100):0;
+      const period=g.group.startDate?spanText({date:g.group.startDate,endDate:g.group.endDate}):'기간 미정';
+      return `<div class="st-row"><div class="l1"><b>${C.esc(g.group.name)}</b><span>${C.esc(period)} · ${C.esc(L.groupVendors(g.vendorCount))}</span></div>
+        <div class="st-meter"><span class="track"><i style="width:${pct}%;background:#7a4dbe"></i></span><span class="n">${g.stepsDone} / ${g.stepsTotal}${g.overdueCount?` · <b style="color:var(--danger)">${L.boardOverdue} ${g.overdueCount}</b>`:''}</span></div></div>`;
+    }).join(''):`<div class="empty" style="padding:8px">${L.groupEmpty}</div>`;
+    const t=C.budgetSummary(state).total;
+    $('stBudgetSum').textContent=t.amount?`${L.budgetRemain} ${C.formatMoney(t.remain)}원`:'미등록';
+    $('stBudgetFace').innerHTML=t.amount||t.spent||t.planned
+      ?`<div class="st-row"><div class="l1"><b>${C.esc(L.budgetTotal)} ${won(t.amount)}</b><span class="${t.remain<0?'neg':''}">${C.esc(t.remain<0?L.budgetOver:L.budgetRemain)} ${won(Math.abs(t.remain))}</span></div>
+         <div class="st-meter"><span class="track">${budgetBarInner(t)}</span><span class="n">${C.esc(L.budgetSpent)} ${won(t.spent)} · ${C.esc(L.budgetPlanned)} ${won(t.planned)}</span></div></div>`
+      :`<div class="empty" style="padding:8px">${L.budgetEmpty}</div>`;
+  }
+  const budgetBarInner=r=>`<i style="width:${r.spentRate}%;background:var(--done)"></i><i style="width:${r.plannedRate}%;background:${r.over?'var(--danger)':'var(--accent)'}"></i>`;
   function boardItemRow(it){
     const dday=it.completed?'완료':(it.date?C.ddayLabel(it):L.boardNoDate);
     const cls=it.completed?'done':(it.date?C.ddayClass(it):'undated');
@@ -287,7 +344,8 @@
       budgetDraft.splice(i,1);if(!budgetDraft.length)budgetDraft.push(blankBudgetRow());renderBudgetItems();
     }));
   }
-  function openBudget(){
+  async function openBudget(){
+    if(await popOut('budget',{}))return;
     budgetDraft=(state.budget.items||[]).map(it=>({...it}));
     if(!budgetDraft.length)budgetDraft.push(blankBudgetRow());
     $('bTitle').value=state.budget.title||'';
@@ -314,7 +372,8 @@
 
   // ── 지출 ─────────────────────────────────────────────────────────────────
   let editingSpendId=null;
-  function openSpend(id,preset={}){
+  async function openSpend(id,preset={}){
+    if(await popOut('spend',{id:id||null,preset}))return;
     editingSpendId=id;
     const sp=id?(state.spends||[]).find(x=>x.id===id):null;
     const src={...(sp||{itemId:'',projectId:null,vendorId:null,name:'',amount:'',status:'spent',date:C.todayISO(),memo:''}),...(sp?{}:preset)};
@@ -356,7 +415,39 @@
     refreshOpenDetail();
   }
   function allEventRecords(){return C.eventRecords(state)}
-  function renderCalendar(){const y=currentMonth.getFullYear(),m=currentMonth.getMonth();$('monthTitle').textContent=`${y}년 ${m+1}월`;$('monthGrid').innerHTML='';const first=new Date(y,m,1),before=first.getDay(),days=new Date(y,m+1,0).getDate(),cells=Math.ceil((before+days)/7)*7,events=allEventRecords(),bands=C.projectBands(state);for(let i=0;i<cells;i++){const d=new Date(y,m,1-before+i),ds=C.iso(d),inMonth=d.getMonth()===m,isToday=ds===C.todayISO(),rows=events.filter(e=>C.spansDay(e,ds)).sort((a,b)=>Number(a.completed)-Number(b.completed)),dayBands=bands.filter(b=>C.spansDay(b,ds));const cell=document.createElement('div');cell.className=`day ${inMonth?'':'out'} ${[0,6].includes(d.getDay())?'weekend':''} ${isToday?'today':''}`;cell.dataset.date=ds;cell.innerHTML=`<div class="day-head"><span class="day-num">${d.getDate()}</span>${isToday?'<span class="today-label">TODAY</span>':''}</div>${dayBands.length?`<div class="day-bands">${dayBands.map(b=>`<span class="day-band ${edgeClass(b,ds)}" title="${C.esc(b.name)} · ${spanText(b)}${b.count?` · ${C.esc(L.groupVendors(b.count))}`:''}">${b.date===ds||d.getDay()===0?C.esc(b.name)+(b.count?` (${b.count})`:''):''}</span>`).join('')}</div>`:''}<div class="events">${rows.map(r=>{const v=C.vendor(state,r.vendorId);return `<button class="event ${r.completed?'done':''} ${r.kind==='manual'?'manual':''} ${!r.completed?C.ddayClass(r):''} ${edgeClass(r,ds)}" data-event-kind="${r.kind}" data-event-id="${r.id}" title="${C.esc(v?.name||'')} · ${C.esc(r.name)} · ${spanText(r)}">${r.completed?'✓ ':''}${C.esc(v?.name||L.noVendor)} · ${C.esc(r.name)}${C.isPeriod(r)&&r.date===ds?` (${C.periodDays(r)}일)`:''}</button>`}).join('')}</div>${inMonth?`<span class="add-hint">+ ${C.esc(state.terms.event)}</span>`:''}`;if(inMonth)cell.addEventListener('click',e=>{if(e.target.closest('[data-event-id]'))return;openSchedule(ds)});$('monthGrid').appendChild(cell)}qa('[data-event-id]',$('monthGrid')).forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();openRecord(b.dataset.eventKind,b.dataset.eventId)}))}
+  function renderCalendar(){const y=currentMonth.getFullYear(),m=currentMonth.getMonth();$('monthTitle').textContent=`${y}년 ${m+1}월`;$('monthGrid').innerHTML='';const first=new Date(y,m,1),before=first.getDay(),days=new Date(y,m+1,0).getDate(),cells=Math.ceil((before+days)/7)*7,events=allEventRecords(),bands=C.projectBands(state);for(let i=0;i<cells;i++){const d=new Date(y,m,1-before+i),ds=C.iso(d),inMonth=d.getMonth()===m,isToday=ds===C.todayISO(),rows=events.filter(e=>C.spansDay(e,ds)).sort((a,b)=>Number(a.completed)-Number(b.completed)),dayBands=bands.filter(b=>C.spansDay(b,ds));const cell=document.createElement('div');cell.className=`day ${inMonth?'':'out'} ${d.getDay()===0?'weekend':''} ${isToday?'today':''}`;cell.dataset.date=ds;cell.innerHTML=`<div class="day-head"><span class="day-num">${d.getDate()}</span>${isToday?'<span class="today-label">TODAY</span>':''}</div>${dayBands.length?`<div class="day-bands">${dayBands.map(b=>`<span class="day-band ${edgeClass(b,ds)}" title="${C.esc(b.name)} · ${spanText(b)}${b.count?` · ${C.esc(L.groupVendors(b.count))}`:''}">${b.date===ds||d.getDay()===0?C.esc(b.name)+(b.count?` (${b.count})`:''):''}</span>`).join('')}</div>`:''}<div class="events">${rows.map(r=>{const v=C.vendor(state,r.vendorId);return `<button class="event ${r.completed?'done':''} ${r.kind==='manual'?'manual':''} ${!r.completed?C.ddayClass(r):''} ${edgeClass(r,ds)}"${r.completed?'':' draggable="true"'} data-event-kind="${r.kind}" data-event-id="${r.id}" title="${C.esc(v?.name||'')} · ${C.esc(r.name)} · ${spanText(r)}">${r.completed?'✓ ':''}${C.esc(v?.name||L.noVendor)} · ${C.esc(r.name)}${C.isPeriod(r)&&r.date===ds?` (${C.periodDays(r)}일)`:''}</button>`}).join('')}</div>${inMonth?`<span class="add-hint">+ ${C.esc(state.terms.event)}</span>`:''}`;
+    if(inMonth){
+      // 시트는 바탕화면이다. 한 번 클릭으로 모달이 튀면 바탕화면을 잘못 건드릴 때마다 창이 뜬다.
+      // DesktopCal 관례대로 빈 날짜는 두 번 클릭으로 연다.
+      cell.addEventListener('dblclick',e=>{if(e.target.closest('[data-event-id]'))return;openSchedule(ds)});
+      cell.addEventListener('dragover',e=>{e.preventDefault();cell.classList.add('drop-ok')});
+      cell.addEventListener('dragleave',()=>cell.classList.remove('drop-ok'));
+      cell.addEventListener('drop',e=>{e.preventDefault();cell.classList.remove('drop-ok');
+        const [kind,id]=String(e.dataTransfer.getData('text/plain')||'').split('|');
+        if(kind&&id)moveRecordTo(kind,id,ds);});
+    }
+    $('monthGrid').appendChild(cell)}
+    qa('[data-event-id]',$('monthGrid')).forEach(b=>{
+      b.addEventListener('click',e=>{e.stopPropagation();openRecord(b.dataset.eventKind,b.dataset.eventId)});
+      if(b.getAttribute('draggable')==='true'){
+        b.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',`${b.dataset.eventKind}|${b.dataset.eventId}`);e.dataTransfer.effectAllowed='move';b.classList.add('dragging')});
+        b.addEventListener('dragend',()=>b.classList.remove('dragging'));
+      }
+    })}
+  // 끌어서 날짜 이동. 기간 건은 길이를 지킨 채 통으로 움직이고, 완료 건은 애초에 끌리지 않는다.
+  async function moveRecordTo(kind,id,ds){
+    const r=findRecord(kind,id);
+    if(!r||r.completed||!ds||r.date===ds)return;
+    await withUndo(L.changedDate,()=>{
+      if(kind==='manual'){
+        const m=state.manualEvents.find(x=>x.id===id);if(!m)return;
+        const len=C.isPeriod(m)?C.diffDays(m.endDate,m.date):0;
+        m.date=ds;m.endDate=len?C.addDays(ds,len):null;
+      }else{
+        const p=C.project(state,r.projectId),s=p?.steps.find(x=>x.id===id);if(s)s.dueDate=ds;
+      }
+    });
+  }
   // option 을 다시 그릴 때 고르고 있던 값을 지킨다. 지키지 않으면 방금 만든 업체가 사라진다.
   function setOptions(el,html){const keep=el.value;el.innerHTML=html;if(keep&&[...el.options].some(o=>o.value===keep))el.value=keep}
   function fillSelects(){
@@ -434,9 +525,10 @@
     if(!id||pickedVendors.some(v=>v.id===id))return;
     pickedVendors.push({id,date:null,endDate:null});renderVendorPicks();
   }
-  function openSchedule(date=C.todayISO()){
+  async function openSchedule(date=C.todayISO(),preset={}){
+    if(await popOut('schedule',{date,...preset}))return;
     selectedRecord=null;$('scheduleTitle').textContent=L.eventModalTitle;
-    $('sDate').value=date;$('sEnd').value='';fillSelects();$('sName').value='';$('sMemo').value='';
+    $('sDate').value=date;$('sEnd').value='';fillSelects();$('sName').value=preset.name||'';$('sMemo').value='';
     pickedVendors=[];
     const first=state.vendorTemplates[0]?.id;
     if(first){$('sVendor').value=first;addPickedVendor(first)}else renderVendorPicks();
@@ -488,7 +580,8 @@
     // 참여기간은 행사에 붙는 순간 필요하다. 템플릿 유무와 무관하다.
     $('wPeriodBox').classList.toggle('hidden',!hasTpl&&!inGroup);
   }
-  function openWork(preset={}){
+  async function openWork(preset={}){
+    if(await popOut('work',preset))return;
     bundleDraft=[blankBundleRow()];
     $('wProject').value='';$('wFirstDate').value=C.todayISO();
     $('wStart').value='';$('wEnd').value='';$('wMemo').value='';
@@ -549,7 +642,9 @@
   function findRecord(kind,id){return allEventRecords().find(r=>r.kind===kind&&r.id===id)}
   function recordEntity(record){if(!record)return null;if(record.kind==='manual')return state.manualEvents.find(x=>x.id===record.id)||null;const p=C.project(state,record.projectId);return p?.steps?.find(x=>x.id===record.id)||null}
   function stepStatus(p,s){const current=C.currentStep(p);if(s.completed)return{key:'done',label:`완료${s.completedAt?` · ${C.pretty(s.completedAt)}`:''}`};if(current?.id===s.id)return{key:'current',label:`현재${s.dueDate?` · ${C.pretty(s.dueDate)}`:''}`};return{key:'future',label:s.dueDate?`예정 · ${C.pretty(s.dueDate)}`:'예정 · 날짜 미정'}}
-  function openRecord(kind,id){selectedRecord=findRecord(kind,id);if(!selectedRecord)return;const v=C.vendor(state,selectedRecord.vendorId),p=C.project(state,selectedRecord.projectId),entity=recordEntity(selectedRecord);if(entity){entity.logs=Array.isArray(entity.logs)?entity.logs:[];entity.attachments=Array.isArray(entity.attachments)?entity.attachments:[]}
+  async function openRecord(kind,id){
+    if(await popOut('detail',{kind,id}))return;
+    selectedRecord=findRecord(kind,id);if(!selectedRecord)return;const v=C.vendor(state,selectedRecord.vendorId),p=C.project(state,selectedRecord.projectId),entity=recordEntity(selectedRecord);if(entity){entity.logs=Array.isArray(entity.logs)?entity.logs:[];entity.attachments=Array.isArray(entity.attachments)?entity.attachments:[]}
     $('detailTitle').textContent=L.detailTitle;$('deleteEventBtn').classList.toggle('hidden',kind!=='manual');$('completeBtn').classList.toggle('hidden',selectedRecord.completed);$('changeDateBtn').classList.toggle('hidden',selectedRecord.completed);$('reopenBtn').classList.toggle('hidden',!selectedRecord.completed);const steps=p?.steps||[];
     const logs=(entity?.logs||[]).slice().sort((a,b)=>String(b.time).localeCompare(String(a.time))),files=entity?.attachments||[];
     $('detailBody').innerHTML=`<div class="detail-hero"><div><div class="detail-vendor">${C.esc(v?.name||'업체')}</div><div class="detail-project">${C.esc(p?.name||L.genericEvent)}</div></div><div class="detail-dday ${selectedRecord.completed?'done':C.ddayClass(selectedRecord)}">${selectedRecord.completed?'완료':C.ddayLabel(selectedRecord)}</div></div>
@@ -713,9 +808,12 @@
     hide('projectStepsModal');
     if(dropped.length)await C.purgeAttachments(C.attachmentsOf(dropped));
     await persist(L.savedSteps)}
-  function openTemplates(){templateTab='vendor';qa('[data-template-tab]').forEach(b=>b.classList.toggle('active',b.dataset.templateTab==='vendor'));$('vendorTemplatePane').classList.remove('hidden');$('workTemplatePane').classList.add('hidden');$('termsPane').classList.add('hidden');renderTemplatePanes();show('templateModal')}
-  async function openHelper(){if(C.isTauri()){try{await window.__TAURI__.core.invoke('show_helper');toast('D-day 도우미를 열었습니다.');return}catch(e){console.warn(e)}}window.open('helper.html','dday-helper','width=330,height=430,resizable=yes')}
-  async function openSettings(){const tauri=C.isTauri();$('alwaysOnTop').checked=!!state.settings.helperAlwaysOnTop;$('autostart').checked=!!state.settings.autostart;if(tauri){try{$('autostart').checked=await window.__TAURI__.core.invoke('is_autostart_enabled');state.settings.autostart=$('autostart').checked}catch(e){}}renderDemoRow();renderBackupRow();show('settingsModal')}
+  async function openTemplates(){if(await popOut('template',{}))return;templateTab='vendor';qa('[data-template-tab]').forEach(b=>b.classList.toggle('active',b.dataset.templateTab==='vendor'));$('vendorTemplatePane').classList.remove('hidden');$('workTemplatePane').classList.add('hidden');$('termsPane').classList.add('hidden');renderTemplatePanes();show('templateModal')}
+  async function openSettings(){
+    if(await popOut('settings',{}))return;
+    const tauri=C.isTauri();$('autostart').checked=!!state.settings.autostart;
+    if(tauri){try{$('autostart').checked=await window.__TAURI__.core.invoke('is_autostart_enabled');state.settings.autostart=$('autostart').checked}catch(e){}}
+    renderDemoRow();renderBackupRow();show('settingsModal')}
   function renderDemoRow(){const on=C.hasDemoData(state);$('demoToggleBtn').textContent=on?'예시 데이터 지우기':'예시 데이터 불러오기';$('demoToggleBtn').classList.toggle('danger',on)}
 
   // ── 백업 ───────────────────────────────────────────────────────────────
@@ -786,19 +884,18 @@
   async function consumePendingSelection(){const sel=state.pendingSelection;if(!sel||!sel.id)return;
     state.pendingSelection=null;await C.saveState(state);
     if(findRecord(sel.kind,sel.id))openRecord(sel.kind,sel.id);}
-  async function setTop(){state.settings.helperAlwaysOnTop=$('alwaysOnTop').checked;await C.saveState(state);if(C.isTauri())try{await window.__TAURI__.core.invoke('set_helper_always_on_top',{enabled:state.settings.helperAlwaysOnTop})}catch(e){} }
   async function setAutostart(){const enabled=$('autostart').checked;state.settings.autostart=enabled;await C.saveState(state);if(C.isTauri())try{await window.__TAURI__.core.invoke('set_autostart',{enabled})}catch(e){toast('자동실행 설정을 적용하지 못했습니다.')}}
   $('horizonSelect').addEventListener('change',async e=>{state.settings.horizon=e.target.value;$('horizonCustom').classList.toggle('hidden',e.target.value!=='custom');await persist()});$('horizonCustom').addEventListener('change',async e=>{state.settings.customHorizon=Math.max(1,Number(e.target.value||1));await persist()});
   $('prevMonth').addEventListener('click',()=>{currentMonth=new Date(currentMonth.getFullYear(),currentMonth.getMonth()-1,1);renderCalendar()});$('nextMonth').addEventListener('click',()=>{currentMonth=new Date(currentMonth.getFullYear(),currentMonth.getMonth()+1,1);renderCalendar()});$('todayBtn').addEventListener('click',()=>{const d=C.parse(C.todayISO());currentMonth=new Date(d.getFullYear(),d.getMonth(),1);renderCalendar();setTimeout(()=>q('.day.today')?.scrollIntoView({block:'center',behavior:'smooth'}),10)});
   $('addScheduleBtn').addEventListener('click',()=>openSchedule());$('saveScheduleBtn').addEventListener('click',saveSchedule);$('sVendor').addEventListener('change',()=>{updateProjectSelect();addPickedVendor($('sVendor').value)});
-  $('sAddVendor').addEventListener('click',()=>{document.getElementById('sVendorInput')?.focus()});$('addWorkBtn').addEventListener('click',openWork);$('saveWorkBtn').addEventListener('click',saveWork);$('wVendor').addEventListener('change',applyWorkMode);$('wTemplate').addEventListener('change',applyWorkMode);
+  $('sAddVendor').addEventListener('click',()=>{document.getElementById('sVendorInput')?.focus()});$('addWorkBtn').addEventListener('click',()=>openWork());$('saveWorkBtn').addEventListener('click',saveWork);$('wVendor').addEventListener('change',applyWorkMode);$('wTemplate').addEventListener('change',applyWorkMode);
   $('wGroup').addEventListener('change',()=>{
     const g=C.group(state,$('wGroup').value);if(!g)return;
     if(!$('wProject').value.trim())$('wProject').value=g.name;
     if(!$('wStart').value)$('wStart').value=g.startDate||'';
     if(!$('wEnd').value)$('wEnd').value=g.endDate||'';
     applyWorkMode();
-  });$('wAddEvent').addEventListener('click',()=>{bundleDraft.push(blankBundleRow());renderBundleEvents()});$('templateBtn').addEventListener('click',openTemplates);$('settingsBtn').addEventListener('click',openSettings);$('helperBtn').addEventListener('click',openHelper);$('settingsOpenHelper').addEventListener('click',openHelper);$('alwaysOnTop').addEventListener('change',setTop);$('autostart').addEventListener('change',setAutostart);$('completeBtn').addEventListener('click',completeSelected);$('changeDateBtn').addEventListener('click',openDateModal);$('saveDateBtn').addEventListener('click',saveSelectedDate);$('reopenBtn').addEventListener('click',reopenSelected);$('deleteEventBtn').addEventListener('click',deleteSelected);$('demoToggleBtn').addEventListener('click',toggleDemo);$('backupNowBtn').addEventListener('click',backupNow);$('backupFolderBtn').addEventListener('click',async()=>{if(!await C.revealBackups())toast('이 환경에서는 폴더를 열 수 없습니다.')});$('restoreBtn').addEventListener('click',restoreFromList);$('restoreFile').addEventListener('change',restoreFromFile);$('projectAddStep').addEventListener('click',()=>{projectStepsDraft.push({id:null,name:'새 단계',offset:1,dueDate:null,completed:false,completedAt:null});renderProjectSteps()});$('saveProjectSteps').addEventListener('click',saveProjectSteps);
+  });$('wAddEvent').addEventListener('click',()=>{bundleDraft.push(blankBundleRow());renderBundleEvents()});$('templateBtn').addEventListener('click',openTemplates);$('settingsBtn').addEventListener('click',openSettings);$('autostart').addEventListener('change',setAutostart);$('completeBtn').addEventListener('click',completeSelected);$('changeDateBtn').addEventListener('click',openDateModal);$('saveDateBtn').addEventListener('click',saveSelectedDate);$('reopenBtn').addEventListener('click',reopenSelected);$('deleteEventBtn').addEventListener('click',deleteSelected);$('demoToggleBtn').addEventListener('click',toggleDemo);$('backupNowBtn').addEventListener('click',backupNow);$('backupFolderBtn').addEventListener('click',async()=>{if(!await C.revealBackups())toast('이 환경에서는 폴더를 열 수 없습니다.')});$('restoreBtn').addEventListener('click',restoreFromList);$('restoreFile').addEventListener('change',restoreFromFile);$('projectAddStep').addEventListener('click',()=>{projectStepsDraft.push({id:null,name:'새 단계',offset:1,dueDate:null,completed:false,completedAt:null});renderProjectSteps()});$('saveProjectSteps').addEventListener('click',saveProjectSteps);
   // 업체가 나오는 곳은 모두 같은 방식으로 고른다 — 치면 걸러지고, 없으면 그 자리에서 만든다.
   const CB=window.WorkCombo;
   if(CB){
@@ -811,7 +908,73 @@
     CB.enhance($('spProject'),{placeholder:L.searchPlaceholder(state.terms.project)});
     CB.enhance($('spItem'),{placeholder:L.searchPlaceholder(state.terms.budgetItem)});
   }
-  qa('[data-board]').forEach(b=>b.addEventListener('click',()=>setBoardMode(b.dataset.board)));
+  qa('.tabs [data-board]').forEach(b=>b.addEventListener('click',()=>setMiniMode(b.dataset.board)));
+  qa('.st-head[data-board]').forEach(b=>b.addEventListener('click',()=>toggleStatus(b.dataset.board)));
+  // ── 추가·검색 한 칸 (미니 대시보드) ──────────────────────────────────────
+  let omniItems=[],omniIdx=-1;
+  function closeOmni(clear){const host=$('omniList');host.classList.add('hidden');$('omni').setAttribute('aria-expanded','false');omniIdx=-1;if(clear)$('omni').value=''}
+  function renderOmni(){
+    const qv=$('omni').value.trim(),host=$('omniList');
+    if(!qv){closeOmni(false);return}
+    const groups=C.searchAll(state,qv);omniItems=[];
+    let html='';
+    groups.forEach(g=>{
+      html+=`<div class="omni-kind">${C.esc(L.omniKind[g.kind]||g.kind)}</div>`;
+      g.rows.forEach(r=>{const i=omniItems.length;omniItems.push({kind:g.kind,row:r});
+        html+=`<button class="omni-opt" data-omni="${i}" id="omni-${i}" role="option"><b>${C.esc(r.name)}</b>${r.sub?`<small>${C.esc(r.sub)}</small>`:''}</button>`;});
+    });
+    const ci=omniItems.length;omniItems.push({kind:'create',row:{name:qv}});
+    html+=(groups.length?'':`<div class="omni-empty">${C.esc(L.omniEmpty(qv))}</div>`)
+      +`<button class="omni-opt create" data-omni="${ci}" id="omni-${ci}" role="option">${C.esc(L.omniCreate(qv))}</button>`;
+    host.innerHTML=html;host.classList.remove('hidden');$('omni').setAttribute('aria-expanded','true');omniIdx=-1;
+    // blur 가 클릭보다 먼저 오면 목록이 닫혀 선택이 무산된다. mousedown 에서 처리한다.
+    qa('[data-omni]',host).forEach(b=>b.addEventListener('mousedown',e=>{e.preventDefault();pickOmni(+b.dataset.omni)}));
+  }
+  async function pickOmni(i){
+    const it=omniItems[i];if(!it)return;
+    closeOmni(true);
+    switch(it.kind){
+      case 'event':openRecord(it.row.recordKind,it.row.id);break;
+      case 'spend':openSpend(it.row.id);break;
+      case 'vendor':await setMiniMode('vendor');expandedVendors.add(it.row.id);renderBoard();applyMiniMode();break;
+      case 'project':await setMiniMode('vendor');expandedVendors.add(it.row.vendorId||'');renderBoard();applyMiniMode();break;
+      case 'group':openStatus.add('group');expandedGroups.add(it.row.id);renderGroupBoard();applyStatus();break;
+      case 'create':openSchedule(C.todayISO(),{name:it.row.name});break;
+    }
+  }
+  function moveOmni(d){
+    if($('omniList').classList.contains('hidden'))return;
+    const n=omniItems.length;if(!n)return;
+    omniIdx=(omniIdx+d+n)%n;
+    qa('[data-omni]').forEach((b,i)=>b.classList.toggle('active',i===omniIdx));
+    document.getElementById(`omni-${omniIdx}`)?.scrollIntoView({block:'nearest'});
+  }
+  if($('omni')){
+    $('omni').addEventListener('input',renderOmni);
+    $('omni').addEventListener('focus',renderOmni);
+    $('omni').addEventListener('blur',()=>setTimeout(()=>closeOmni(false),120));
+    $('omni').addEventListener('keydown',e=>{
+      if(e.key==='ArrowDown'){e.preventDefault();moveOmni(1)}
+      else if(e.key==='ArrowUp'){e.preventDefault();moveOmni(-1)}
+      else if(e.key==='Enter'){e.preventDefault();const qv=$('omni').value.trim();if(!qv)return;
+        pickOmni(omniIdx>=0?omniIdx:omniItems.length-1)}   // 고르지 않았으면 '새로 만들기'
+      else if(e.key==='Escape'&&!$('omniList').classList.contains('hidden')){e.preventDefault();e.stopPropagation();closeOmni(false)}
+    });
+    $('omniAdd').addEventListener('click',()=>{const qv=$('omni').value.trim();closeOmni(true);openSchedule(C.todayISO(),qv?{name:qv}:{})});
+  }
+  // ── 키보드 — 입력 중이거나 모달이 떠 있으면 아무것도 가로채지 않는다 ────
+  const typing=()=>{const el=document.activeElement;return !!el&&(el.tagName==='INPUT'||el.tagName==='TEXTAREA'||el.tagName==='SELECT'||el.isContentEditable)};
+  document.addEventListener('keydown',e=>{
+    if(modalStack.length||typing()||e.ctrlKey||e.metaKey||e.altKey)return;
+    const k=e.key;
+    if(hasPiece('cal')){
+      if(k==='t'||k==='T'){e.preventDefault();$('todayBtn').click();return}
+      if(k==='ArrowLeft'){e.preventDefault();$('prevMonth').click();return}
+      if(k==='ArrowRight'){e.preventDefault();$('nextMonth').click();return}
+    }
+    if(k==='n'||k==='N'){e.preventDefault();openSchedule();return}
+    if(k==='/'&&hasPiece('mini')){e.preventDefault();$('omni').focus()}
+  });
   $('bAddItem').addEventListener('click',()=>{budgetDraft.push(blankBudgetRow());renderBudgetItems()});
   $('saveBudgetBtn').addEventListener('click',saveBudget);
   $('saveSpendBtn').addEventListener('click',saveSpend);
@@ -820,7 +983,20 @@
   await C.watchState(v=>{state=v;render();consumePendingSelection()});
   const d=C.parse(C.todayISO());currentMonth=new Date(d.getFullYear(),d.getMonth(),1);render();consumePendingSelection();  // 사용자가 버튼을 눌러야 보호된다면 그건 또 하나의 업무다. 시작할 때 조용히 처리한다.
   (async()=>{try{const moved=await C.migrateAttachmentsToDisk(state);if(moved)console.info('첨부 '+moved+'개를 앱 폴더로 옮겼습니다.');const ab=await C.maybeAutoBackup(state);if(ab&&ab.ok===false)toast('자동 백업에 실패했습니다: '+ab.error);}catch(e){console.warn(e)}})();setTimeout(()=>q('.day.today')?.scrollIntoView({block:'center'}),50);
-  // 본체 창은 visible:false 로 만들어 두고 여기서 띄운다. 먼저 띄우면 아직 아무것도 그리지 않은
-  // WebView2 가 검은 사각형으로 잠깐(느린 PC 에서는 오래) 남는다.
-  if(C.isTauri())requestAnimationFrame(()=>{try{window.__TAURI__.core.invoke('main_ready')}catch(e){console.warn(e)}});
+  // pop 창이면 요청된 폼을 바로 연다. 폼이 못 열리면(대상이 그 사이 지워졌으면) 스스로 닫는다.
+  if(IS_POP){
+    const form=PARAMS.get('form');let payload={};
+    try{payload=JSON.parse(PARAMS.get('payload')||'{}')}catch(e){}
+    if(form==='schedule')openSchedule(payload.date||C.todayISO(),payload);
+    else if(form==='work')openWork(payload);
+    else if(form==='detail')openRecord(payload.kind,payload.id);
+    else if(form==='spend')openSpend(payload.id||null,payload.preset||{});
+    else if(form==='budget')openBudget();
+    else if(form==='template')openTemplates();
+    else if(form==='settings')openSettings();
+    setTimeout(()=>{if(!modalStack.length)closePopSoon()},200);
+  }
+  // 조각 창은 visible:false 로 만들어 두고 첫 렌더가 끝난 여기서 띄운다. 먼저 띄우면 아직
+  // 아무것도 그리지 않은 WebView2 가 검은 사각형으로 잠깐(느린 PC 에서는 오래) 남는다.
+  if(C.isTauri()&&!IS_POP)requestAnimationFrame(()=>{try{window.__TAURI__.core.invoke('piece_ready')}catch(e){console.warn(e)}});
 })();

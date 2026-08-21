@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main-files",
-  "description": "본 화면에서만 첨부파일과 백업을 앱 전용 폴더에 읽고 쓴다. 도우미 창에는 주지 않는다.",
-  "windows": ["main"],
+  "description": "첨부파일과 백업을 앱 전용 폴더에서만 읽고 쓴다. 임의 경로 쓰기는 만들지 않는다(§26). pop 창은 상세(첨부)와 설정(백업)을 담으므로 포함한다.",
+  "windows": ["cal", "mini", "status", "pop"],
   "permissions": [
     "fs:allow-appdata-read-recursive",
     "fs:allow-appdata-write-recursive",

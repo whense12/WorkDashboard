@@ -62,7 +62,11 @@
       app:T.app,
       addProject:`${P} 추가`, addEvent:`${E} 추가`,
       upcoming:`다가오는 ${E}`,
-      viewCalendar:'캘린더', viewVendor:`${V}별`, viewGroup:'행사별',
+      viewCalendar:'캘린더', viewVendor:`${V}별`, viewGroup:'행사별', viewDue:'일정순',
+      omniPlaceholder:`검색 · 바로 추가`,
+      omniEmpty:q=>`‘${q}’ 검색 결과가 없습니다.`,
+      omniCreate:q=>`‘${q}’ ${j(E,['을','를'])} 새로 만들기`,
+      omniKind:{vendor:V,group:'행사',project:P,event:E,spend:SP},
       fGroup:'행사(선택)', groupName:'행사명',
       createGroupRow:n=>`‘${n}’ 새 행사로 만들기`,
       createdGroup:n=>`새 행사를 만들었습니다: ${n}`,
@@ -86,7 +90,7 @@
       boardNoDate:'날짜 미정', boardProgress:`${S} 진행`,
       boardEmpty:`진행 중인 ${j(P,['이','가'])} 없습니다.`,
       sideCaption:`${V}별 가장 가까운 ${j(E,['이','가'])} 날짜순으로 표시됩니다.`,
-      calHint:`빈 날짜를 클릭하면 ${E} 추가`,
+      calHint:`빈 날짜 두 번 클릭 = ${E} 추가 · ${E}은 끌어서 날짜 이동`,
       eventModalTitle:`${E} 추가`, saveEvent:`${E} 저장`,
       fVendor:V, fLinkedProject:`연결 ${P}`,
       fLinkedNote:`${j(P,['과','와'])} 무관한 ${j(E,['은','는'])} ‘일반 ${E}’을 선택합니다.`,
@@ -566,6 +570,29 @@
     }).sort((a,b)=>String(a.group.startDate||'~').localeCompare(String(b.group.startDate||'~'))
       ||String(a.group.name).localeCompare(String(b.group.name)));
   }
+  // ── 전체 검색 ────────────────────────────────────────────────────────────
+  // 업체·행사·업무·일정·지출 다섯 종류를 한 칸에서 찾는다. 화면이 다섯 갈래로 갈라져
+  // 있어도 "어디에 있더라"는 질문은 하나다. 종류별로 묶어 상위 몇 건만 돌려준다.
+  function searchAll(state,qRaw,limit=5){
+    const q=String(qRaw||'').trim().toLowerCase();
+    if(!q)return [];
+    const hit=s=>String(s||'').toLowerCase().includes(q);
+    const out=[];
+    const push=(kind,rows)=>{if(rows.length)out.push({kind,rows:rows.slice(0,limit),more:Math.max(0,rows.length-limit)})};
+    push('vendor',state.vendorTemplates.filter(v=>hit(v.name)||Object.values(v.values||{}).some(hit))
+      .map(v=>({id:v.id,name:v.name,sub:Object.values(v.values||{}).filter(Boolean).join(' · ')})));
+    push('group',(state.groups||[]).filter(g=>hit(g.name))
+      .map(g=>({id:g.id,name:g.name,sub:g.startDate?`${pretty(g.startDate)} ~ ${pretty(g.endDate||g.startDate)}`:''})));
+    push('project',state.projects.filter(p=>hit(p.name)||hit(p.memo))
+      .map(p=>({id:p.id,name:p.name,sub:vendor(state,p.vendorId)?.name||'',vendorId:p.vendorId})));
+    push('event',eventRecords(state).filter(r=>hit(r.name)||hit(r.memo))
+      .sort((a,b)=>sortDate(a).localeCompare(sortDate(b)))
+      .map(r=>({id:r.id,recordKind:r.kind,name:r.name,
+        sub:[vendor(state,r.vendorId)?.name,r.date?(isPeriod(r)?`${pretty(r.date)} ~ ${pretty(r.endDate)}`:pretty(r.date)):null,r.completed?'완료':null].filter(Boolean).join(' · ')})));
+    push('spend',(state.spends||[]).filter(sp=>hit(sp.name)||hit(sp.memo))
+      .map(sp=>({id:sp.id,name:sp.name,sub:[vendor(state,sp.vendorId)?.name,sp.date?pretty(sp.date):null,`${formatMoney(sp.amount)}원`].filter(Boolean).join(' · ')})));
+    return out;
+  }
   function ddayLabel(a,b){
     const r=asRange(a,b);
     switch(phaseOf(r)){
@@ -735,7 +762,7 @@
     if(moved)await saveState(state);
     return moved;
   }
-  window.WorkCore={KEY,STATE_VERSION,seed,defaultTerms,defaultVendorFields,labels,josa,demoData,hasDemoData,clone,uid,todayISO,parse,iso,addDays,diffDays,pretty,esc,isTauri,nativeFiles,migrate,normalizeState,initStorage,saveState,watchState,readState,vendor,project,currentStep,eventRecords,dueCards,ddayLabel,ddayClass,horizonDays,horizonLabel,vendorSummaries,groupSummaries,group,projectsOfGroup,budgetSummary,spendsOfRecord,formatMoney,isPeriod,periodDays,spansDay,phaseOf,sortDate,endOf,projectBands,projectFromTemplate,completeEvent,reopenEvent,
+  window.WorkCore={KEY,STATE_VERSION,seed,defaultTerms,defaultVendorFields,labels,josa,demoData,hasDemoData,clone,uid,todayISO,parse,iso,addDays,diffDays,pretty,esc,isTauri,nativeFiles,migrate,normalizeState,initStorage,saveState,watchState,readState,vendor,project,currentStep,eventRecords,dueCards,ddayLabel,ddayClass,horizonDays,horizonLabel,vendorSummaries,groupSummaries,group,projectsOfGroup,budgetSummary,spendsOfRecord,formatMoney,searchAll,isPeriod,periodDays,spansDay,phaseOf,sortDate,endOf,projectBands,projectFromTemplate,completeEvent,reopenEvent,
     putAttachment,readAttachment,deleteAttachment,attachmentsOf,purgeAttachments,revealAttachment,migrateAttachmentsToDisk,formatBytes,
     buildBackup,readBackup,restoreBackup,writeBackupFile,listBackups,readBackupFile,rotateBackups,revealBackups,maybeAutoBackup};
 })();
