@@ -245,10 +245,17 @@ if (-not $blob) {
 }
 
 # ==== 5. 미니 [업체별] 토글 + 게이트 D ====
+# 지난 실행의 실측: 상단+20px 는 탭 버튼의 윗변 경계에 걸려 호버조차 안 떴다.
+# 버튼 세로 중심(+30px)을 누르고, 첫 클릭이 창 활성화로 소비되는 환경까지 대비해
+# 카드 목록의 빈 자리를 먼저 한 번 눌러 조각을 깨운다.
 $mr = Get-Rect $pieces['mini']
 Save-Screen "$OutDir/틈-전체.png"
 Save-ScreenCrop "$OutDir/틈-전체.png" $mr "$OutDir/5-미니-토글전.png"
-Click ([int]($mr.Left + 0.30 * ($mr.Right - $mr.Left))) ($mr.Top + 20) 1
+Click ([int]($mr.Left + 0.5 * ($mr.Right - $mr.Left))) ([int]($mr.Top + 0.62 * ($mr.Bottom - $mr.Top))) 1
+Start-Sleep -Milliseconds 500
+$tx = [int]($mr.Left + 0.29 * ($mr.Right - $mr.Left)); $ty = $mr.Top + 30
+Write-Host "토글 클릭 지점 ($tx,$ty) 의 창: '$(Hit-Title $tx $ty)'"
+Click $tx $ty 1
 Start-Sleep -Seconds 2
 Save-Screen "$OutDir/5-토글후-전체.png"
 Save-ScreenCrop "$OutDir/5-토글후-전체.png" (Get-Rect $pieces['mini']) "$OutDir/5-미니-업체별.png"
