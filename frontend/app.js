@@ -1002,10 +1002,6 @@
   $('saveSpendBtn').addEventListener('click',saveSpend);
   $('deleteSpendBtn').addEventListener('click',deleteSpend);
   qa('[data-template-tab]').forEach(b=>b.addEventListener('click',()=>{templateTab=b.dataset.templateTab;qa('[data-template-tab]').forEach(x=>x.classList.toggle('active',x===b));$('vendorTemplatePane').classList.toggle('hidden',templateTab!=='vendor');$('workTemplatePane').classList.toggle('hidden',templateTab!=='work');$('termsPane').classList.toggle('hidden',templateTab!=='terms')}));qa('[data-close]').forEach(b=>b.addEventListener('click',()=>hide(b.dataset.close)));qa('.modal-bg').forEach(bg=>bg.addEventListener('mousedown',e=>{if(e.target===bg)hide(bg.id)}));document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modalStack.length)hide(modalStack[modalStack.length-1].id)});
-  // 바닥 모드 — 달력 시트가 바탕화면 파일 '뒤'에 붙으면(러스트가 알림) 달력은
-  // 보기 전용이 된다: 클릭이 아이콘 레이어에 막히므로 눌리는 척하는 버튼을 걷어내고
-  // 입력 경로(미니 대시보드)를 안내한다.
-  if(MODE==='cal'&&C.isTauri()){try{window.__TAURI__.event.listen('floor-mode',()=>{document.body.classList.add('floor');$('calHint').textContent='달력은 바탕화면 바닥에 깔려 있습니다 · 일정 입력은 미니 대시보드에서'})}catch(e){console.warn(e)}}
   await C.watchState(v=>{state=v;render();consumePendingSelection()});
   const d=C.parse(C.todayISO());currentMonth=new Date(d.getFullYear(),d.getMonth(),1);render();consumePendingSelection();  // 사용자가 버튼을 눌러야 보호된다면 그건 또 하나의 업무다. 시작할 때 조용히 처리한다.
   (async()=>{try{const moved=await C.migrateAttachmentsToDisk(state);if(moved)console.info('첨부 '+moved+'개를 앱 폴더로 옮겼습니다.');const ab=await C.maybeAutoBackup(state);if(ab&&ab.ok===false)toast('자동 백업에 실패했습니다: '+ab.error);}catch(e){console.warn(e)}})();setTimeout(()=>q('.day.today')?.scrollIntoView({block:'center'}),50);

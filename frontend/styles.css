@@ -499,6 +499,3 @@ body.mode-pop .modal-bg.show~.modal-bg.show .modal{width:min(560px,100%);max-hei
   .template-layout{grid-template-columns:1fr}
   .template-list{max-height:180px;overflow:auto}
 }
-
-/* 바닥 모드 — 달력이 바탕화면 파일 뒤에 붙어 보기 전용일 때. 눌리지 않는 버튼을 걷어낸다. */
-body.floor #prevMonth,body.floor #nextMonth,body.floor #todayBtn,body.floor #addScheduleBtn{display:none}
