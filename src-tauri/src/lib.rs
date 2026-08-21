@@ -227,8 +227,8 @@ fn toggle_piece(app: &tauri::AppHandle, label: &str) {
 mod floor {
     use windows_sys::Win32::Foundation::{HWND, LPARAM, POINT, RECT};
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        EnumWindows, FindWindowExW, FindWindowW, GetWindowRect, IsChild, SendMessageTimeoutW,
-        SetParent, WindowFromPoint, SMTO_NORMAL,
+        EnumWindows, FindWindowExW, FindWindowW, GetClassNameW, GetWindowRect, IsChild,
+        SendMessageTimeoutW, SetParent, WindowFromPoint, SMTO_NORMAL,
     };
 
     fn wide(s: &str) -> Vec<u16> {
@@ -251,54 +251,94 @@ mod floor {
         1
     }
 
-    /// 배경화면 계층의 부모 창. 못 찾으면 Progman(아이콘 레이어 아래 형제 자리) 폴백.
-    fn wallpaper_host() -> Option<HWND> {
+    fn class_of(hwnd: HWND) -> String {
+        unsafe {
+            let mut buf = [0u16; 128];
+            let n = GetClassNameW(hwnd, buf.as_mut_ptr(), buf.len() as i32);
+            String::from_utf16_lossy(&buf[..n.max(0) as usize])
+        }
+    }
+
+    /// 배경화면 계층의 부모 창을 찾고, 판단의 매 단계를 log 에 남긴다.
+    /// 구형(WorkerW 가 Progman 의 최상위 형제)과 24H2형(WorkerW 가 Progman 의
+    /// 자식) 두 구조를 모두 시도한다. 어느 쪽도 없으면 Progman 자식 클래스
+    /// 목록을 기록해 어떤 구조인지 사후에 알 수 있게 한다.
+    fn wallpaper_host(log: &mut Vec<String>) -> Option<HWND> {
         unsafe {
             let progman_class = wide("Progman");
             let progman = FindWindowW(progman_class.as_ptr(), std::ptr::null());
             if progman.is_null() {
+                log.push("host: Progman 창 자체가 없다".into());
                 return None;
             }
             let mut result: usize = 0;
             SendMessageTimeoutW(progman, 0x052C, 0, 0, SMTO_NORMAL, 1000, &mut result);
             let mut found: HWND = std::ptr::null_mut();
             EnumWindows(Some(find_workerw), &mut found as *mut HWND as LPARAM);
-            // WorkerW 를 못 찾는 환경(예: 배경화면 구조가 바뀐 Windows 11 24H2)에서는
-            // 붙일 안전한 자리가 없다 — Progman 에 붙이면 아이콘 '위'로 들어가 파일을
-            // 덮어 버린다. 바닥 모드를 포기하고 아이콘-위 모드로 남는다.
-            if found.is_null() {
-                None
-            } else {
-                Some(found)
+            if !found.is_null() {
+                log.push("host: WorkerW(최상위 형제) 발견 — 구형 구조".into());
+                return Some(found);
             }
+            let workerw = wide("WorkerW");
+            let child =
+                FindWindowExW(progman, std::ptr::null_mut(), workerw.as_ptr(), std::ptr::null());
+            if !child.is_null() {
+                log.push("host: WorkerW(Progman 자식) 발견 — 24H2형 구조".into());
+                return Some(child);
+            }
+            // 진단: Progman 아래에 실제로 무엇이 있는지 남긴다.
+            let mut kids: Vec<String> = Vec::new();
+            let mut cur =
+                FindWindowExW(progman, std::ptr::null_mut(), std::ptr::null(), std::ptr::null());
+            while !cur.is_null() && kids.len() < 16 {
+                kids.push(class_of(cur));
+                cur = FindWindowExW(progman, cur, std::ptr::null(), std::ptr::null());
+            }
+            log.push(format!("host: WorkerW 없음. Progman 자식 = [{}]", kids.join(", ")));
+            None
         }
     }
 
     /// 조각 한가운데를 가리켰을 때 실제로 조각(또는 그 안의 WebView 자식 창)이 잡히는가.
-    fn input_reaches(hwnd: HWND) -> bool {
+    /// 아니라면 무엇이 대신 잡혔는지 log 에 남긴다 — '왜 안 닿는가'를 추측하지 않기 위해.
+    fn input_reaches(hwnd: HWND, log: &mut Vec<String>) -> bool {
         unsafe {
             let mut rc: RECT = std::mem::zeroed();
             if GetWindowRect(hwnd, &mut rc) == 0 {
+                log.push("input: GetWindowRect 실패".into());
                 return false;
             }
             let pt = POINT { x: (rc.left + rc.right) / 2, y: (rc.top + rc.bottom) / 2 };
             let hit = WindowFromPoint(pt);
             if hit.is_null() {
+                log.push("input: WindowFromPoint 가 아무 창도 못 잡음".into());
                 return false;
             }
-            hit == hwnd || IsChild(hwnd, hit) != 0
+            if hit == hwnd || IsChild(hwnd, hit) != 0 {
+                log.push("input: 클릭이 조각에 닿는다".into());
+                true
+            } else {
+                log.push(format!("input: 클릭을 '{}' 창이 가로챈다", class_of(hit)));
+                false
+            }
         }
     }
 
     /// 조각을 바닥에 붙인다. 클릭이 닿지 않으면 되돌리고 false.
-    pub fn embed(hwnd: HWND) -> bool {
-        let Some(host) = wallpaper_host() else { return false };
+    pub fn embed(hwnd: HWND, log: &mut Vec<String>) -> bool {
+        let Some(host) = wallpaper_host(log) else { return false };
         unsafe {
-            SetParent(hwnd, host);
-            if input_reaches(hwnd) {
+            let prev = SetParent(hwnd, host);
+            if prev.is_null() {
+                log.push("embed: SetParent 실패".into());
+                return false;
+            }
+            if input_reaches(hwnd, log) {
+                log.push("embed: 바닥 유지".into());
                 true
             } else {
                 SetParent(hwnd, std::ptr::null_mut());
+                log.push("embed: 클릭 불가 → 아이콘-위로 복귀".into());
                 false
             }
         }
@@ -307,8 +347,11 @@ mod floor {
 
 /// 조각들을 아이콘 뒤 바닥에 붙여 본다. 하나라도 클릭이 안 닿으면 전부 원래
 /// 자리(아이콘 위)로 두고 항상-아래를 다시 건다 — 반쯤 섞인 상태를 만들지 않는다.
+/// 매 단계의 판단을 앱 데이터 폴더의 floor.log 에 남긴다 — '왜 이 모드가 됐는가'를
+/// 사후에 추측이 아니라 기록으로 답하기 위해서다. CI 가 이 파일을 증거로 올린다.
 #[cfg(windows)]
 fn embed_pieces(app: &tauri::AppHandle) {
+    let mut log: Vec<String> = Vec::new();
     let handles: Vec<(tauri::WebviewWindow, isize)> = PIECES
         .iter()
         .filter_map(|l| {
@@ -318,22 +361,34 @@ fn embed_pieces(app: &tauri::AppHandle) {
         })
         .collect();
     if handles.len() != PIECES.len() {
-        return;
-    }
-    let all_ok = handles
-        .iter()
-        .all(|(_, h)| floor::embed(*h as windows_sys::Win32::Foundation::HWND));
-    if !all_ok {
-        // 되돌린다 — SetParent(null) 뒤에는 항상-아래를 다시 걸어야 한다.
+        log.push("조각 핸들을 다 얻지 못해 바닥 모드를 시도하지 않음".into());
+    } else {
+        let mut all_ok = true;
         for (w, h) in &handles {
-            unsafe {
-                windows_sys::Win32::UI::WindowsAndMessaging::SetParent(
-                    *h as windows_sys::Win32::Foundation::HWND,
-                    std::ptr::null_mut(),
-                );
+            log.push(format!("--- {} ---", w.label()));
+            if !floor::embed(*h as windows_sys::Win32::Foundation::HWND, &mut log) {
+                all_ok = false;
+                break;
             }
-            let _ = w.set_always_on_bottom(true);
         }
+        if all_ok {
+            log.push("결과: 세 조각 모두 바닥(파일 뒤) 모드".into());
+        } else {
+            log.push("결과: 아이콘-위 모드로 전체 복귀".into());
+            for (w, h) in &handles {
+                unsafe {
+                    windows_sys::Win32::UI::WindowsAndMessaging::SetParent(
+                        *h as windows_sys::Win32::Foundation::HWND,
+                        std::ptr::null_mut(),
+                    );
+                }
+                let _ = w.set_always_on_bottom(true);
+            }
+        }
+    }
+    if let Ok(dir) = app.path().app_data_dir() {
+        let _ = std::fs::create_dir_all(&dir);
+        let _ = std::fs::write(dir.join("floor.log"), log.join("\n"));
     }
 }
 #[cfg(not(windows))]

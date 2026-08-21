@@ -209,6 +209,17 @@ foreach ($k in @('cal', 'mini', 'status')) {
 }
 $modeLines -join "`n" | Set-Content -Path "$OutDir/모드.txt" -Encoding utf8
 
+# 앱이 남긴 바닥 모드 판단 기록을 증거로 복사한다 — '왜 이 모드가 됐는가'의 원문.
+$floorLog = Join-Path $env:LOCALAPPDATA 'kr.go.goseong.work-calendar-helper/floor.log'
+if (Test-Path $floorLog) {
+  Copy-Item $floorLog "$OutDir/floor.log"
+  Write-Host "--- floor.log ---"
+  Get-Content $floorLog | ForEach-Object { Write-Host $_ }
+  Write-Host "-----------------"
+} else {
+  Write-Host "floor.log 없음 — 앱이 바닥 모드 판단 기록을 남기지 않았다."
+}
+
 # ==== 2. 렌더링 증거 + 게이트 A ====
 Save-Screen "$OutDir/1-바탕화면-전체.png"
 foreach ($k in @('cal', 'mini', 'status')) {
@@ -300,6 +311,45 @@ $mr3 = Get-Rect $pieces['mini']
 $wClosed = $mr3.Right - $mr3.Left
 Write-Host "Escape 후 조각 폭: $wClosed"
 if ($wClosed -gt $wBefore + 50) { $failures.Add("F: Escape 로 설정이 닫히지 않았습니다.") }
+
+# ==== 7.5 '바닥'의 사용상 핵심: 다른 프로그램이 조각 위에 온다 + 게이트 I ====
+# 메모장을 실제로 띄워 달력 한가운데에 겹친다. (1) 메모장이 달력을 덮어야 하고,
+# (2) 달력의 다른 자리를 클릭해도 달력이 메모장 위로 떠오르지 않아야 한다.
+Start-Process notepad
+$np = $null
+foreach ($i in 1..20) {
+  Start-Sleep -Milliseconds 500
+  $np = Get-Process notepad -ErrorAction SilentlyContinue |
+        Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+  if ($np) { break }
+}
+if (-not $np) {
+  $failures.Add("I: 메모장을 띄우지 못해 겹침 검사를 못 했습니다.")
+} else {
+  $cr2 = Get-Rect $pieces['cal']
+  $ncx = [int](($cr2.Left + $cr2.Right) / 2); $ncy = [int](($cr2.Top + $cr2.Bottom) / 2)
+  [void][W32P]::SetWindowPos($np.MainWindowHandle, [IntPtr]::Zero, $ncx - 250, $ncy - 200, 500, 400, 0)
+  Start-Sleep -Seconds 2
+  Save-Screen "$OutDir/8-메모장이-달력을-덮음.png"
+  $pt = New-Object W32P+POINT; $pt.X = $ncx; $pt.Y = $ncy
+  $hit1 = [W32P]::GetAncestor([W32P]::WindowFromPoint($pt), 2)
+  if ($hit1 -ne $np.MainWindowHandle) {
+    $failures.Add("I: 메모장을 달력 위에 놓았는데 달력이 메모장을 가립니다 — 조각이 바닥이 아닙니다.")
+  } else {
+    # 달력의 메모장 밖 자리를 실제로 클릭해도(활성화) 조각이 위로 떠오르면 안 된다.
+    Click ($cr2.Left + 40) ($cr2.Bottom - 60) 1
+    Start-Sleep -Milliseconds 900
+    $hit2 = [W32P]::GetAncestor([W32P]::WindowFromPoint($pt), 2)
+    Save-Screen "$OutDir/9-달력-클릭후에도-메모장이-위.png"
+    if ($hit2 -ne $np.MainWindowHandle) {
+      $failures.Add("I: 달력을 클릭하자 조각이 메모장 위로 떠올랐습니다 — 항상-아래가 깨졌습니다.")
+    } else {
+      Write-Host "겹침 확인 — 조각은 클릭해도 다른 프로그램 아래에 머문다."
+    }
+  }
+  Stop-Process -Name notepad -Force -ErrorAction SilentlyContinue
+  Start-Sleep -Milliseconds 800
+}
 
 # ==== 8. 세 조각 Alt+F4 → 앱 스스로 종료 + 게이트 G ====
 # 각 조각의 상호작용 없는 자리를 클릭해 포커스를 준 뒤 Alt+F4.
