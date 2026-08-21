@@ -129,21 +129,20 @@ jobs:
           }
           Write-Host "조각 3창 확인 — 실물 앱이 화면을 띄웁니다."
 
-      - name: 화면 증거 — 실물 픽셀 스크린샷과 더블클릭 반응
+      - name: 화면 증거 — 실물 사용 시나리오를 마우스·키보드로 재연
         shell: pwsh
-        timeout-minutes: 8
+        timeout-minutes: 12
         run: |
-          # '창이 존재한다'와 '화면에 실제로 보인다'는 다른 명제다. 러너 화면을
-          # 그대로 캡처해 사람이 눈으로 확인할 수 있는 증거를 남기고,
-          # (A) 조각 픽셀이 검정이 아니고 (B) 실제 마우스 더블클릭에 화면이
-          # 반응하는지(일정 추가 폼이 열리는지)를 기계로도 게이트한다.
+          # '창이 존재한다'와 '보이고 눌리고 저장되고 꺼진다'는 다른 명제다.
+          # 러너 화면을 캡처해 사람이 눈으로 확인할 증거를 남기고, 렌더링·더블클릭·
+          # 저장·토글·설정·닫기·Alt+F4 종료·구버전 정리를 기계로도 게이트한다.
           $exe = Get-ChildItem src-tauri/target/release -Filter '*.exe' -File |
                  Where-Object { $_.Name -like 'work?calendar?helper.exe' } |
                  Select-Object -First 1
           if (-not $exe) { throw "빌드된 실행파일을 찾지 못했습니다." }
           Start-Process $exe.FullName
           Start-Sleep -Seconds 14
-          pwsh -NoProfile -ExecutionPolicy Bypass -File tests/screenshot.ps1 -ProcessName $exe.BaseName -OutDir proof
+          pwsh -NoProfile -ExecutionPolicy Bypass -File tests/screenshot.ps1 -ProcessName $exe.BaseName -ExePath $exe.FullName -OutDir proof
           $code = $LASTEXITCODE
           taskkill /F /IM "$($exe.Name)" 2>$null | Out-Null
           exit $code
