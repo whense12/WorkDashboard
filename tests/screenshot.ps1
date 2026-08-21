@@ -210,14 +210,23 @@ foreach ($k in @('cal', 'mini', 'status')) {
 $modeLines -join "`n" | Set-Content -Path "$OutDir/모드.txt" -Encoding utf8
 
 # 앱이 남긴 바닥 모드 판단 기록을 증거로 복사한다 — '왜 이 모드가 됐는가'의 원문.
-$floorLog = Join-Path $env:LOCALAPPDATA 'kr.go.goseong.work-calendar-helper/floor.log'
-if (Test-Path $floorLog) {
+# Tauri 의 app_data_dir 는 Windows 에서 Roaming AppData 다. Local 만 보다가
+# 한 번 놓쳤으므로 두 곳을 다 뒤진다.
+$floorLog = $null
+foreach ($root in @($env:APPDATA, $env:LOCALAPPDATA)) {
+  $cand = Join-Path $root 'kr.go.goseong.work-calendar-helper/floor.log'
+  if (Test-Path $cand) { $floorLog = $cand; break }
+}
+if ($floorLog) {
   Copy-Item $floorLog "$OutDir/floor.log"
-  Write-Host "--- floor.log ---"
+  Write-Host "--- floor.log ($floorLog) ---"
   Get-Content $floorLog | ForEach-Object { Write-Host $_ }
   Write-Host "-----------------"
 } else {
-  Write-Host "floor.log 없음 — 앱이 바닥 모드 판단 기록을 남기지 않았다."
+  Write-Host "floor.log 없음 — 앱이 바닥 모드 판단 기록을 남기지 않았다. (Roaming/Local 모두 확인)"
+  Get-ChildItem $env:APPDATA, $env:LOCALAPPDATA -Directory -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -like '*goseong*' } |
+    ForEach-Object { Write-Host "발견된 앱 폴더: $($_.FullName)"; Get-ChildItem $_.FullName | ForEach-Object { Write-Host "  $($_.Name)" } }
 }
 
 # ==== 2. 렌더링 증거 + 게이트 A ====
