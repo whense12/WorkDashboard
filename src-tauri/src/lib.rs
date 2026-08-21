@@ -140,6 +140,56 @@ fn is_autostart_enabled(app: tauri::AppHandle) -> Result<bool, String> {
     app.autolaunch().is_enabled().map_err(|e| e.to_string())
 }
 
+/// 조각이 이 화면 안에 온전히 들어와 있는가. 8px 는 그림자 여백 오차 허용.
+fn fits(mon: &tauri::Monitor, pos: tauri::PhysicalPosition<i32>, size: tauri::PhysicalSize<u32>) -> bool {
+    let mp = mon.position();
+    let ms = mon.size();
+    pos.x >= mp.x - 8
+        && pos.y >= mp.y - 8
+        && pos.x + size.width as i32 <= mp.x + ms.width as i32 + 8
+        && pos.y + size.height as i32 <= mp.y + ms.height as i32 + 8
+}
+
+/// 첫 실행이거나 저장된 위치가 이 화면을 벗어나 있으면, 화면 크기에 맞춰 세 조각을
+/// 다시 배치한다. 설정 파일의 고정 좌표는 1440px 이상 화면 기준이라, 그보다 좁은
+/// 화면에서는 우측 열이 화면 밖으로 밀리고 시트가 잘렸다.
+fn layout_pieces(app: &tauri::AppHandle) {
+    let Ok(Some(mon)) = app.primary_monitor() else { return };
+    let out_of_bounds = PIECES.iter().any(|l| {
+        app.get_webview_window(l)
+            .map(|w| match (w.outer_position(), w.outer_size()) {
+                (Ok(p), Ok(s)) => !fits(&mon, p, s),
+                _ => false,
+            })
+            .unwrap_or(false)
+    });
+    if !out_of_bounds {
+        return; // 사용자가 잡아 둔 배치는 존중한다
+    }
+    let sf = mon.scale_factor();
+    let px = |v: f64| (v * sf) as i32;
+    let mp = mon.position();
+    let ms = mon.size();
+    let margin = px(14.0);
+    let gap = px(12.0);
+    let taskbar = px(52.0); // 작업 표시줄 자리
+    let col_w = px(352.0).min(ms.width as i32 / 3);
+    let usable_h = ms.height as i32 - taskbar - margin * 2;
+    let right_x = mp.x + ms.width as i32 - margin - col_w;
+    let cal_w = (right_x - gap) - (mp.x + margin);
+    let mini_h = usable_h * 3 / 5;
+    let status_h = usable_h - mini_h - gap;
+    let place = |label: &str, x: i32, y: i32, w: i32, h: i32| {
+        if let Some(win) = app.get_webview_window(label) {
+            let _ = win.set_size(tauri::PhysicalSize::new(w.max(240) as u32, h.max(180) as u32));
+            let _ = win.set_position(tauri::PhysicalPosition::new(x, y));
+        }
+    };
+    place("cal", mp.x + margin, mp.y + margin, cal_w, usable_h);
+    place("mini", right_x, mp.y + margin, col_w, mini_h);
+    place("status", right_x, mp.y + margin + mini_h + gap, col_w, status_h);
+}
+
 fn toggle_piece(app: &tauri::AppHandle, label: &str) {
     if let Ok(w) = win(app, label) {
         if matches!(w.is_visible(), Ok(true)) {
@@ -243,6 +293,9 @@ pub fn run() {
                     _ => {}
                 })
                 .build(app)?;
+
+            // 창들이 아직 숨어 있는 지금 배치한다 — 뜬 뒤에 움직이면 화면이 튄다.
+            layout_pieces(app.handle());
 
             // 화면 스크립트가 어떤 이유로든 piece_ready 를 못 보내면 앱이 보이지 않는 채로
             // 남으므로 안전망을 둔다.

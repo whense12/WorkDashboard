@@ -26,11 +26,13 @@
   --shadow:0 10px 34px rgba(19,20,22,.20);
   --r:16px;
 
-  /* 조각(무장식 창)의 유리 질감. 배경화면이 비쳐 보이는 반투명 카드다. */
-  --glass:rgba(252,253,255,.90);
-  --glass-line:rgba(255,255,255,.78);
-  --cell:rgba(255,255,255,.55);
-  --cell-dim:rgba(255,255,255,.22);
+  /* 조각(무장식 창)의 유리 질감. Windows 는 창 뒤 바탕화면을 흐릿하게 만들 수 없으므로
+     (backdrop-filter 는 페이지 내용에만 듣는다) 유리를 거의 불투명하게 깐다 —
+     투명도를 남기면 바탕화면 아이콘이 글자 사이로 그대로 비쳐 읽을 수 없다. */
+  --glass:rgba(249,250,252,.97);
+  --glass-line:rgba(255,255,255,.85);
+  --cell:rgba(255,255,255,.92);
+  --cell-dim:rgba(244,246,248,.6);
 
   /* 타입 스케일 — KRDS PC 토큰. 13px 하한(발주서 §19.3). */
   --fs-xs:13px;
@@ -62,7 +64,14 @@ body{
 .piece-cal{grid-row:1/3}
 .piece{min-height:0;display:flex;flex-direction:column;overflow:hidden;
   background:var(--glass);border:1px solid var(--glass-line);border-radius:var(--r);
-  box-shadow:var(--shadow);backdrop-filter:blur(14px)}
+  box-shadow:var(--shadow)}
+/* 유리 위 스크롤바 — 기본 스크롤바는 흰 기둥으로 도드라진다 */
+.calendar-scroll::-webkit-scrollbar,.due-list::-webkit-scrollbar,.vendor-board::-webkit-scrollbar,
+.budget-board::-webkit-scrollbar,.status-scroll::-webkit-scrollbar,.modal-body::-webkit-scrollbar{width:8px;height:8px}
+.calendar-scroll::-webkit-scrollbar-thumb,.due-list::-webkit-scrollbar-thumb,.vendor-board::-webkit-scrollbar-thumb,
+.budget-board::-webkit-scrollbar-thumb,.status-scroll::-webkit-scrollbar-thumb,.modal-body::-webkit-scrollbar-thumb{background:rgba(30,33,36,.22);border-radius:999px}
+.calendar-scroll::-webkit-scrollbar-track,.due-list::-webkit-scrollbar-track,.vendor-board::-webkit-scrollbar-track,
+.budget-board::-webkit-scrollbar-track,.status-scroll::-webkit-scrollbar-track,.modal-body::-webkit-scrollbar-track{background:transparent}
 
 /* 조각 하나만 보이는 창 모드. 바깥 여백은 그림자가 그려질 실제 투명 영역이다. */
 body.win-mode{background:transparent;overflow:hidden}
@@ -107,10 +116,10 @@ body.mode-pop .modal-bg.show~.modal-bg.show .modal{width:min(560px,100%);max-hei
 .calendar-scroll{flex:1;min-height:0;overflow:auto;scrollbar-gutter:stable;padding:0 10px 10px}
 .month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-auto-rows:minmax(112px,1fr);gap:3px;min-height:100%}
 .day{position:relative;min-height:112px;border-radius:10px;background:var(--cell);padding:5px 7px 18px}
-.day:hover{background:rgba(255,255,255,.72)}
+.day:hover{background:#fff}
 .day.out{background:var(--cell-dim)}
 .day.out .day-num{color:rgba(30,33,36,.38)}
-.day.today{background:rgba(255,255,255,.9);box-shadow:inset 0 0 0 2px var(--accent-line)}
+.day.today{background:#fff;box-shadow:inset 0 0 0 2px var(--accent-line)}
 .day-head{height:24px;display:flex;align-items:center;justify-content:space-between;gap:4px}
 .day-num{min-width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font-size:13px;font-weight:850}
 .weekend .day-num{color:var(--danger)}
