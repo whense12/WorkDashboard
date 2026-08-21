@@ -50,11 +50,14 @@ fn piece_ready(window: WebviewWindow) {
     }
 }
 
-/// pop 창 안에서 첫 모달이 열렸다고 알려 온다. 이때 띄워야 빈 창이 번쩍이지 않는다.
+/// pop 창 안에서 첫 모달이 열렸다고 알려 온다. 창은 만들 때부터 보이지만,
+/// 숨김→표시 전환에서 WebView2 가 검은/빈 사각형을 남기는 일이 있어 리페인트를 걸고
+/// 포커스를 준다.
 #[tauri::command]
 fn pop_ready(window: WebviewWindow) {
     if window.label() == "pop" {
         let _ = window.show();
+        repaint(&window);
         let _ = window.set_focus();
     }
 }
@@ -96,11 +99,21 @@ fn open_form(app: tauri::AppHandle, form: String, payload: String) -> Result<(),
         "settings" => (620.0, 560.0),
         _ => return Err(format!("unknown form: {form}")),
     };
-    // 한 번에 하나. 이미 떠 있으면 닫고 새로 연다 — 폼이 겹겹이 쌓이면 그게 또 창이다.
-    if let Some(existing) = app.get_webview_window("pop") {
-        let _ = existing.close();
-    }
     let url = format!("index.html?w=pop&form={}&payload={}", form, urlenc(&payload));
+    // 한 번에 하나. 이미 떠 있으면 같은 창을 새 폼으로 항해시킨다 — 닫고 다시 만들면
+    // 같은 라벨이 아직 등록돼 있어 생성이 실패하는 경합이 있다.
+    if let Some(existing) = app.get_webview_window("pop") {
+        existing
+            .eval(&format!("window.location.replace('/{url}')"))
+            .map_err(|e| e.to_string())?;
+        let _ = existing.set_size(tauri::LogicalSize::new(w, h));
+        let _ = existing.show();
+        repaint(&existing);
+        let _ = existing.set_focus();
+        return Ok(());
+    }
+    // 처음부터 보이게 만든다. visible:false 로 만들었다가 나중에 띄우는 방식은
+    // 신호가 한 번이라도 어긋나면 "눌러도 아무 일도 안 일어나는" 보이지 않는 창을 남긴다.
     WebviewWindowBuilder::new(&app, "pop", WebviewUrl::App(url.into()))
         .title("입력 (pop)")
         .inner_size(w, h)
@@ -111,7 +124,7 @@ fn open_form(app: tauri::AppHandle, form: String, payload: String) -> Result<(),
         .skip_taskbar(true)
         .resizable(true)
         .maximizable(false)
-        .visible(false) // pop_ready 가 올 때 띄운다
+        .visible(true)
         .focused(true)
         .build()
         .map_err(|e| e.to_string())?;
@@ -200,8 +213,29 @@ fn toggle_piece(app: &tauri::AppHandle, label: &str) {
     }
 }
 
+/// 설치·업데이트 뒤에도 이전 버전 프로세스가 숨은 채 살아 있으면, 새 실행이
+/// 단일 인스턴스 규칙에 밀려 이전(구버전) 화면만 다시 보게 된다. 사용자에게
+/// "작업 관리자에서 끝내라"고 시키지 않는다 — 새 실행이 항상 이긴다.
+#[cfg(windows)]
+fn kill_stale_instances() {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let me = std::process::id();
+    let exe = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.file_name().map(|s| s.to_string_lossy().into_owned()))
+        .unwrap_or_else(|| "work-calendar-helper.exe".into());
+    let _ = std::process::Command::new("taskkill")
+        .args(["/F", "/IM", &exe, "/FI", &format!("PID ne {me}")])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output();
+}
+#[cfg(not(windows))]
+fn kill_stale_instances() {}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    kill_stale_instances();
     tauri::Builder::default()
         // 자동 실행으로 한 번, 바탕화면 아이콘으로 또 한 번 — 두 벌이 동시에 뜨면
         // 같은 저장소를 두 프로세스가 쓴다. 두 번째 실행은 조각들을 다시 보이고 끝낸다.

@@ -590,7 +590,7 @@ body.mode-pop .modal-bg.show~.modal-bg.show .modal{width:min(560px,100%);max-hei
 
 <div class="modal-bg" id="projectStepsModal"><section class="modal wide" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="projectStepsTitle"><div class="modal-head"><h2 id="projectStepsTitle">업무 절차 편집</h2><button class="close" data-close="projectStepsModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body"><div class="proc-list" id="projectStepsList"></div><button class="btn" id="projectAddStep" style="margin-top:8px" data-t="addStep"></button></div><div class="modal-foot"><button class="btn" data-close="projectStepsModal">취소</button><button class="btn primary" id="saveProjectSteps" data-t="saveSteps"></button></div></section></div>
 
-<div class="modal-bg" id="settingsModal"><section class="modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="settingsTitle"><div class="modal-head"><h2 id="settingsTitle">설정</h2><button class="close" data-close="settingsModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body">
+<div class="modal-bg" id="settingsModal"><section class="modal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="settingsTitle"><div class="modal-head"><h2 id="settingsTitle">설정 <small id="appVersion" style="font-size:13px;color:#58616a;font-weight:600"></small></h2><button class="close" data-close="settingsModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body">
   <div class="setting-row"><div class="setting-copy"><b>컴퓨터 시작 시 자동 실행</b><span>켜 두면 부팅과 함께 조각들이 바탕화면에 올라옵니다.</span></div><label class="switch"><input id="autostart" type="checkbox"><span class="slider"></span></label></div>
   <div class="setting-row"><div class="setting-copy"><b>백업</b><span id="backupCopy"></span></div><div class="setting-actions"><button class="btn" id="backupNowBtn">지금 백업</button><button class="btn hidden" id="backupFolderBtn">폴더 열기</button></div></div>
   <div class="setting-row"><div class="setting-copy"><b>백업에서 복원</b><span>복원 직전 현재 데이터를 한 벌 자동으로 남깁니다.</span></div><div class="setting-actions"><select id="backupPick" class="hidden" aria-label="복원할 백업 선택"></select><button class="btn hidden" id="restoreBtn">복원</button><label class="btn hidden" for="restoreFile" id="restoreFileLabel">백업 파일 선택</label><input id="restoreFile" type="file" accept=".zip,application/zip" hidden></div></div>
@@ -2507,6 +2507,9 @@ body.mode-pop .modal-bg.show~.modal-bg.show .modal{width:min(560px,100%);max-hei
     if(await popOut('settings',{}))return;
     const tauri=C.isTauri();$('autostart').checked=!!state.settings.autostart;
     if(tauri){try{$('autostart').checked=await window.__TAURI__.core.invoke('is_autostart_enabled');state.settings.autostart=$('autostart').checked}catch(e){}}
+    // 어떤 빌드가 돌고 있는지 화면에서 바로 알 수 있어야 한다 — "새 버전인데 이전 화면"
+    // 같은 문제를 스크린샷 한 장으로 진단할 수 있다.
+    try{$('appVersion').textContent='v'+await window.__TAURI__.app.getVersion()}catch(e){$('appVersion').textContent='(웹 미리보기)'}
     renderDemoRow();renderBackupRow();show('settingsModal')}
   function renderDemoRow(){const on=C.hasDemoData(state);$('demoToggleBtn').textContent=on?'예시 데이터 지우기':'예시 데이터 불러오기';$('demoToggleBtn').classList.toggle('danger',on)}
 

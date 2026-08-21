@@ -815,6 +815,9 @@
     if(await popOut('settings',{}))return;
     const tauri=C.isTauri();$('autostart').checked=!!state.settings.autostart;
     if(tauri){try{$('autostart').checked=await window.__TAURI__.core.invoke('is_autostart_enabled');state.settings.autostart=$('autostart').checked}catch(e){}}
+    // 어떤 빌드가 돌고 있는지 화면에서 바로 알 수 있어야 한다 — "새 버전인데 이전 화면"
+    // 같은 문제를 스크린샷 한 장으로 진단할 수 있다.
+    try{$('appVersion').textContent='v'+await window.__TAURI__.app.getVersion()}catch(e){$('appVersion').textContent='(웹 미리보기)'}
     renderDemoRow();renderBackupRow();show('settingsModal')}
   function renderDemoRow(){const on=C.hasDemoData(state);$('demoToggleBtn').textContent=on?'예시 데이터 지우기':'예시 데이터 불러오기';$('demoToggleBtn').classList.toggle('danger',on)}
 
