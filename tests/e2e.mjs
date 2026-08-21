@@ -154,7 +154,7 @@ try {
       cards: document.querySelectorAll('.due-card, .empty').length,
     };`);
   // 스크립트가 돌았다는 것 자체가 script-src 'self' 가 번들 스크립트를 막지 않았다는 증거다.
-  check('CSP 가 번들 스크립트를 막지 않는다', boot.version === 7, JSON.stringify(boot));
+  check('CSP 가 번들 스크립트를 막지 않는다', boot.version === 9, JSON.stringify(boot));
   check('CSP 아래에서 번들 폰트가 로드된다', boot.fontLoaded === true, `fontLoaded=${boot.fontLoaded}`);
   check('fs 플러그인이 웹뷰에 노출된다', boot.hasFsPlugin === true);
   check('첨부 백엔드가 네이티브로 잡힌다', boot.nativeFiles === true);
@@ -211,57 +211,43 @@ try {
   const runKeyAfter = ps('autostart');
   check('끄면 레지스트리에서 사라진다', !/work-calendar|업체별/.test(runKeyAfter), runKeyAfter);
 
-  // ── 5. 도우미 창 ──────────────────────────────────────────────────────────
-  console.log('\n[E5] 도우미 창 — 표시와 항상 위에 두기 (인수조건 H)');
-  const helperErr = await evalAsync(`try { await window.__TAURI__.core.invoke('show_helper'); return null } catch (e) { return String(e) }`);
-  check('도우미 창이 열린다', helperErr === null, String(helperErr));
+  // ── 5. 조각 창 세 개 — 창이 없는 앱의 실체 ────────────────────────────────
+  console.log('\n[E5] 조각 창 — 달력 시트·미니 대시보드·현황이 각각 떠 있다');
   await sleep(1200);
   const titles = ps('listwindows');
-  check('도우미 창이 화면에 존재한다', titles.includes('D-day'), titles);
-  check('본 창과 도우미 창이 함께 떠 있다', titles.split('|').length >= 2, titles);
-  const topErr = await evalAsync(`try { await window.__TAURI__.core.invoke('set_helper_always_on_top', { enabled: true }); return null } catch (e) { return String(e) }`);
-  check('always-on-top 명령이 오류 없이 끝난다', topErr === null, String(topErr));
-  await sleep(500);
-  const topmost = ps('topmost', ['-Kind', 'helper']);
-  if (topmost === 'NOWINDOW' || topmost.startsWith('PSERROR')) skip('창에 WS_EX_TOPMOST 가 설정된다', `창을 찾지 못함 (${topmost})`);
-  else check('창에 WS_EX_TOPMOST 가 실제로 설정된다', topmost === 'True', topmost);
+  check('달력 시트 창이 있다', titles.includes('(cal)'), titles);
+  check('미니 대시보드 창이 있다', titles.includes('(mini)'), titles);
+  check('현황 창이 있다', titles.includes('(status)'), titles);
+  // 항상 아래(악세사리)이므로 TOPMOST 가 아니어야 한다.
+  const calTop = ps('topmost', ['-Kind', 'cal']);
+  if (calTop === 'NOWINDOW' || calTop.startsWith('PSERROR')) skip('조각이 TOPMOST 가 아니다', calTop);
+  else check('조각이 TOPMOST 가 아니다 (항상 아래 악세사리)', calTop === 'False', calTop);
 
-  // ── 6. 도우미 딥링크 ──────────────────────────────────────────────────────
-  console.log('\n[E6] 도우미 딥링크 — 카드를 누르면 본체가 해당 상세를 연다 (§12)');
-  const handles = await wd('GET', `/session/${sessionId}/window/handles`).catch(() => null);
-  if (Array.isArray(handles) && handles.length > 1) {
-    const mainHandle = await wd('GET', `/session/${sessionId}/window`);
-    let clicked = false;
-    for (const h of handles.filter((x) => x !== mainHandle)) {
-      await wd('POST', `/session/${sessionId}/window`, { handle: h });
-      const isHelper = await evalAsync(`return !!document.querySelector('.helper-card')`).catch(() => false);
-      if (isHelper) { await evalAsync(`document.querySelector('.helper-card').click(); return 1`); clicked = true; break; }
-    }
-    await wd('POST', `/session/${sessionId}/window`, { handle: mainHandle });
-    if (clicked) {
-      await sleep(1500);
-      const opened = await evalAsync(`return { open: document.getElementById('detailModal').classList.contains('show'), vendor: (document.querySelector('.detail-vendor') || {}).textContent || '' }`);
-      check('도우미 카드 클릭으로 본체 상세가 열린다', opened.open === true, JSON.stringify(opened));
-    } else skip('도우미 카드 클릭', '도우미 웹뷰를 찾지 못함');
-  } else {
-    // tauri-driver 가 창 하나만 노출하는 경우 — 딥링크가 쓰는 공유 상태 경로로 확인한다.
-    skip('도우미 창 직접 클릭', `webdriver 가 창을 ${Array.isArray(handles) ? handles.length : '?'}개만 노출함`);
-    const relay = await evalAsync(`
-      const C = window.WorkCore, s = await C.readState();
-      const ev = s.manualEvents[0];
-      s.pendingSelection = { kind: 'manual', id: ev.id };
-      await C.saveState(s);
-      await new Promise(r => setTimeout(r, 1500));
-      return { open: document.getElementById('detailModal').classList.contains('show'),
-               left: (await C.readState()).pendingSelection, name: ev.name };`);
-    check('공유 상태 딥링크로 본체 상세가 열린다', relay.open === true, JSON.stringify(relay));
-    check('소비 후 딥링크 상태가 비워진다', relay.left === null, JSON.stringify(relay.left));
-  }
-  await evalAsync(`document.getElementById('detailModal').classList.remove('show'); return 1`).catch(() => {});
+  // ── 6. pop 창 — 폼은 창으로 열렸다 닫힌다 ────────────────────────────────
+  console.log('\n[E6] pop 창 — 입력 폼이 작은 창으로 열리고, 딥링크가 상세 pop 을 연다');
+  const formErr = await evalAsync(`try { await window.__TAURI__.core.invoke('open_form', { form: 'schedule', payload: '{}' }); return null } catch (e) { return String(e) }`);
+  check('open_form 이 오류 없이 끝난다', formErr === null, String(formErr));
+  await sleep(2000);
+  const withPop = ps('listwindows');
+  check('pop 창이 뜬다', withPop.includes('(pop)'), withPop);
+  const badForm = await evalAsync(`try { await window.__TAURI__.core.invoke('open_form', { form: 'evil<script>', payload: '{}' }); return null } catch (e) { return String(e) }`);
+  check('화이트리스트 밖 폼 이름은 거부된다', badForm !== null, String(badForm));
+
+  // 딥링크 — 다른 창이 공유 상태에 적으면 달력 시트 창이 소비해 상세 pop 을 연다.
+  const relay = await evalAsync(`
+    const C = window.WorkCore, s = await C.readState();
+    const ev = s.manualEvents[0];
+    s.pendingSelection = { kind: 'manual', id: ev.id };
+    await C.saveState(s);
+    await new Promise(r => setTimeout(r, 1800));
+    return { left: (await C.readState()).pendingSelection };`);
+  check('소비 후 딥링크 상태가 비워진다', relay.left === null, JSON.stringify(relay.left));
+  const afterRelay = ps('listwindows');
+  check('딥링크가 상세 pop 창을 연다', afterRelay.includes('(pop)'), afterRelay);
 
   // ── 7. 창 위치 복원 + 첨부 유지 ───────────────────────────────────────────
   console.log('\n[E7] 앱을 껐다 켠다 — 창 위치 복원과 첨부 유지');
-  const moved = ps('move', ['-Kind', 'main', '-X', '140', '-Y', '90']);
+  const moved = ps('move', ['-Kind', 'cal', '-X', '140', '-Y', '90']);
   const movedOk = /^\d+,\d+$/.test(moved);
   if (!movedOk) skip('창 위치 복원', `창을 옮기지 못함 (${moved})`);
   await sleep(800);
@@ -283,7 +269,7 @@ try {
 
   if (movedOk) {
     await sleep(500);
-    const rect = ps('rect', ['-Kind', 'main']);
+    const rect = ps('rect', ['-Kind', 'cal']);
     if (!/^\d+,\d+$/.test(rect)) skip('창 위치 복원', `재기동 후 창을 찾지 못함 (${rect})`);
     else {
       const [mx, my] = moved.split(',').map(Number), [rx, ry] = rect.split(',').map(Number);

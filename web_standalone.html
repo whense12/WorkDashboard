@@ -169,7 +169,7 @@ body.mode-pop .modal-bg.show~.modal-bg.show .modal{width:min(560px,100%);max-hei
 #omniAdd:hover{background:#083891}
 .omni-list{position:absolute;z-index:80;left:0;right:0;top:calc(100% + 5px);max-height:340px;overflow:auto;
   background:#fff;border:1px solid var(--line-strong);border-radius:12px;box-shadow:0 12px 32px rgba(19,20,22,.2);padding:5px}
-.omni-kind{padding:7px 9px 3px;font-size:11px;font-weight:900;letter-spacing:.06em;color:var(--muted)}
+.omni-kind{padding:7px 9px 3px;font-size:var(--fs-xs);font-weight:900;letter-spacing:.05em;color:var(--muted)}
 .omni-opt{display:block;width:100%;text-align:left;border:0;background:transparent;border-radius:8px;padding:7px 9px;font-size:var(--fs-xs)}
 .omni-opt b{display:block;font-size:var(--fs-sm);font-weight:800}
 .omni-opt small{display:block;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -182,8 +182,8 @@ body.mode-pop .modal-bg.show~.modal-bg.show .modal{width:min(560px,100%);max-hei
 .due-card:hover{background:#fff}
 .due-card.today:before{background:var(--warn)}
 .due-card.overdue:before{background:var(--danger)}
-.due-vendor{display:block;font-size:var(--fs-sm);font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.due-task{display:block;font-size:var(--fs-xs);font-weight:750;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.due-vendor{display:block;font-size:var(--fs-md);font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.due-task{display:block;font-size:var(--fs-sm);font-weight:750;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .due-sub{display:block;font-size:var(--fs-xs);color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .due-dday{min-width:56px;height:40px;border-radius:9px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-size:var(--fs-sm);font-weight:900}
 .due-card.today .due-dday{background:var(--warn-soft);color:var(--warn)}
@@ -1788,7 +1788,7 @@ body.mode-pop .modal-bg.show~.modal-bg.show .modal{width:min(560px,100%);max-hei
   const miniMode=()=>MINI_MODES.includes(state.settings.miniView)?state.settings.miniView:'due';
   let expandedVendors=new Set();   // 펼침은 화면 상태다. 저장하지 않는다.
   let expandedItems=new Set(),expandedProjects=new Set();
-  let openStatus=new Set();        // 현황 조각에서 펼쳐 둔 부(행사/예산)
+  let openStatus=new Set(Array.isArray(state.settings.statusOpen)?state.settings.statusOpen:[]); // 현황 조각에서 펼쳐 둔 부(행사/예산). 다시 켰을 때 보던 화면이 그대로 있어야 한다.
   function applyMiniMode(){
     const mode=miniMode();
     $('dueList').classList.toggle('hidden',mode!=='due');
@@ -1812,6 +1812,8 @@ body.mode-pop .modal-bg.show~.modal-bg.show .modal{width:min(560px,100%);max-hei
   }
   function toggleStatus(k){
     if(openStatus.has(k))openStatus.delete(k);else openStatus.add(k);
+    state.settings.statusOpen=[...openStatus];
+    C.saveState(state);
     applyStatus();
   }
   function renderStatus(){
@@ -2562,8 +2564,9 @@ body.mode-pop .modal-bg.show~.modal-bg.show .modal{width:min(560px,100%);max-hei
       renderDemoRow();await persist('예시 데이터를 불러왔습니다.');
     }
   }
-  // 도우미 창에서 카드를 누르면 공유 상태에 대상이 적히고 본체가 열린다. 본체는 그 대상을 소비해 상세를 띄운다.
-  async function consumePendingSelection(){const sel=state.pendingSelection;if(!sel||!sel.id)return;
+  // 다른 창이 공유 상태에 대상을 적으면 이 창이 소비해 상세를 연다.
+  // 조각 세 창이 모두 소비하면 pop 창이 세 번 열린다 — 달력 시트 창(브라우저 포함)만 소비한다.
+  async function consumePendingSelection(){if(MODE&&MODE!=='cal')return;const sel=state.pendingSelection;if(!sel||!sel.id)return;
     state.pendingSelection=null;await C.saveState(state);
     if(findRecord(sel.kind,sel.id))openRecord(sel.kind,sel.id);}
   async function setAutostart(){const enabled=$('autostart').checked;state.settings.autostart=enabled;await C.saveState(state);if(C.isTauri())try{await window.__TAURI__.core.invoke('set_autostart',{enabled})}catch(e){toast('자동실행 설정을 적용하지 못했습니다.')}}

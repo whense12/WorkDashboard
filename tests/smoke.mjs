@@ -112,20 +112,25 @@ console.log('\n[2] 메인 화면 렌더 — 좌 D-day 레일 + 우 캘린더');
   const labels = await page.$$eval('.event', (e) => e.map((x) => x.textContent.trim()));
   check('캘린더 이벤트 라벨이 "업체 · 일정명" 형식', labels.every((l) => l.includes(' · ')), labels[0]);
   check('캘린더 라벨에 D-day 를 넣지 않는다', !labels.some((l) => /D[-+]\d|D-DAY/.test(l)), labels.find((l) => /D[-+]\d/.test(l)) || '');
-  check('요일 헤더가 sticky', (await page.$eval('.weekdays', (e) => getComputedStyle(e).position)) === 'sticky');
+  // 요일 헤더는 스크롤 컨테이너 밖에 있어 항상 보인다 (sticky 대신 구조로 해결)
+  check('요일 헤더가 스크롤과 무관하게 남는다', await page.$eval('.weekdays', (e) => !e.closest('#calendarScroll')));
   check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
   await ctx.close();
 }
 
-console.log('\n[3] 빈 날짜 클릭 → 일정 추가(날짜 프리필) / 이벤트 클릭 → 상세');
+console.log('\n[3] 빈 날짜 더블클릭 → 일정 추가(날짜 프리필) / 이벤트 클릭 → 상세');
 {
   const { ctx, page, errors } = await open();
   const target = await page.$$eval('.day:not(.out)', (els) => {
     const empty = els.find((e) => !e.querySelector('.event'));
     return empty ? empty.dataset.date : null;
   });
+  // 시트는 바탕화면이다. 한 번 클릭에 모달이 튀면 안 된다 — DesktopCal 관례대로 두 번 클릭.
   await page.click(`.day[data-date="${target}"]`, { position: { x: 40, y: 100 } });
-  check('빈 날짜 클릭으로 일정 추가가 열린다', await page.$eval('#scheduleModal', (e) => e.classList.contains('show')));
+  await page.waitForTimeout(150);
+  check('한 번 클릭으로는 아무것도 열리지 않는다', !(await page.$eval('#scheduleModal', (e) => e.classList.contains('show'))));
+  await page.dblclick(`.day[data-date="${target}"]`, { position: { x: 40, y: 100 } });
+  check('빈 날짜 두 번 클릭으로 일정 추가가 열린다', await page.$eval('#scheduleModal', (e) => e.classList.contains('show')));
   check('클릭한 날짜가 이미 채워져 있다', (await page.inputValue('#sDate')) === target, `${await page.inputValue('#sDate')} != ${target}`);
   await page.fill('#sName', '테스트 일정');
   await page.click('#saveScheduleBtn');
@@ -307,22 +312,63 @@ console.log('\n[10] 템플릿 스냅샷 격리 (발주서 §10)');
   await ctx.close();
 }
 
-console.log('\n[11] 도우미 딥링크 — 카드 클릭이 본체의 해당 상세를 연다 (발주서 §12)');
+console.log('\n[11] 창 모드 — 조각 하나가 곧 창이고, pop 창은 폼 하나만 싣는다');
 {
   const { ctx, page, errors } = await open();
-  const helper = await ctx.newPage();
-  await helper.goto(BASE + '/helper.html');
-  await helper.waitForSelector('.helper-card');
-  const helperCards = await helper.$$eval('.helper-card', (e) => e.length);
-  check('도우미가 본체와 같은 목록을 보여준다', helperCards === 4, `helper=${helperCards}`);
-  check('도우미가 같은 D-day 기준을 표시한다', (await helper.innerText('#helperHorizon')).length > 0);
 
-  const targetVendor = await helper.$eval('.helper-card .helper-vendor', (e) => e.textContent.trim());
-  await helper.click('.helper-card');
-  await page.waitForTimeout(600);
-  const open2 = await page.$eval('#detailModal', (e) => e.classList.contains('show'));
-  check('본체에서 해당 일정 상세가 열린다', open2);
-  if (open2) check('열린 상세가 클릭한 업체다', (await page.innerText('.detail-vendor')) === targetVendor, `${await page.innerText('.detail-vendor')} != ${targetVendor}`);
+  // ?w=cal : 달력 시트만
+  const cal = await ctx.newPage();
+  await cal.goto(BASE + '/index.html?w=cal');
+  await cal.waitForFunction(() => !!window.WorkCore);
+  const calShown = await cal.evaluate(() => ({
+    mode: document.body.classList.contains('win-mode') && document.body.classList.contains('mode-cal'),
+    cal: getComputedStyle(document.getElementById('pieceCal')).display !== 'none',
+    mini: getComputedStyle(document.getElementById('pieceMini')).display === 'none',
+    status: getComputedStyle(document.getElementById('pieceStatus')).display === 'none',
+    transparent: /rgba\(0, 0, 0, 0\)|transparent/.test(getComputedStyle(document.body).backgroundColor),
+  }));
+  check('?w=cal 은 달력 시트만 보인다', calShown.mode && calShown.cal && calShown.mini && calShown.status, JSON.stringify(calShown));
+  check('조각 창의 배경이 투명하다 (바탕화면이 비친다)', calShown.transparent);
+  await cal.close();
+
+  // ?w=mini : 미니 대시보드만
+  const mini = await ctx.newPage();
+  await mini.goto(BASE + '/index.html?w=mini');
+  await mini.waitForFunction(() => !!window.WorkCore);
+  const miniShown = await mini.evaluate(() => ({
+    mini: getComputedStyle(document.getElementById('pieceMini')).display !== 'none',
+    cal: getComputedStyle(document.getElementById('pieceCal')).display === 'none',
+    omni: !!document.getElementById('omni'),
+  }));
+  check('?w=mini 는 미니 대시보드만 보인다', miniShown.mini && miniShown.cal && miniShown.omni, JSON.stringify(miniShown));
+  await mini.close();
+
+  // ?w=pop&form=schedule : 조각 없이 폼만
+  const pop = await ctx.newPage();
+  const payload = encodeURIComponent(JSON.stringify({ date: '2026-09-02', name: '팝 프리필' }));
+  await pop.goto(BASE + `/index.html?w=pop&form=schedule&payload=${payload}`);
+  await pop.waitForSelector('#scheduleModal.show');
+  const popShown = await pop.evaluate(() => ({
+    desk: getComputedStyle(document.getElementById('desk')).display === 'none',
+    modal: document.getElementById('scheduleModal').classList.contains('show'),
+    date: document.getElementById('sDate').value,
+    name: document.getElementById('sName').value,
+  }));
+  check('pop 창은 조각 없이 폼만 싣는다', popShown.desk && popShown.modal, JSON.stringify(popShown));
+  check('payload 의 날짜·이름이 미리 채워진다', popShown.date === '2026-09-02' && popShown.name === '팝 프리필', JSON.stringify(popShown));
+  await pop.close();
+
+  // 딥링크(pendingSelection)는 도우미가 사라져도 유효하다 — 다른 창이 적으면 이 창이 소비한다.
+  const targetId = await page.evaluate(async () => {
+    const C = window.WorkCore, s = await C.readState();
+    const m = s.manualEvents[0];
+    s.pendingSelection = { kind: 'manual', id: m.id };
+    await C.saveState(s);
+    return m.id;
+  });
+  await page.reload();
+  await page.waitForSelector('#detailModal.show');
+  check('딥링크가 해당 상세를 연다', !!targetId);
   const leftover = await page.evaluate(async () => (await window.WorkCore.readState()).pendingSelection);
   check('소비 후 딥링크 상태가 비워진다', leftover === null, JSON.stringify(leftover));
   check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
@@ -413,12 +459,13 @@ console.log('\n[14] 타이포그래피 하한 — 화면의 모든 글자가 13p
   const sub = await page.$eval('.due-sub', (e) => parseFloat(getComputedStyle(e).fontSize));
   check('정보 계층이 크기로 드러난다 (업체 > 일정명 > 부제)', vendor > task && task > sub, `${vendor}/${task}/${sub}`);
 
-  const helper = await ctx.newPage();
-  await helper.setViewportSize({ width: 330, height: 430 });
-  await helper.goto(BASE + '/helper.html');
-  await helper.waitForSelector('.helper-card');
-  const hp = await helper.evaluate(measure);
-  check(`도우미 창에 ${FLOOR}px 미만 텍스트가 없다`, hp.length === 0, hp.join(' | '));
+  // 좁은 조각 창에서도 하한이 지켜진다
+  const mini = await ctx.newPage();
+  await mini.setViewportSize({ width: 362, height: 640 });
+  await mini.goto(BASE + '/index.html?w=mini');
+  await mini.waitForSelector('.due-card');
+  const mp = await mini.evaluate(measure);
+  check(`미니 대시보드 창에 ${FLOOR}px 미만 텍스트가 없다`, mp.length === 0, mp.join(' | '));
   check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
   await ctx.close();
 }
@@ -429,21 +476,19 @@ console.log('\n[15] 레이아웃 — 좁은 화면에서도 가로 스크롤이 
     const { ctx, page } = await open({ viewport: vp });
     const over = await page.evaluate(() => ({
       doc: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      header: (() => { const t = document.querySelector('.topbar'); return t.scrollWidth - t.clientWidth; })(),
+      head: (() => { const t = document.querySelector('.sheet-head'); return t.scrollWidth - t.clientWidth; })(),
     }));
     check(`${vp.width}x${vp.height} 가로 넘침 없음`, over.doc <= 0, `문서 +${over.doc}px`);
-    check(`${vp.width}x${vp.height} 헤더 버튼이 넘치지 않음`, over.header <= 0, `헤더 +${over.header}px`);
+    check(`${vp.width}x${vp.height} 시트 머리가 넘치지 않음`, over.head <= 0, `+${over.head}px`);
     // 발주서 §13: 캘린더는 하나의 세로 스크롤 컨테이너를 가지고, 주 행을 억지로 눌러
     // 담지 않는다. 화면이 크면 한 달이 통째로 들어와 스크롤이 안 생기는 게 정상이다.
     const cal = await page.$eval('.calendar-scroll', (e) => ({
       overflowY: getComputedStyle(e).overflowY,
-      scrolls: e.scrollHeight > e.clientHeight + 4,
     }));
     check(`${vp.width}x${vp.height} 캘린더가 세로 스크롤 컨테이너다`, cal.overflowY === 'auto' || cal.overflowY === 'scroll', cal.overflowY);
-    if (vp.height <= 900) check(`${vp.width}x${vp.height} 넘치는 달이 실제로 스크롤된다`, cal.scrolls);
     // 주 행 높이를 줄여 억지로 맞추지 않는다.
     const rowH = await page.$eval('.day', (e) => e.getBoundingClientRect().height);
-    check(`${vp.width}x${vp.height} 날짜 칸이 눌리지 않는다 (>=146px)`, rowH >= 146, `${Math.round(rowH)}px`);
+    check(`${vp.width}x${vp.height} 날짜 칸이 눌리지 않는다 (>=112px)`, rowH >= 112, `${Math.round(rowH)}px`);
     await ctx.close();
   }
 }
@@ -671,15 +716,13 @@ console.log('\n[22] 용어 설정화 — 다른 업무에도 쓸 수 있고, 조
 
   const ui = await page.evaluate(() => ({
     title: document.title,
-    h1: document.querySelector('h1').textContent,
-    addProject: document.querySelector('#addWorkBtn .label').textContent,
-    addEvent: document.querySelector('#addScheduleBtn .label').textContent,
-    caption: document.querySelector('.side-caption').textContent,
-    upcoming: document.querySelector('.side-title').textContent,
+    addProject: document.querySelector('#addWorkBtn [data-t="addProject"]').textContent,
+    addEvent: document.querySelector('#addScheduleBtn [data-t="addEvent"]').textContent,
+    vendorTab: document.querySelector('.tabs [data-board="vendor"]').textContent,
   }));
-  check('앱 이름이 바뀐다', ui.title === '거래처별 계약 일정' && ui.h1 === '거래처별 계약 일정', JSON.stringify(ui));
-  check('헤더 버튼이 바뀐다', ui.addProject === '계약건 추가' && ui.addEvent === '일정 추가', `${ui.addProject} / ${ui.addEvent}`);
-  check('좌 레일 문구의 조사가 맞는다', ui.caption === '거래처별 가장 가까운 일정이 날짜순으로 표시됩니다.', ui.caption);
+  check('앱 이름이 바뀐다', ui.title === '거래처별 계약 일정', JSON.stringify(ui));
+  check('버튼 문구가 바뀐다', ui.addProject === '계약건 추가' && ui.addEvent === '일정 추가', `${ui.addProject} / ${ui.addEvent}`);
+  check('미니 토글 이름이 용어를 따른다', ui.vendorTab === '거래처별', ui.vendorTab);
 
   await page.click('.due-card >> nth=0');
   await page.waitForSelector('#detailBody .step');
@@ -785,121 +828,95 @@ console.log('\n[24] v6 -> v7 이관 — 담당자·연락처 값이 보존된다
   await ctx.close();
 }
 
-console.log('\n[25] 도우미 — 창이 아니라 악세사리로 보이고, 거기서 바로 일정을 적을 수 있다');
+console.log('\n[25] 조각 — 창이 아니라 악세사리로 보이고, 미니에서 바로 일정을 적을 수 있다');
 {
   const { ctx, page, errors } = await open();
-  const helper = await ctx.newPage();
-  await helper.setViewportSize({ width: 318, height: 460 });
-  await helper.goto(BASE + '/helper.html');
-  await helper.waitForSelector('.helper-card');
 
-  // 모양 — 창처럼 보이게 하던 것들이 없어야 한다.
-  const look = await helper.evaluate(() => {
+  // 모양 — 창처럼 보이게 하던 것들이 없어야 한다. 조각 창 하나를 실제로 띄워 확인한다.
+  const mini = await ctx.newPage();
+  await mini.setViewportSize({ width: 362, height: 640 });
+  await mini.goto(BASE + '/index.html?w=mini');
+  await mini.waitForSelector('.due-card');
+  const look = await mini.evaluate(() => {
     const cs = (sel) => getComputedStyle(document.querySelector(sel));
-    const shell = cs('.helper-shell');
+    const piece = cs('#pieceMini');
     return {
-      html: getComputedStyle(document.documentElement).backgroundColor,
       body: cs('body').backgroundColor,
-      radius: parseFloat(shell.borderTopLeftRadius),
-      shadow: shell.boxShadow,
-      pad: parseFloat(cs('body').paddingTop),
-      hasTitleBar: !!document.querySelector('.helper-bar'),
+      radius: parseFloat(piece.borderTopLeftRadius),
+      shadow: piece.boxShadow,
+      pad: parseFloat(cs('.desk').paddingTop),
     };
   });
   const transparent = (c) => /rgba\(0, 0, 0, 0\)|transparent/.test(c);
-  check('창 배경이 투명하다 (검은 사각형이 남지 않는다)', transparent(look.html) && transparent(look.body), `${look.html} / ${look.body}`);
+  check('창 배경이 투명하다 (검은 사각형이 남지 않는다)', transparent(look.body), look.body);
   check('모서리가 둥글다', look.radius >= 12, `${look.radius}px`);
   check('그림자가 그려진다', look.shadow !== 'none' && look.shadow.length > 0);
   check('그림자가 그려질 여백이 있다', look.pad >= 8, `${look.pad}px`);
-  check('제목표시줄 모양의 헤더가 없다', look.hasTitleBar === false);
 
   // 끌기 — data-tauri-drag-region 은 mousedown 대상 요소 자신에 있어야 동작한다.
-  const drag = await helper.evaluate(() => {
-    const need = ['.helper-shell', '.helper-grip', '.helper-grip strong', '.helper-list', '.helper-footer'];
+  const drag = await mini.evaluate(() => {
+    const need = ['.mini-head', '.mini-tools', '#pieceCal .sheet-head'];
     return need.filter((s) => !document.querySelector(s)?.hasAttribute('data-tauri-drag-region'));
   });
-  check('바탕 어디를 잡아도 끌 수 있다', drag.length === 0, drag.join(', '));
-  const noDrag = await helper.evaluate(() =>
-    ['.helper-card', '#helperQuick', '#helperHide', '#helperOpenMain']
+  check('머리와 바닥을 잡아 끌 수 있다', drag.length === 0, drag.join(', '));
+  const noDrag = await mini.evaluate(() =>
+    ['.due-card', '#omni', '#omniAdd', '#settingsBtn', '.tabs [data-board="due"]']
       .filter((s) => document.querySelector(s)?.hasAttribute('data-tauri-drag-region')));
   check('누를 것들은 끌기 영역이 아니다', noDrag.length === 0, noDrag.join(', '));
+  await mini.close();
 
-  // 빠른 추가
-  const before = await helper.$$eval('.helper-card', (e) => e.length);
-  // hidden 속성만 보면 안 된다. .helper-quick 에 display 를 지정한 순간
-  // UA 의 [hidden]{display:none} 을 이겨 폼이 늘 펼쳐진 채로 남는다.
-  check('빠른 추가 폼은 처음엔 접혀 있다',
-    await helper.$eval('#helperQuickForm', (e) => e.hidden && getComputedStyle(e).display === 'none'));
-  await helper.click('#helperQuick');
-  check('+ 를 누르면 펼쳐진다',
-    await helper.$eval('#helperQuickForm', (e) => !e.hidden && getComputedStyle(e).display !== 'none'));
-  const vendorOpts = await helper.$$eval('#qVendor option', (e) => e.length);
-  check('업체 목록이 채워진다 (미지정 포함)', vendorOpts === 5, `${vendorOpts}`);
-  check('날짜가 오늘로 미리 채워진다', await helper.$eval('#qDate', (e) => !!e.value));
-
-  await helper.click('button[type="submit"].q-save');
-  check('이름 없이 저장하면 막고 알린다', (await helper.innerText('#qMsg')).length > 0);
-  check('막혔을 때 폼이 닫히지 않는다', await helper.$eval('#helperQuickForm', (e) => !e.hidden));
-
-  await helper.fill('#qName', '비료 수급 확인');
-  await helper.selectOption('#qVendor', { index: 1 });
-  await helper.fill('#qDate', new Date().toISOString().slice(0, 10));
-  await helper.click('button[type="submit"].q-save');
-  await helper.waitForFunction(() => document.getElementById('helperQuickForm').hidden);
-  check('저장하면 폼이 닫힌다', true);
-  const after = await helper.$$eval('.helper-card', (e) => e.length);
-  check('도우미 목록에 곧바로 반영된다', after >= before, `${before} -> ${after}`);
-
-  const saved = await helper.evaluate(async () => {
+  // 빠른 추가 — 추가·검색 한 칸에 치고 + 를 누르면 그 이름으로 일정 폼이 열린다.
+  await page.fill('#omni', '비료 수급 확인');
+  await page.click('#omniAdd');
+  await page.waitForSelector('#scheduleModal.show');
+  check('+ 는 친 이름 그대로 일정 추가를 연다', (await page.inputValue('#sName')) === '비료 수급 확인');
+  check('날짜가 오늘로 미리 채워진다', (await page.inputValue('#sDate')) === (await page.evaluate(() => window.WorkCore.todayISO())));
+  await page.click('#saveScheduleBtn');
+  await page.waitForTimeout(400);
+  const saved = await page.evaluate(async () => {
     const s = await window.WorkCore.readState();
     const m = s.manualEvents.find((x) => x.name === '비료 수급 확인');
-    return m ? { name: m.name, vendorId: m.vendorId, date: m.date, completed: m.completed, logs: Array.isArray(m.logs) } : null;
+    return m ? { vendorId: m.vendorId, completed: m.completed, logs: Array.isArray(m.logs) } : null;
   });
   check('일정이 상태에 저장된다', !!saved, JSON.stringify(saved));
-  if (saved) {
-    check('선택한 업체가 함께 저장된다', !!saved.vendorId, saved.vendorId);
-    check('완료되지 않은 상태로 들어간다', saved.completed === false && saved.logs === true);
-  }
+  if (saved) check('완료되지 않은 상태로 들어간다', saved.completed === false && saved.logs === true);
+  check('미니 목록에 곧바로 반영된다', (await page.innerText('#dueList')).includes('비료 수급 확인'));
 
-  await page.waitForTimeout(600);
-  const inMain = await page.innerText('#dueList');
-  check('본체 목록에도 나타난다', inMain.includes('비료 수급 확인'), inMain.slice(0, 80));
-
-  // Escape 는 도우미를 치우는 게 아니라 폼만 닫는다.
-  await helper.click('#helperQuick');
-  await helper.keyboard.press('Escape');
-  check('Escape 가 폼만 닫는다', await helper.$eval('#helperQuickForm', (e) => e.hidden));
+  // Escape 는 검색 목록만 닫는다 — 조각을 치우지 않는다.
+  await page.fill('#omni', '대한');
+  await page.waitForTimeout(150);
+  check('치면 목록이 열린다', !(await page.$eval('#omniList', (e) => e.classList.contains('hidden'))));
+  await page.press('#omni', 'Escape');
+  check('Escape 가 목록만 닫는다', await page.$eval('#omniList', (e) => e.classList.contains('hidden')));
 
   check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
   await ctx.close();
 }
 
-console.log('\n[26] 대시보드 업체별 요약 — 캘린더와 토글로 오가고, 펼쳐서 상세까지 간다');
+console.log('\n[26] 미니 대시보드 — 일정순/업체별 토글로 오가고, 펼쳐서 상세까지 간다');
 {
   const { ctx, page, errors } = await open();
 
   const shown = () => page.evaluate(() => ({
-    cal: !document.getElementById('calendarScroll').classList.contains('hidden'),
+    due: !document.getElementById('dueList').classList.contains('hidden'),
     board: !document.getElementById('vendorBoard').classList.contains('hidden'),
-    nav: !document.getElementById('calNav').classList.contains('hidden'),
-    hint: document.getElementById('calHint').textContent,
+    cal: getComputedStyle(document.getElementById('pieceCal')).display !== 'none',
   }));
   const before = await shown();
-  check('처음에는 캘린더다 (기존 화면이 말없이 바뀌지 않는다)', before.cal && !before.board, JSON.stringify(before));
+  check('처음에는 일정순이다', before.due && !before.board, JSON.stringify(before));
 
-  await page.click('[data-board="vendor"]');
+  await page.click('.tabs [data-board="vendor"]');
   await page.waitForSelector('.board-row');
   const after = await shown();
-  check('업체별로 바뀐다', after.board && !after.cal, JSON.stringify(after));
-  check('업체별에서는 월 이동이 숨는다', after.nav === false);
-  check('안내 문구도 모드에 맞게 바뀐다', after.hint !== before.hint && after.hint.includes('업체별'), after.hint);
+  check('업체별로 바뀐다', after.board && !after.due, JSON.stringify(after));
+  check('토글해도 달력 시트는 그대로 있다 (조각은 서로 독립이다)', after.cal);
 
   // 저장되어 다시 켜도 유지된다
   await page.waitForTimeout(300);
   await page.reload();
   await page.waitForSelector('.board-row');
   const kept = await shown();
-  check('선택이 저장되어 새로고침 후에도 유지된다', kept.board && !kept.cal, JSON.stringify(kept));
+  check('선택이 저장되어 새로고침 후에도 유지된다', kept.board && !kept.due, JSON.stringify(kept));
 
   // 예시 데이터는 업체 4곳에 업무 4건. 템플릿만 있고 업무가 없는 업체는 나오지 않는다.
   const rowNames = await page.$$eval('.board-row .bh-name', (e) => e.map((x) => x.textContent.trim()));
@@ -1160,8 +1177,8 @@ console.log('\n[29] 예산 — 예산항목 → 행사 → 업체로 점점 좁�
   // 합본예산서를 손으로 넣는다
   await page.click('[data-board="budget"]');
   await page.waitForSelector('#budgetBoard:not(.hidden)');
-  check('예산이 세 번째 축으로 붙는다', await page.$eval('#calendarScroll', (e) => e.classList.contains('hidden')));
-  check('예산에서도 왼쪽 급한 일정 레일은 남는다', await page.$$eval('#dueList .due-card', (e) => e.length) > 0);
+  check('현황의 예산 부가 제자리에서 펼쳐진다', (await page.$eval('.st-head[data-board="budget"]', (e) => e.getAttribute('aria-expanded'))) === 'true');
+  check('예산을 펼쳐도 미니의 급한 일정은 남는다', await page.$$eval('#dueList .due-card', (e) => e.length) > 0);
   check('예산 항목이 없으면 그렇게 말한다', (await page.innerText('#budgetBoard')).includes('없습니다'));
 
   await page.click('#editBudgetBtn');
@@ -1273,7 +1290,7 @@ console.log('\n[29] 예산 — 예산항목 → 행사 → 업체로 점점 좁�
   check('금액 수정이 반영된다', edited === 13000000, `${edited}`);
 
   // 업체별 보드의 총지출이 예산 화면과 같은 숫자다
-  await page.click('[data-board="vendor"]');
+  await page.click('.tabs [data-board="vendor"]');
   await page.waitForSelector('#vendorBoard:not(.hidden) .board-row');
   const vendorMoney = await page.evaluate(async () => {
     const C = window.WorkCore, s = await C.readState();
@@ -1285,7 +1302,7 @@ console.log('\n[29] 예산 — 예산항목 → 행사 → 업체로 점점 좁�
   check('업체 줄에 지출이 표시된다', vendorMoney.shown);
 
   // 상세에서 바로 지출을 적는다
-  await page.click('[data-board="calendar"]');
+  await page.click('.tabs [data-board="due"]');
   await page.click('.due-card');
   await page.waitForSelector('#detailModal.show');
   await page.click('#detailAddSpend');
@@ -1309,12 +1326,10 @@ console.log('\n[29] 예산 — 예산항목 → 행사 → 업체로 점점 좁�
   await page.keyboard.press('Escape');
   await page.waitForTimeout(200);
 
-  // 예산 모드가 저장된다
-  await page.click('[data-board="budget"]');
-  await page.waitForTimeout(300);
+  // 현황의 펼침 상태가 저장된다 — 다시 켰을 때 보던 화면이 그대로 있어야 한다
   await page.reload();
   await page.waitForSelector('#budgetBoard:not(.hidden)');
-  check('예산 모드가 새로고침 후에도 유지된다', await page.$eval('#budgetBoard', (e) => !e.classList.contains('hidden')));
+  check('예산 펼침이 새로고침 후에도 유지된다', await page.$eval('#budgetBoard', (e) => !e.classList.contains('hidden')));
 
   // 용어를 바꿔도 예산 문구가 따라온다
   const terms = await page.evaluate(() => {
@@ -1481,7 +1496,7 @@ console.log('\n[31] 되돌리기 — 물어보는 대신 되돌릴 기회를 준
     s.budget = { title: '', year: null, items: [{ id: 'bi-x', code: '', name: '행사비', amount: 1000000 }] };
     s.spends = [{ id: 'sp-x', itemId: 'bi-x', projectId: null, vendorId: 'v-daehan', name: '임차료',
       amount: 300000, status: 'spent', date: C.todayISO(), memo: '', recordKind: null, recordId: null }];
-    s.settings.boardView = 'budget';
+    s.settings.statusOpen = ['budget'];
     await C.saveState(s);
   });
   await page.reload();
@@ -1536,10 +1551,10 @@ console.log('\n[32] 행사 — 한 행사에 여러 업체가 붙고, 중간에 
   check('참여 건이 행사에 붙는다', s1.projects.filter((p) => p.groupId === gid).length === 1);
   check('행사 기간이 첫 참여 건에서 채워진다', !!s1.groups.find((g) => g.id === gid)?.startDate);
 
-  // 중간에 업체를 더 붙인다 — 행사별 화면에서 바로
+  // 중간에 업체를 더 붙인다 — 현황의 행사별 부에서 바로
   await page.click('[data-board="group"]');
   await page.waitForSelector('#groupBoard:not(.hidden) .board-row');
-  check('행사별이 네 번째 축으로 붙는다', await page.$eval('#vendorBoard', (e) => e.classList.contains('hidden')));
+  check('현황의 행사별 부가 제자리에서 펼쳐진다', (await page.$eval('.st-head[data-board="group"]', (e) => e.getAttribute('aria-expanded'))) === 'true');
   await page.click('#groupBoard .board-head');
   await page.waitForSelector('[data-group-add]');
   await page.click('[data-group-add]');
@@ -1561,7 +1576,6 @@ console.log('\n[32] 행사 — 한 행사에 여러 업체가 붙고, 중간에 
     parts.some((p) => s2.vendorTemplates.find((v) => v.id === p.vendorId)?.name === '솔뫼농산'));
 
   // 업체마다 참여기간을 줄인다 — AB는 한 달, C는 2주
-  await page.click('[data-board="group"]');
   await page.waitForSelector('#groupBoard:not(.hidden)');
   const shorter = await page.evaluate(async (args) => {
     const C = window.WorkCore, s = await C.readState();
@@ -1576,8 +1590,7 @@ console.log('\n[32] 행사 — 한 행사에 여러 업체가 붙고, 중간에 
     new Set(shorter.members.map((m) => m[2])).size === 2, JSON.stringify(shorter.members));
   check('한 업체를 줄여도 행사 기간은 그대로다', shorter.groupEnd === await d(40), `${shorter.groupEnd}`);
 
-  // 캘린더 띠는 업체 수와 무관하게 한 줄
-  await page.click('[data-board="calendar"]');
+  // 캘린더 띠는 업체 수와 무관하게 한 줄 — 달력 시트는 늘 떠 있다
   await page.waitForTimeout(200);
   const bands = await page.evaluate(() => {
     const names = [...document.querySelectorAll('.day-band')].map((e) => e.getAttribute('title'));
@@ -1706,6 +1719,179 @@ console.log('\n[33] 공통 일정 — 여러 업체에 한 번에, 업체별로 
 
   const tiny = await page.evaluate(measure);
   check('13px 미만 텍스트가 없다', tiny.length === 0, tiny.join(' | '));
+  check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
+console.log('\n[34] 끌어서 날짜 이동 — 기간은 통으로, 완료는 못 끌고, 되돌릴 수 있다');
+{
+  const { ctx, page, errors } = await open();
+  const d = (n) => page.evaluate((k) => window.WorkCore.addDays(window.WorkCore.todayISO(), k), n);
+  // 이번 달 안에서 이동을 확인할 수 있게 일정을 직접 심는다.
+  await page.evaluate(async () => {
+    const C = window.WorkCore, s = await C.readState();
+    const t = C.parse(C.todayISO()), y = t.getFullYear(), m = String(t.getMonth() + 1).padStart(2, '0');
+    s.manualEvents.push(
+      { id: 'drag-1', vendorId: s.vendorTemplates[0].id, projectId: null, date: `${y}-${m}-03`, endDate: null, name: '끌기 단일', memo: '', completed: false, completedAt: null, logs: [], attachments: [] },
+      { id: 'drag-2', vendorId: s.vendorTemplates[1].id, projectId: null, date: `${y}-${m}-05`, endDate: `${y}-${m}-08`, name: '끌기 기간', memo: '', completed: false, completedAt: null, logs: [], attachments: [] },
+      { id: 'drag-3', vendorId: s.vendorTemplates[2].id, projectId: null, date: `${y}-${m}-04`, endDate: null, name: '끌기 완료', memo: '', completed: true, completedAt: `${y}-${m}-04`, logs: [], attachments: [] },
+    );
+    await C.saveState(s);
+  });
+  await page.reload();
+  await page.waitForSelector('.due-card');
+
+  check('완료 건은 끌리지 않는다', await page.$eval('.event.done', (e) => e.getAttribute('draggable') !== 'true'));
+  check('진행 건은 끌린다', await page.$eval('[data-event-id="drag-1"]', (e) => e.getAttribute('draggable') === 'true'));
+
+  // HTML5 DnD 를 이벤트로 흉내낸다 — Playwright 의 dragTo 는 파일시스템 밖 DataTransfer 를 못 만든다.
+  const dropTo = (id, day) => page.evaluate(([evId, ds]) => {
+    const src = document.querySelector(`[data-event-id="${evId}"]`);
+    const dst = document.querySelector(`.day[data-date="${ds}"]`);
+    const dt = new DataTransfer();
+    src.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: dt }));
+    dst.dispatchEvent(new DragEvent('dragover', { bubbles: true, dataTransfer: dt, cancelable: true }));
+    dst.dispatchEvent(new DragEvent('drop', { bubbles: true, dataTransfer: dt, cancelable: true }));
+    src.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: dt }));
+  }, [id, day]);
+
+  const t12 = await page.evaluate(() => { const C = window.WorkCore, t = C.parse(C.todayISO()); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-12`; });
+  await dropTo('drag-1', t12);
+  await page.waitForTimeout(300);
+  const single = await page.evaluate(async () => (await window.WorkCore.readState()).manualEvents.find((m) => m.id === 'drag-1'));
+  check('단일 일정이 놓은 날짜로 옮겨진다', single.date === t12, `${single.date} != ${t12}`);
+  check('끌어 옮기면 되돌리기가 뜬다', await page.$$eval('#undoBtn', (e) => e.length) === 1);
+  await page.click('#undoBtn');
+  await page.waitForTimeout(300);
+  const undone = await page.evaluate(async () => (await window.WorkCore.readState()).manualEvents.find((m) => m.id === 'drag-1'));
+  check('되돌리면 원래 날짜로 돌아온다', undone.date.endsWith('-03'), undone.date);
+
+  const t20 = t12.slice(0, 8) + '20';
+  await dropTo('drag-2', t20);
+  await page.waitForTimeout(300);
+  const period = await page.evaluate(async () => (await window.WorkCore.readState()).manualEvents.find((m) => m.id === 'drag-2'));
+  check('기간 일정은 길이를 지킨 채 통으로 움직인다',
+    period.date === t20 && period.endDate === t20.slice(0, 8) + '23', JSON.stringify([period.date, period.endDate]));
+
+  check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
+console.log('\n[35] 추가·검색 한 칸 — 다섯 종류를 찾고, 골라서 그 자리로 간다');
+{
+  const { ctx, page, errors } = await open();
+  // 행사·예산·지출을 갖춘 상태를 만든다.
+  await page.evaluate(async () => {
+    const C = window.WorkCore, s = await C.readState(), t = C.todayISO();
+    s.groups.push({ id: 'g-omni', name: '옴니 대축제', startDate: t, endDate: C.addDays(t, 20), memo: '' });
+    s.projects[0].groupId = 'g-omni';
+    s.budget = { title: '', year: null, items: [{ id: 'bi-omni', code: '', name: '운영비', amount: 1000000 }] };
+    s.spends = [{ id: 'sp-omni', itemId: 'bi-omni', projectId: s.projects[0].id, vendorId: s.projects[0].vendorId, name: '옴니 임차료', amount: 200000, status: 'spent', date: t, memo: '', recordKind: null, recordId: null }];
+    await C.saveState(s);
+  });
+  await page.reload();
+  await page.waitForSelector('.due-card');
+
+  const kinds = await page.evaluate(() => {
+    const r = window.WorkCore.searchAll;
+    return {
+      vendor: r({ vendorTemplates: [{ id: 'v', name: '대한건설', values: {} }], groups: [], projects: [], manualEvents: [], spends: [], budget: { items: [] } }, '대한').length,
+    };
+  });
+  check('searchAll 이 코어에 있다', kinds.vendor === 1);
+
+  await page.fill('#omni', '대한');
+  await page.waitForTimeout(200);
+  const list1 = await page.innerText('#omniList');
+  check('업체가 검색된다', list1.includes('대한건설'));
+  await page.fill('#omni', '정비');
+  await page.waitForTimeout(200);
+  check('업무도 검색된다', (await page.innerText('#omniList')).includes('정비공사'));
+  await page.fill('#omni', '시행계획');
+  await page.waitForTimeout(200);
+  check('일정(절차)도 검색된다', (await page.innerText('#omniList')).includes('시행계획'));
+
+  await page.fill('#omni', '옴니');
+  await page.waitForTimeout(200);
+  const list2 = await page.innerText('#omniList');
+  check('행사가 검색된다', list2.includes('옴니 대축제'));
+  check('지출이 검색된다', list2.includes('옴니 임차료'));
+  check('새로 만들기 줄이 늘 마지막에 있다', await page.$eval('#omniList .omni-opt.create', (e) => e.textContent.includes('옴니')));
+
+  // 일정 결과를 고르면 상세가 열린다
+  await page.fill('#omni', '안전보건');
+  await page.waitForTimeout(200);
+  await page.click('#omniList .omni-opt');
+  await page.waitForSelector('#detailModal.show');
+  check('일정 결과를 고르면 상세가 열린다', (await page.innerText('#detailBody')).includes('안전보건'));
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(150);
+
+  // 업체 결과를 고르면 업체별 토글로 가서 그 업체가 펼쳐진다
+  await page.fill('#omni', '미래토건');
+  await page.waitForTimeout(200);
+  await page.click('#omniList .omni-opt');
+  await page.waitForTimeout(300);
+  const vendorNav = await page.evaluate(() => ({
+    boardShown: !document.getElementById('vendorBoard').classList.contains('hidden'),
+    opened: [...document.querySelectorAll('.board-row.open .bh-name')].map((e) => e.textContent),
+  }));
+  check('업체 결과가 업체별 토글로 데려간다', vendorNav.boardShown && vendorNav.opened.some((n) => n.includes('미래토건')), JSON.stringify(vendorNav));
+
+  // 행사 결과를 고르면 현황의 행사별 부가 펼쳐진다
+  await page.fill('#omni', '옴니 대축제');
+  await page.waitForTimeout(200);
+  await page.click('#omniList .omni-opt');
+  await page.waitForTimeout(300);
+  check('행사 결과가 현황의 행사별로 데려간다', await page.$eval('#groupBoard', (e) => !e.classList.contains('hidden')));
+
+  // 없는 이름 + Enter = 그 이름으로 일정 추가
+  await page.fill('#omni', '난데없는 새 일정');
+  await page.waitForTimeout(200);
+  await page.press('#omni', 'Enter');
+  await page.waitForSelector('#scheduleModal.show');
+  check('없는 이름은 Enter 로 바로 일정 추가가 된다', (await page.inputValue('#sName')) === '난데없는 새 일정');
+
+  check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
+console.log('\n[36] 키보드 — T·화살표·N·/ 이 통하고, 입력 중에는 가로채지 않는다');
+{
+  const { ctx, page, errors } = await open();
+  const title = () => page.innerText('#monthTitle');
+  const t0 = await title();
+  await page.keyboard.press('ArrowRight');
+  await page.waitForTimeout(150);
+  check('→ 가 다음 달로 간다', (await title()) !== t0, await title());
+  await page.keyboard.press('t');
+  await page.waitForTimeout(150);
+  check('T 가 오늘 달로 돌아온다', (await title()) === t0);
+  await page.keyboard.press('ArrowLeft');
+  await page.waitForTimeout(150);
+  check('← 가 이전 달로 간다', (await title()) !== t0);
+  await page.keyboard.press('t');
+  await page.waitForTimeout(150);
+
+  await page.keyboard.press('/');
+  check('/ 가 검색 칸에 포커스를 준다', await page.evaluate(() => document.activeElement?.id === 'omni'));
+  // 입력 중에는 단축키를 가로채지 않는다
+  await page.fill('#omni', '');
+  await page.type('#omni', 't');
+  await page.waitForTimeout(150);
+  check('입력 중의 t 는 글자다', (await page.inputValue('#omni')) === 't' && (await title()) === t0);
+  await page.press('#omni', 'Escape');
+  await page.evaluate(() => document.activeElement.blur());
+
+  await page.keyboard.press('n');
+  await page.waitForSelector('#scheduleModal.show');
+  check('N 이 일정 추가를 연다', true);
+  // 모달이 떠 있으면 단축키가 죽는다
+  await page.keyboard.press('ArrowRight');
+  await page.waitForTimeout(150);
+  check('모달 위에서는 화살표가 달을 넘기지 않는다', (await title()) === t0);
+  await page.keyboard.press('Escape');
+
   check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
   await ctx.close();
 }

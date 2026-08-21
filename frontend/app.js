@@ -106,7 +106,7 @@
   const miniMode=()=>MINI_MODES.includes(state.settings.miniView)?state.settings.miniView:'due';
   let expandedVendors=new Set();   // 펼침은 화면 상태다. 저장하지 않는다.
   let expandedItems=new Set(),expandedProjects=new Set();
-  let openStatus=new Set();        // 현황 조각에서 펼쳐 둔 부(행사/예산)
+  let openStatus=new Set(Array.isArray(state.settings.statusOpen)?state.settings.statusOpen:[]); // 현황 조각에서 펼쳐 둔 부(행사/예산). 다시 켰을 때 보던 화면이 그대로 있어야 한다.
   function applyMiniMode(){
     const mode=miniMode();
     $('dueList').classList.toggle('hidden',mode!=='due');
@@ -130,6 +130,8 @@
   }
   function toggleStatus(k){
     if(openStatus.has(k))openStatus.delete(k);else openStatus.add(k);
+    state.settings.statusOpen=[...openStatus];
+    C.saveState(state);
     applyStatus();
   }
   function renderStatus(){
@@ -880,8 +882,9 @@
       renderDemoRow();await persist('예시 데이터를 불러왔습니다.');
     }
   }
-  // 도우미 창에서 카드를 누르면 공유 상태에 대상이 적히고 본체가 열린다. 본체는 그 대상을 소비해 상세를 띄운다.
-  async function consumePendingSelection(){const sel=state.pendingSelection;if(!sel||!sel.id)return;
+  // 다른 창이 공유 상태에 대상을 적으면 이 창이 소비해 상세를 연다.
+  // 조각 세 창이 모두 소비하면 pop 창이 세 번 열린다 — 달력 시트 창(브라우저 포함)만 소비한다.
+  async function consumePendingSelection(){if(MODE&&MODE!=='cal')return;const sel=state.pendingSelection;if(!sel||!sel.id)return;
     state.pendingSelection=null;await C.saveState(state);
     if(findRecord(sel.kind,sel.id))openRecord(sel.kind,sel.id);}
   async function setAutostart(){const enabled=$('autostart').checked;state.settings.autostart=enabled;await C.saveState(state);if(C.isTauri())try{await window.__TAURI__.core.invoke('set_autostart',{enabled})}catch(e){toast('자동실행 설정을 적용하지 못했습니다.')}}

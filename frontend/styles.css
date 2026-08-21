@@ -164,7 +164,7 @@ body.mode-pop .modal-bg.show~.modal-bg.show .modal{width:min(560px,100%);max-hei
 #omniAdd:hover{background:#083891}
 .omni-list{position:absolute;z-index:80;left:0;right:0;top:calc(100% + 5px);max-height:340px;overflow:auto;
   background:#fff;border:1px solid var(--line-strong);border-radius:12px;box-shadow:0 12px 32px rgba(19,20,22,.2);padding:5px}
-.omni-kind{padding:7px 9px 3px;font-size:11px;font-weight:900;letter-spacing:.06em;color:var(--muted)}
+.omni-kind{padding:7px 9px 3px;font-size:var(--fs-xs);font-weight:900;letter-spacing:.05em;color:var(--muted)}
 .omni-opt{display:block;width:100%;text-align:left;border:0;background:transparent;border-radius:8px;padding:7px 9px;font-size:var(--fs-xs)}
 .omni-opt b{display:block;font-size:var(--fs-sm);font-weight:800}
 .omni-opt small{display:block;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -177,8 +177,8 @@ body.mode-pop .modal-bg.show~.modal-bg.show .modal{width:min(560px,100%);max-hei
 .due-card:hover{background:#fff}
 .due-card.today:before{background:var(--warn)}
 .due-card.overdue:before{background:var(--danger)}
-.due-vendor{display:block;font-size:var(--fs-sm);font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.due-task{display:block;font-size:var(--fs-xs);font-weight:750;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.due-vendor{display:block;font-size:var(--fs-md);font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.due-task{display:block;font-size:var(--fs-sm);font-weight:750;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .due-sub{display:block;font-size:var(--fs-xs);color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .due-dday{min-width:56px;height:40px;border-radius:9px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-size:var(--fs-sm);font-weight:900}
 .due-card.today .due-dday{background:var(--warn-soft);color:var(--warn)}

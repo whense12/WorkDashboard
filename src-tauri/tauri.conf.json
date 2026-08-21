@@ -12,7 +12,7 @@
     "windows": [
       {
         "label": "cal",
-        "title": "달력 시트",
+        "title": "달력 시트 (cal)",
         "url": "index.html?w=cal",
         "width": 980,
         "height": 700,
@@ -31,7 +31,7 @@
       },
       {
         "label": "mini",
-        "title": "미니 대시보드",
+        "title": "미니 대시보드 (mini)",
         "url": "index.html?w=mini",
         "width": 362,
         "height": 640,
@@ -50,7 +50,7 @@
       },
       {
         "label": "status",
-        "title": "현황",
+        "title": "현황 (status)",
         "url": "index.html?w=status",
         "width": 362,
         "height": 400,

@@ -2,11 +2,11 @@
 # 확인하려고 앱에 테스트 전용 권한이나 명령을 추가하지 않으려고 Win32 를 직접 부른다.
 #
 # 창은 제목이 아니라 **프로세스 이름**으로 찾는다. 창 제목이 한글이라 인자로 넘기면
-# 콘솔 코드페이지에 따라 깨진다. 본 창과 도우미 창은 도우미 제목에만 있는 ASCII
-# 문자열 'D-day' 로 구분한다.
+# 콘솔 코드페이지에 따라 깨진다. 조각 창들은 제목 끝의 ASCII 태그 '(cal)/(mini)/(status)/(pop)'
+# 로 구분한다. 태그는 작업표시줄·Alt-Tab 에 나오지 않는 창이라 사용자에게 보이지 않는다.
 param(
   [Parameter(Mandatory = $true)][ValidateSet('topmost', 'move', 'rect', 'autostart', 'listwindows')][string]$Action,
-  [ValidateSet('main', 'helper')][string]$Kind = 'main',
+  [ValidateSet('cal', 'mini', 'status', 'pop')][string]$Kind = 'cal',
   [string]$ProcessName = 'work-calendar-helper',
   [int]$X = 0,
   [int]$Y = 0
@@ -56,9 +56,7 @@ function Get-AppWindows {
 function Get-Target([string]$kind) {
   $all = Get-AppWindows
   if ($all.Count -eq 0) { return $null }
-  # 도우미 창 제목에만 ASCII 'D-day' 가 들어 있다.
-  if ($kind -eq 'helper') { return ($all | Where-Object { $_.Value -like '*D-day*' } | Select-Object -First 1) }
-  return ($all | Where-Object { $_.Value -notlike '*D-day*' } | Select-Object -First 1)
+  return ($all | Where-Object { $_.Value -like "*($kind)*" } | Select-Object -First 1)
 }
 
 switch ($Action) {

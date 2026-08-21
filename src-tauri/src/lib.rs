@@ -102,7 +102,7 @@ fn open_form(app: tauri::AppHandle, form: String, payload: String) -> Result<(),
     }
     let url = format!("index.html?w=pop&form={}&payload={}", form, urlenc(&payload));
     WebviewWindowBuilder::new(&app, "pop", WebviewUrl::App(url.into()))
-        .title("입력")
+        .title("입력 (pop)")
         .inner_size(w, h)
         .center()
         .decorations(false)
