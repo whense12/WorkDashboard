@@ -288,6 +288,15 @@ pub fn run() {
                         let _ = window.unminimize();
                     }
                 }
+                WindowEvent::Focused(true) => {
+                    // 항상-아래는 창을 만들 때 한 번 바닥에 꽂을 뿐, 클릭으로 활성화되면
+                    // Windows 가 창을 다른 프로그램 위로 끌어올린다 — 위젯이 순간 '창'이
+                    // 되어 작업 중인 화면을 덮는다(실측: 메모장 겹침 게이트에서 검출).
+                    // 포커스를 받을 때마다 바닥으로 되밀어 넣는다. 입력은 그대로 받는다.
+                    if PIECES.contains(&label.as_str()) {
+                        let _ = window.set_always_on_bottom(true);
+                    }
+                }
                 _ => {}
             }
         })

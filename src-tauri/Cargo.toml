@@ -1,6 +1,6 @@
 [package]
 name = "work_calendar_helper"
-version = "0.6.0"
+version = "0.6.1"
 description = "업체별 업무 일정 및 D-day 도우미"
 authors = ["OpenAI"]
 edition = "2021"
