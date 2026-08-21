@@ -187,7 +187,12 @@ foreach ($k in @('cal', 'mini', 'status')) {
   if (-not $p) { Write-Host "::error::($k) 창을 찾지 못했습니다."; exit 1 }
   $pieces[$k] = $p.Key
   $r = Get-Rect $p.Key
-  $parClass = Get-Class ([W32P]::GetParent($p.Key))
+  # GetParent 는 소유자/자식 특례가 있어 SetParent 된 최상위 창에서 NULL 을 주기도
+  # 한다(지난 실행 실측 — floor.log 는 바닥인데 GetParent 는 빈 값). 실제 부모는
+  # GetAncestor(GA_PARENT=1) 로 읽는다. 최상위 창이면 데스크톱 창이 나온다.
+  $par = [W32P]::GetAncestor($p.Key, 1)
+  if ($par -eq [IntPtr]::Zero) { $par = [W32P]::GetParent($p.Key) }
+  $parClass = if ($par -eq [W32P]::GetDesktopWindow()) { '' } else { Get-Class $par }
   $mode = switch ($parClass) {
     'WorkerW' { '바닥(WorkerW)' }
     'Progman' { '바닥(Progman)' }
