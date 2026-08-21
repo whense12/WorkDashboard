@@ -118,6 +118,13 @@ fn open_form(app: tauri::AppHandle, form: String, payload: String) -> Result<(),
     Ok(())
 }
 
+/// 설정의 '앱 종료' 버튼. 트레이 아이콘이 Windows 의 ^ 숨김 영역으로 들어가면
+/// 사용자가 종료 경로를 못 찾는다 — 화면 안에도 하나 둔다.
+#[tauri::command]
+fn exit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
 #[tauri::command]
 fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
     let manager = app.autolaunch();
@@ -171,10 +178,21 @@ pub fn run() {
             match event {
                 WindowEvent::CloseRequested { api, .. } => {
                     // 조각에는 닫기 버튼이 없지만 Alt+F4 는 온다. 앱을 끝내는 대신 숨긴다 —
-                    // 트레이에서 다시 부를 수 있다. 종료는 트레이의 '종료'만 한다.
+                    // 트레이에서 다시 부를 수 있다. 다만 마지막 조각까지 숨었으면 화면에
+                    // 아무것도 남지 않는다. 그때는 앱을 끝낸다 — 트레이 아이콘이 숨김
+                    // 영역에 들어가 있으면 유령 프로세스를 끝낼 방법이 없기 때문이다.
                     if PIECES.contains(&label.as_str()) {
                         api.prevent_close();
                         let _ = window.hide();
+                        let app = window.app_handle();
+                        let any_visible = PIECES.iter().any(|l| {
+                            app.get_webview_window(l)
+                                .and_then(|w| w.is_visible().ok())
+                                .unwrap_or(false)
+                        });
+                        if !any_visible {
+                            app.exit(0);
+                        }
                     }
                 }
                 WindowEvent::Resized(_) => {
@@ -246,6 +264,7 @@ pub fn run() {
             pop_ready,
             close_pop,
             open_form,
+            exit_app,
             set_autostart,
             is_autostart_enabled
         ])
