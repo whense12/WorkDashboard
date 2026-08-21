@@ -7,6 +7,8 @@
     "core:default",
     "store:default",
     "window-state:default",
-    "core:window:allow-start-dragging"
+    "core:window:allow-start-dragging",
+    "core:window:allow-inner-size",
+    "core:window:allow-set-size"
   ]
 }

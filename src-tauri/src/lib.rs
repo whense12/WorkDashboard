@@ -213,6 +213,132 @@ fn toggle_piece(app: &tauri::AppHandle, label: &str) {
     }
 }
 
+/// ── 바닥 모드 ────────────────────────────────────────────────────────────────
+/// 조각은 "창"이 아니라 바탕화면의 바닥이어야 한다 — 바탕화면 파일(아이콘) 뒤에.
+/// Windows 에서 Progman 에 0x052C 를 보내면 배경화면을 그리는 WorkerW 가 아이콘
+/// 레이어(SHELLDLL_DefView) 뒤에 생긴다. 조각 창을 그 WorkerW 의 자식으로 붙이면
+/// 아이콘 뒤 바닥이 된다(DesktopCal·Wallpaper Engine 이 쓰는 기법).
+///
+/// 다만 이 자리에서는 클릭이 아이콘 레이어에 먹혀 조각에 닿지 않는 환경이 있다.
+/// 붙인 직후 WindowFromPoint 로 "조각 한가운데를 가리키면 조각이 잡히는가"를
+/// 실측해서, 닿지 않으면 즉시 원래 자리(아이콘 위·항상 아래)로 되돌린다 —
+/// 바닥처럼 보이는 것보다 눌렀을 때 반응하는 것이 먼저다.
+#[cfg(windows)]
+mod floor {
+    use windows_sys::Win32::Foundation::{HWND, LPARAM, POINT, RECT};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        EnumWindows, FindWindowExW, FindWindowW, GetWindowRect, IsChild, SendMessageTimeoutW,
+        SetParent, WindowFromPoint, SMTO_NORMAL,
+    };
+
+    fn wide(s: &str) -> Vec<u16> {
+        s.encode_utf16().chain(std::iter::once(0)).collect()
+    }
+
+    unsafe extern "system" fn find_workerw(hwnd: HWND, lparam: LPARAM) -> i32 {
+        let defview = wide("SHELLDLL_DefView");
+        let workerw = wide("WorkerW");
+        if !FindWindowExW(hwnd, std::ptr::null_mut(), defview.as_ptr(), std::ptr::null()).is_null()
+        {
+            // 아이콘 레이어를 가진 창의 다음 형제 WorkerW 가 배경화면 호스트다.
+            let found =
+                FindWindowExW(std::ptr::null_mut(), hwnd, workerw.as_ptr(), std::ptr::null());
+            if !found.is_null() {
+                *(lparam as *mut HWND) = found;
+                return 0; // 찾았다 — 열거 중단
+            }
+        }
+        1
+    }
+
+    /// 배경화면 계층의 부모 창. 못 찾으면 Progman(아이콘 레이어 아래 형제 자리) 폴백.
+    fn wallpaper_host() -> Option<HWND> {
+        unsafe {
+            let progman_class = wide("Progman");
+            let progman = FindWindowW(progman_class.as_ptr(), std::ptr::null());
+            if progman.is_null() {
+                return None;
+            }
+            let mut result: usize = 0;
+            SendMessageTimeoutW(progman, 0x052C, 0, 0, SMTO_NORMAL, 1000, &mut result);
+            let mut found: HWND = std::ptr::null_mut();
+            EnumWindows(Some(find_workerw), &mut found as *mut HWND as LPARAM);
+            // WorkerW 를 못 찾는 환경(예: 배경화면 구조가 바뀐 Windows 11 24H2)에서는
+            // 붙일 안전한 자리가 없다 — Progman 에 붙이면 아이콘 '위'로 들어가 파일을
+            // 덮어 버린다. 바닥 모드를 포기하고 아이콘-위 모드로 남는다.
+            if found.is_null() {
+                None
+            } else {
+                Some(found)
+            }
+        }
+    }
+
+    /// 조각 한가운데를 가리켰을 때 실제로 조각(또는 그 안의 WebView 자식 창)이 잡히는가.
+    fn input_reaches(hwnd: HWND) -> bool {
+        unsafe {
+            let mut rc: RECT = std::mem::zeroed();
+            if GetWindowRect(hwnd, &mut rc) == 0 {
+                return false;
+            }
+            let pt = POINT { x: (rc.left + rc.right) / 2, y: (rc.top + rc.bottom) / 2 };
+            let hit = WindowFromPoint(pt);
+            if hit.is_null() {
+                return false;
+            }
+            hit == hwnd || IsChild(hwnd, hit) != 0
+        }
+    }
+
+    /// 조각을 바닥에 붙인다. 클릭이 닿지 않으면 되돌리고 false.
+    pub fn embed(hwnd: HWND) -> bool {
+        let Some(host) = wallpaper_host() else { return false };
+        unsafe {
+            SetParent(hwnd, host);
+            if input_reaches(hwnd) {
+                true
+            } else {
+                SetParent(hwnd, std::ptr::null_mut());
+                false
+            }
+        }
+    }
+}
+
+/// 조각들을 아이콘 뒤 바닥에 붙여 본다. 하나라도 클릭이 안 닿으면 전부 원래
+/// 자리(아이콘 위)로 두고 항상-아래를 다시 건다 — 반쯤 섞인 상태를 만들지 않는다.
+#[cfg(windows)]
+fn embed_pieces(app: &tauri::AppHandle) {
+    let handles: Vec<(tauri::WebviewWindow, isize)> = PIECES
+        .iter()
+        .filter_map(|l| {
+            let w = app.get_webview_window(l)?;
+            let h = w.hwnd().ok()?.0 as isize;
+            Some((w, h))
+        })
+        .collect();
+    if handles.len() != PIECES.len() {
+        return;
+    }
+    let all_ok = handles
+        .iter()
+        .all(|(_, h)| floor::embed(*h as windows_sys::Win32::Foundation::HWND));
+    if !all_ok {
+        // 되돌린다 — SetParent(null) 뒤에는 항상-아래를 다시 걸어야 한다.
+        for (w, h) in &handles {
+            unsafe {
+                windows_sys::Win32::UI::WindowsAndMessaging::SetParent(
+                    *h as windows_sys::Win32::Foundation::HWND,
+                    std::ptr::null_mut(),
+                );
+            }
+            let _ = w.set_always_on_bottom(true);
+        }
+    }
+}
+#[cfg(not(windows))]
+fn embed_pieces(_app: &tauri::AppHandle) {}
+
 /// 설치·업데이트 뒤에도 이전 버전 프로세스가 숨은 채 살아 있으면, 새 실행이
 /// 단일 인스턴스 규칙에 밀려 이전(구버전) 화면만 다시 보게 된다. 사용자에게
 /// "작업 관리자에서 끝내라"고 시키지 않는다 — 새 실행이 항상 이긴다.
@@ -328,8 +454,10 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            // 창들이 아직 숨어 있는 지금 배치한다 — 뜬 뒤에 움직이면 화면이 튄다.
+            // 창들이 아직 숨어 있는 지금 배치하고, 바탕화면 아이콘 뒤 바닥에 붙인다 —
+            // 뜬 뒤에 움직이면 화면이 튄다.
             layout_pieces(app.handle());
+            embed_pieces(app.handle());
 
             // 화면 스크립트가 어떤 이유로든 piece_ready 를 못 보내면 앱이 보이지 않는 채로
             // 남으므로 안전망을 둔다.

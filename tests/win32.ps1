@@ -24,6 +24,8 @@ public class W32 {
   [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr a, int x, int y, int cx, int cy, uint f);
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
   [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc cb, IntPtr p);
+  [DllImport("user32.dll")] public static extern bool EnumChildWindows(IntPtr parent, EnumProc cb, IntPtr p);
+  [DllImport("user32.dll")] public static extern IntPtr GetDesktopWindow();
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowTextW(IntPtr h, StringBuilder s, int n);
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
@@ -32,7 +34,9 @@ public class W32 {
 
   public static List<KeyValuePair<IntPtr,string>> WindowsOf(uint[] pids) {
     var res = new List<KeyValuePair<IntPtr,string>>();
-    EnumWindows((h, p) => {
+    // 조각이 배경화면 계층(WorkerW)의 자식으로 들어가면 EnumWindows(최상위만)에
+    // 잡히지 않는다. 데스크톱 전체 트리를 훑는다.
+    EnumChildWindows(GetDesktopWindow(), (h, p) => {
       if (!IsWindowVisible(h)) return true;
       uint wp; GetWindowThreadProcessId(h, out wp);
       if (Array.IndexOf(pids, wp) < 0) return true;

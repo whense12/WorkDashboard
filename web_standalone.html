@@ -1702,12 +1702,10 @@ body.mode-pop .modal-bg.show~.modal-bg.show .modal{width:min(560px,100%);max-hei
   if(MODE==='cal'||MODE==='mini'||MODE==='status')document.body.classList.add('win-mode','mode-'+MODE);
   if(IS_POP)document.body.classList.add('mode-pop');
   const hasPiece=p=>!MODE||MODE===p;   // 이 창에 그 조각이 있는가
-  /** 조각 창에서 폼을 열면 pop 창으로 내보낸다. pop 창 자신과 브라우저는 제자리에서 연다. */
-  async function popOut(form,payload){
-    if(!C.isTauri()||IS_POP)return false;
-    try{await window.__TAURI__.core.invoke('open_form',{form,payload:JSON.stringify(payload||{})});return true}
-    catch(e){console.warn('pop 창을 열지 못했습니다',e);return false}
-  }
+  /** 폼은 항상 누른 그 조각 안에서 연다. 별도 pop 창으로 내보내던 방식은 창 생성이
+   *  한 번이라도 어긋나면 "눌러도 아무 일도 안 일어나는" 상태를 만들었다 — 폐지한다.
+   *  좁은 조각에서는 창을 잠깐 넓혔다가 닫을 때 되돌린다(fitWindowForModal). */
+  async function popOut(){return false}
   // pop 창은 마지막 모달이 닫히면 스스로 사라진다. 되돌리기 토스트가 떠 있는 동안은
   // 기다린다 — 창이 먼저 닫히면 되돌릴 기회도 함께 사라진다.
   function closePopSoon(){
@@ -1758,12 +1756,30 @@ body.mode-pop .modal-bg.show~.modal-bg.show .modal{width:min(560px,100%);max-hei
   const modalStack=[];
   const FOCUSABLE='a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
   const focusables=root=>[...root.querySelectorAll(FOCUSABLE)].filter(el=>el.offsetWidth||el.offsetHeight||el.getClientRects().length);
+  // 좁은 조각(미니·현황)에서 폼이 열리면 창을 잠깐 폼 크기로 넓힌다. 닫으면 되돌린다.
+  let preModalSize=null;
+  async function fitWindowForModal(){
+    if(!C.isTauri()||!MODE||preModalSize||window.innerWidth>=640)return;
+    try{
+      const w=window.__TAURI__.window.getCurrentWindow();
+      preModalSize=await w.innerSize();
+      const dpr=window.devicePixelRatio||1;
+      await w.setSize(new window.__TAURI__.window.PhysicalSize(
+        Math.max(preModalSize.width,Math.round(680*dpr)),
+        Math.max(preModalSize.height,Math.round(700*dpr))));
+    }catch(e){console.warn('창 넓히기 실패',e);preModalSize=null}
+  }
+  async function unfitWindow(){
+    if(!preModalSize)return;
+    const s=preModalSize;preModalSize=null;
+    try{await window.__TAURI__.window.getCurrentWindow().setSize(new window.__TAURI__.window.PhysicalSize(s.width,s.height))}catch(e){}
+  }
   let popShown=false;
   function show(id){
     const bg=$(id);if(bg.classList.contains('show'))return;
     modalStack.push({id,returnTo:document.activeElement});
     bg.classList.add('show');
-    // pop 창은 visible:false 로 태어난다. 첫 모달이 화면에 잡힌 지금 띄운다.
+    fitWindowForModal();
     if(IS_POP&&!popShown){popShown=true;try{window.__TAURI__?.core?.invoke('pop_ready')}catch(e){}}
     window.WorkCombo?.syncAll(bg);
     (focusables(bg)[0]||bg.querySelector('.modal'))?.focus?.();
@@ -1774,7 +1790,7 @@ body.mode-pop .modal-bg.show~.modal-bg.show .modal{width:min(560px,100%);max-hei
     const i=modalStack.findIndex(m=>m.id===id);
     const entry=i>=0?modalStack.splice(i,1)[0]:null;
     if(entry?.returnTo?.isConnected)entry.returnTo.focus?.();
-    if(!modalStack.length)closePopSoon();
+    if(!modalStack.length){unfitWindow();closePopSoon()}
   }
   // Tab 이 모달 밖으로 새어 나가지 않게 가둔다.
   document.addEventListener('keydown',e=>{
