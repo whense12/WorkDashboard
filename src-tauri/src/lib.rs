@@ -228,7 +228,7 @@ mod floor {
     use windows_sys::Win32::Foundation::{HWND, LPARAM, POINT, RECT};
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         EnumWindows, FindWindowExW, FindWindowW, GetClassNameW, GetWindowRect, IsChild,
-        SendMessageTimeoutW, SetParent, WindowFromPoint, SMTO_NORMAL,
+        SendMessageTimeoutW, SetParent, SetWindowPos, WindowFromPoint, SMTO_NORMAL,
     };
 
     fn wide(s: &str) -> Vec<u16> {
@@ -259,11 +259,11 @@ mod floor {
         }
     }
 
-    /// 배경화면 계층의 부모 창을 찾고, 판단의 매 단계를 log 에 남긴다.
-    /// 구형(WorkerW 가 Progman 의 최상위 형제)과 24H2형(WorkerW 가 Progman 의
-    /// 자식) 두 구조를 모두 시도한다. 어느 쪽도 없으면 Progman 자식 클래스
-    /// 목록을 기록해 어떤 구조인지 사후에 알 수 있게 한다.
-    fn wallpaper_host(log: &mut Vec<String>) -> Option<HWND> {
+    /// 배경화면 계층의 부모 창과, 아이콘 레이어 '아래'로 끼워 넣을 기준 창을 찾는다.
+    /// 구형(WorkerW 최상위 형제) → 24H2형(WorkerW 가 Progman 자식) → WorkerW 가
+    /// 아예 없는 세대(Progman 에 직접 붙이되 SHELLDLL_DefView 아래 순서로) 순서로
+    /// 시도한다. 판단의 매 단계를 log 에 남긴다.
+    fn wallpaper_host(log: &mut Vec<String>) -> Option<(HWND, HWND)> {
         unsafe {
             let progman_class = wide("Progman");
             let progman = FindWindowW(progman_class.as_ptr(), std::ptr::null());
@@ -276,15 +276,29 @@ mod floor {
             let mut found: HWND = std::ptr::null_mut();
             EnumWindows(Some(find_workerw), &mut found as *mut HWND as LPARAM);
             if !found.is_null() {
-                log.push("host: WorkerW(최상위 형제) 발견 — 구형 구조".into());
-                return Some(found);
+                log.push("host: WorkerW(최상위 형제) — 구형 구조, 그대로 붙인다".into());
+                return Some((found, std::ptr::null_mut()));
             }
             let workerw = wide("WorkerW");
             let child =
                 FindWindowExW(progman, std::ptr::null_mut(), workerw.as_ptr(), std::ptr::null());
             if !child.is_null() {
-                log.push("host: WorkerW(Progman 자식) 발견 — 24H2형 구조".into());
-                return Some(child);
+                log.push("host: WorkerW(Progman 자식) — 24H2형 구조, 그대로 붙인다".into());
+                return Some((child, std::ptr::null_mut()));
+            }
+            let defview_class = wide("SHELLDLL_DefView");
+            let defview = FindWindowExW(
+                progman,
+                std::ptr::null_mut(),
+                defview_class.as_ptr(),
+                std::ptr::null(),
+            );
+            if !defview.is_null() {
+                log.push(
+                    "host: WorkerW 없음 — Progman 에 직접 붙이고 아이콘 레이어(SHELLDLL_DefView) 아래 순서로 끼운다"
+                        .into(),
+                );
+                return Some((progman, defview));
             }
             // 진단: Progman 아래에 실제로 무엇이 있는지 남긴다.
             let mut kids: Vec<String> = Vec::new();
@@ -294,7 +308,10 @@ mod floor {
                 kids.push(class_of(cur));
                 cur = FindWindowExW(progman, cur, std::ptr::null(), std::ptr::null());
             }
-            log.push(format!("host: WorkerW 없음. Progman 자식 = [{}]", kids.join(", ")));
+            log.push(format!(
+                "host: WorkerW 도 SHELLDLL_DefView 도 없음. Progman 자식 = [{}]",
+                kids.join(", ")
+            ));
             None
         }
     }
@@ -324,67 +341,59 @@ mod floor {
         }
     }
 
-    /// 조각을 바닥에 붙인다. 클릭이 닿지 않으면 되돌리고 false.
+    /// 달력 시트를 바닥(파일 뒤)에 붙인다. 바닥의 달력은 보기 전용이다 —
+    /// 아이콘 레이어가 클릭을 가져가는 것이 '파일 뒤'의 정의이므로, 입력 실측은
+    /// 되돌림 조건이 아니라 기록용이다. 입력은 미니 대시보드가 맡는다.
     pub fn embed(hwnd: HWND, log: &mut Vec<String>) -> bool {
-        let Some(host) = wallpaper_host(log) else { return false };
+        let Some((host, below)) = wallpaper_host(log) else { return false };
         unsafe {
             let prev = SetParent(hwnd, host);
             if prev.is_null() {
                 log.push("embed: SetParent 실패".into());
                 return false;
             }
-            if input_reaches(hwnd, log) {
-                log.push("embed: 바닥 유지".into());
-                true
-            } else {
-                SetParent(hwnd, std::ptr::null_mut());
-                log.push("embed: 클릭 불가 → 아이콘-위로 복귀".into());
-                false
+            if !below.is_null() {
+                // SWP_NOSIZE|SWP_NOMOVE|SWP_NOACTIVATE — 아이콘 레이어 바로 아래로.
+                SetWindowPos(hwnd, below, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010);
             }
+            let _ = input_reaches(hwnd, log); // 기록용 — 바닥에서는 안 닿는 것이 정상이다.
+            log.push("embed: 바닥(파일 뒤) 유지 — 달력은 보기 전용".into());
+            true
         }
     }
 }
 
-/// 조각들을 아이콘 뒤 바닥에 붙여 본다. 하나라도 클릭이 안 닿으면 전부 원래
-/// 자리(아이콘 위)로 두고 항상-아래를 다시 건다 — 반쯤 섞인 상태를 만들지 않는다.
+/// 달력이 바닥(파일 뒤)에 실제로 붙었는가. 종료 규칙이 이 값을 본다 —
+/// 바닥의 달력은 포커스를 받을 수 없어 Alt+F4 로 거둘 수 없으므로,
+/// 조작 가능한 두 조각(미니·현황)이 다 숨으면 앱을 끝낸다.
+static FLOOR_CAL: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// 달력 시트만 바닥(파일 뒤)에 붙인다 — 하이브리드 골격.
+/// 달력 = 바탕화면 파일 뒤에 깔린 보기 전용 시트(아이콘이 달력 위에 보인다).
+/// 미니·현황 = 아이콘 위·항상 아래의 조작 조각(입력·상세·설정은 전부 여기서).
 /// 매 단계의 판단을 앱 데이터 폴더의 floor.log 에 남긴다 — '왜 이 모드가 됐는가'를
 /// 사후에 추측이 아니라 기록으로 답하기 위해서다. CI 가 이 파일을 증거로 올린다.
 #[cfg(windows)]
 fn embed_pieces(app: &tauri::AppHandle) {
+    use tauri::Emitter;
     let mut log: Vec<String> = Vec::new();
-    let handles: Vec<(tauri::WebviewWindow, isize)> = PIECES
-        .iter()
-        .filter_map(|l| {
-            let w = app.get_webview_window(l)?;
-            let h = w.hwnd().ok()?.0 as isize;
-            Some((w, h))
-        })
-        .collect();
-    if handles.len() != PIECES.len() {
-        log.push("조각 핸들을 다 얻지 못해 바닥 모드를 시도하지 않음".into());
-    } else {
-        let mut all_ok = true;
-        for (w, h) in &handles {
-            log.push(format!("--- {} ---", w.label()));
-            if !floor::embed(*h as windows_sys::Win32::Foundation::HWND, &mut log) {
-                all_ok = false;
-                break;
-            }
-        }
-        if all_ok {
-            log.push("결과: 세 조각 모두 바닥(파일 뒤) 모드".into());
-        } else {
-            log.push("결과: 아이콘-위 모드로 전체 복귀".into());
-            for (w, h) in &handles {
-                unsafe {
-                    windows_sys::Win32::UI::WindowsAndMessaging::SetParent(
-                        *h as windows_sys::Win32::Foundation::HWND,
-                        std::ptr::null_mut(),
-                    );
-                }
+    if let Some(w) = app.get_webview_window("cal") {
+        if let Ok(h) = w.hwnd() {
+            log.push("--- cal (달력 시트) ---".into());
+            if floor::embed(h.0 as windows_sys::Win32::Foundation::HWND, &mut log) {
+                FLOOR_CAL.store(true, std::sync::atomic::Ordering::SeqCst);
+                // 화면 쪽이 '바닥 모드' 표시를 맞추게 알린다(입력 안내 문구·버튼 숨김).
+                let _ = w.emit("floor-mode", true);
+                log.push("결과: 달력 = 바닥(파일 뒤), 미니·현황 = 아이콘 위(조작)".into());
+            } else {
                 let _ = w.set_always_on_bottom(true);
+                log.push("결과: 바닥을 만들 수 없는 구조 — 달력도 아이콘 위(조작 가능)로 남음".into());
             }
+        } else {
+            log.push("cal 창 핸들을 얻지 못함".into());
         }
+    } else {
+        log.push("cal 창이 없음".into());
     }
     if let Ok(dir) = app.path().app_data_dir() {
         let _ = std::fs::create_dir_all(&dir);
@@ -451,7 +460,15 @@ pub fn run() {
                         api.prevent_close();
                         let _ = window.hide();
                         let app = window.app_handle();
-                        let any_visible = PIECES.iter().any(|l| {
+                        // 바닥에 붙은 달력은 포커스를 못 받아 Alt+F4 로 거둘 수 없다.
+                        // 그때는 조작 조각(미니·현황)만 세어, 둘 다 숨으면 끝낸다.
+                        let countable: &[&str] =
+                            if FLOOR_CAL.load(std::sync::atomic::Ordering::SeqCst) {
+                                &["mini", "status"]
+                            } else {
+                                &PIECES
+                            };
+                        let any_visible = countable.iter().any(|l| {
                             app.get_webview_window(l)
                                 .and_then(|w| w.is_visible().ok())
                                 .unwrap_or(false)
