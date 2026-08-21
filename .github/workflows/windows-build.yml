@@ -140,6 +140,13 @@ jobs:
                  Where-Object { $_.Name -like 'work?calendar?helper.exe' } |
                  Select-Object -First 1
           if (-not $exe) { throw "빌드된 실행파일을 찾지 못했습니다." }
+          # 바닥 모드 증명 준비: 바탕화면에 실물 파일을 만들어 아이콘이 조각 '위'에
+          # 그려지는지 볼 수 있게 하고, 러너의 다른 창을 전부 최소화해 바탕화면을 비운다
+          # (다른 창이 조각을 덮고 있으면 입력 실측이 그 창에 막혀 바닥 모드가
+          # 설계대로 스스로 물러난다 — 실제 사용자의 바탕화면 상황을 재현한다).
+          Set-Content -Path (Join-Path ([Environment]::GetFolderPath('Desktop')) '바닥증명.txt') -Value 'proof'
+          (New-Object -ComObject Shell.Application).MinimizeAll()
+          Start-Sleep -Seconds 2
           Start-Process $exe.FullName
           Start-Sleep -Seconds 14
           pwsh -NoProfile -ExecutionPolicy Bypass -File tests/screenshot.ps1 -ProcessName $exe.BaseName -ExePath $exe.FullName -OutDir proof
@@ -167,7 +174,7 @@ jobs:
             echo "  받은 .exe 를 그대로 실행하면 됩니다."
             echo "  새 버전을 실행하면 숨어 있던 이전 버전 프로세스를 자동으로 정리합니다 —"
             echo "  이전처럼 '새 버전을 켰는데 구식 화면이 나오는' 일이 다시 생기지 않습니다."
-            echo "  지금 어떤 버전이 돌고 있는지는 설정 창 제목(v0.4.1)에서 확인할 수 있습니다."
+            echo "  지금 어떤 버전이 돌고 있는지는 설정 창 제목(v0.4.2)에서 확인할 수 있습니다."
             echo "  관리자 권한(UAC)이 필요 없습니다 — 현재 사용자 폴더에만 설치됩니다."
             echo "  WebView2 가 없는 PC 를 위해 부트스트래퍼를 설치파일에 담았습니다."
             echo
@@ -176,8 +183,9 @@ jobs:
             echo "    1) 달력 시트 - 바탕화면에 심어진 월 달력"
             echo "    2) 미니 대시보드 - 급한 일정과 검색·추가 한 칸"
             echo "    3) 현황 - 행사·예산 요약"
-            echo "  * 바탕화면 아이콘 '뒤'로 넣는 방식은 화면이 검게 나오는 환경이 있어 뺐습니다."
-            echo "    조각을 끌어서 파일이 없는 자리에 두면 서로 가리지 않습니다."
+            echo "  조각은 바탕화면 파일(아이콘) '뒤' 바닥에 깔립니다 - 파일이 조각 위에 보입니다."
+            echo "  * 이 방식이 성립하지 않는 환경(일부 Windows 구성)에서는 클릭이 먹통이 되지"
+            echo "    않도록 자동으로 '아이콘 위 - 항상 아래' 방식으로 전환됩니다."
             echo "  조각은 제목표시줄이 없고 작업표시줄에도 뜨지 않습니다."
             echo "  머리 부분을 잡아 끌면 움직이고, 그 자리를 기억합니다."
             echo "  '바탕화면 보기(Win+D)' 를 눌러도 조각은 사라지지 않습니다."

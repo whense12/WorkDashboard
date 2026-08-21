@@ -40,6 +40,8 @@ public class W32P {
   [DllImport("user32.dll")] public static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extra);
   [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(POINT p);
   [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr h, uint flags);
+  [DllImport("user32.dll")] public static extern IntPtr GetParent(IntPtr h);
+  [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetClassNameW(IntPtr h, StringBuilder s, int n);
   public delegate bool EnumProc(IntPtr h, IntPtr p);
   [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
   [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X, Y; }
@@ -184,15 +186,28 @@ function Hit-Title([int]$x, [int]$y) {
   return $sb.ToString()
 }
 
-# ==== 1. 세 조각을 찾는다 ====
+# ==== 1. 세 조각을 찾고, 어느 모드로 붙었는지 기록한다 ====
+# 부모가 WorkerW(배경화면 계층)면 바닥 모드(파일 뒤), 부모가 없으면 아이콘-위 모드.
 $pieces = @{}
+$modeLines = @()
 foreach ($k in @('cal', 'mini', 'status')) {
   $p = Get-Piece $k
   if (-not $p) { Write-Host "::error::($k) 창을 찾지 못했습니다."; exit 1 }
   $pieces[$k] = $p.Key
   $r = Get-Rect $p.Key
-  Write-Host "($k) rect=$($r.Left),$($r.Top),$($r.Right),$($r.Bottom)"
+  $par = [W32P]::GetParent($p.Key)
+  $parClass = ''
+  if ($par -ne [IntPtr]::Zero) {
+    $sb = New-Object System.Text.StringBuilder 256
+    [void][W32P]::GetClassNameW($par, $sb, 256)
+    $parClass = $sb.ToString()
+  }
+  $mode = if ($parClass -eq 'WorkerW') { '바닥(파일 뒤)' } elseif ($parClass -eq '') { '아이콘 위' } else { "기타($parClass)" }
+  $line = "($k) rect=$($r.Left),$($r.Top),$($r.Right),$($r.Bottom) 모드=$mode"
+  Write-Host $line
+  $modeLines += $line
 }
+$modeLines -join "`n" | Set-Content -Path "$OutDir/모드.txt" -Encoding utf8
 
 # ==== 2. 렌더링 증거 + 게이트 A ====
 Save-Screen "$OutDir/1-바탕화면-전체.png"
