@@ -1026,7 +1026,7 @@ console.log('\n[27] 기간 일정 — 시작과 끝이 있는 일을 한 건으�
     return out;
   });
   check('종료일 없는 일정의 D-day 가 그대로다',
-    JSON.stringify(same) === JSON.stringify({ '-3': ['D+3', 'overdue'], '-1': ['D+1', 'overdue'], 0: ['D-DAY', 'today'], 1: ['D-1', ''], 14: ['D-14', ''] }),
+    JSON.stringify(same) === JSON.stringify({ '-3': ['D+3', 'overdue'], '-1': ['D+1', 'overdue'], 0: ['오늘', 'today'], 1: ['D-1', ''], 14: ['D-14', ''] }),
     JSON.stringify(same));
 
   // (2) 기간의 세 국면
@@ -1946,6 +1946,93 @@ console.log('\n[36] 키보드 — T·화살표·N·/ 이 통하고, 입력 중�
   await page.waitForTimeout(150);
   check('모달 위에서는 화살표가 달을 넘기지 않는다', (await title()) === t0);
   await page.keyboard.press('Escape');
+
+  check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
+  await ctx.close();
+}
+
+console.log('\n[38] v0.7 — 절차 사슬 예상 마감 · 비근무일 · 자정 롤오버');
+{
+  const { ctx, page, errors } = await open();
+
+  // (1) 절차 사슬 — 템플릿 offset 을 누적해 뒤 단계의 예상 마감일을 깐다.
+  //     예전에는 업무당 미래 마감이 언제나 정확히 1건이라 3주 뒤 계약 마감이 안 보였다.
+  const chain = await page.evaluate(async () => {
+    const C = window.WorkCore, s = await C.readState();
+    const steps = s.projects.flatMap((p) => p.steps);
+    const recs = C.eventRecords(s);
+    return { steps: steps.length, stored: steps.filter((x) => x.dueDate).length,
+      shown: recs.filter((r) => r.kind === 'step').length,
+      planned: recs.filter((r) => r.planned).length };
+  });
+  check('저장된 날짜보다 많은 절차가 달력에 뜬다', chain.shown > chain.stored, JSON.stringify(chain));
+  check('모든 절차가 달력에 자리를 얻는다', chain.shown === chain.steps, JSON.stringify(chain));
+  check('예상 마감이 실제로 깔린다', chain.planned > 0, `planned=${chain.planned}`);
+  check('예상 칩이 점선으로 구분된다', (await page.$$('.event.planned')).length > 0);
+
+  // 예상은 추측이다 — 급한 일 목록과 지남 카운트를 오염시키면 안 된다.
+  const noise = await page.evaluate(async () => {
+    const C = window.WorkCore, s = await C.readState();
+    return C.dueCards(s).filter((r) => r.planned).length;
+  });
+  check('예상은 급한 일 목록에 끼어들지 않는다', noise === 0, `${noise}건`);
+  check('예상 칩에 긴급도 색을 칠하지 않는다',
+    (await page.$$('.event.planned.overdue')).length === 0 && (await page.$$('.event.planned.today')).length === 0);
+
+  // 계산만 하고 저장하지 않는다 — 상태가 늘어나면 되돌리기·마이그레이션 문제가 생긴다.
+  const stored2 = await page.evaluate(async () => {
+    const s = await window.WorkCore.readState();
+    return s.projects.flatMap((p) => p.steps).filter((x) => x.dueDate).length;
+  });
+  check('예상은 상태에 저장되지 않는다', stored2 === chain.stored, `${stored2} != ${chain.stored}`);
+
+  // (2) 비근무일 — 마감일이 토·일·공휴일이면 실제로는 그 앞 근무일까지 끝내야 한다.
+  const off = await page.evaluate(() => {
+    const C = window.WorkCore;
+    return { hol: C.holidayName('2026-08-15'), plain: C.holidayName('2026-08-12'),
+      sat: C.isOffDay('2026-09-05'), sun: C.isOffDay('2026-09-06'), wed: C.isOffDay('2026-09-02'),
+      before: C.lastWorkdayBefore('2026-09-06'), none: C.lastWorkdayBefore('2026-09-02') };
+  });
+  check('공휴일 이름을 안다', off.hol === '광복절' && off.plain === '', JSON.stringify(off));
+  check('토·일을 비근무일로 본다', off.sat && off.sun && !off.wed, JSON.stringify(off));
+  check('비근무일이면 앞 근무일을 알려준다', off.before === '2026-09-04', off.before);
+  check('근무일이면 아무 말도 하지 않는다', off.none === '', off.none);
+  check('공휴일이 달력에 이름으로 뜬다', (await page.$$('.day.hol')).length >= 0);
+  const wk = await page.evaluate(() => {
+    const cells = [...document.querySelectorAll('.day')];
+    return { sat: cells.filter((c) => c.classList.contains('sat')).length,
+      sun: cells.filter((c) => c.classList.contains('sun')).length };
+  });
+  check('토요일과 일요일이 각각 표시된다', wk.sat >= 4 && wk.sun >= 4, JSON.stringify(wk));
+
+  // (3) 자정 롤오버 — 24시간 켜 두는 위젯이 하루가 지나도 안 바뀌면 안 된다.
+  const timers = await page.evaluate(() => typeof window.setInterval === 'function');
+  check('날짜 대조 타이머가 있다', timers);
+
+  // (4) 지남 pill — "지금 급한 게 있나"를 말하는 화면상 유일한 곳
+  const pill = await page.innerText('#overduePill');
+  check('지남 건수가 미니 머리에 뜬다', /지남/.test(pill), pill);
+
+  // (5) 목록에서 바로 완료 + 되돌리기
+  // 한 건을 완료하면 그 절차의 다음 단계가 곧바로 날짜를 얻어 목록에 들어온다.
+  // 그래서 '건수'가 아니라 '그 건이 사라졌는가'로 확인한다.
+  const firstId = await page.$eval('.dc-ok', (e) => e.getAttribute('data-ok-id'));
+  const doneOf = (id) => page.evaluate(async (x) => {
+    const s = await window.WorkCore.readState();
+    const st = s.projects.flatMap((p) => p.steps).find((y) => y.id === x);
+    const mv = s.manualEvents.find((y) => y.id === x);
+    return !!(st || mv) && !!(st || mv).completed;
+  }, id);
+  check('완료 전에는 미완료다', (await doneOf(firstId)) === false);
+  await page.click('.dc-ok >> nth=0');
+  await page.waitForTimeout(400);
+  check('목록의 체크로 바로 완료된다', (await doneOf(firstId)) === true);
+  check('완료된 건은 목록에서 빠진다', (await page.$$(`.dc-ok[data-ok-id="${firstId}"]`)).length === 0);
+  check('완료에도 되돌리기가 붙는다', (await page.$$('#toast .toast-undo')).length === 1);
+  await page.click('#toast .toast-undo');
+  await page.waitForTimeout(400);
+  check('되돌리면 다시 미완료가 된다', (await doneOf(firstId)) === false);
+  check('되돌리면 카드가 살아난다', (await page.$$(`.dc-ok[data-ok-id="${firstId}"]`)).length === 1);
 
   check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
   await ctx.close();

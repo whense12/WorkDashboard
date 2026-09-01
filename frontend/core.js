@@ -443,10 +443,44 @@
   /** 그 행사의 참여 건(업무)들. 업무 하나가 '업체 × 행사' 한 칸이다. */
   const projectsOfGroup=(state,gid)=>state.projects.filter(p=>p.groupId===gid);
   function currentStep(p){return p?.steps?.find(s=>!s.completed)||null}
+  /** 아직 날짜가 없는 뒤 단계의 '예상 마감일'을 템플릿 offset 을 누적해 계산한다.
+   *
+   *  지금까지 업무를 등록하면 첫 단계에만 날짜가 붙었고, 완료할 때마다 바로 다음 한 건에만
+   *  날짜가 생겼다. 템플릿은 단계마다 +2일 +3일 +20일을 이미 갖고 있는데 첫 단계 말고는
+   *  쓰지 않았다 — 그래서 업무당 미래 마감이 언제나 정확히 1건이었고, 3주 뒤 계약 마감이
+   *  다가오는지 알 방법이 없었다. 이게 없으면 이 앱은 '업체 이름이 붙는 달력'일 뿐이다.
+   *
+   *  계산만 하고 저장하지 않는다. 상태를 건드리지 않으니 마이그레이션도, 되돌리기도,
+   *  '사용자가 넣은 날짜인지 자동 계산인지' 구분 문제도 생기지 않는다. 실제 완료일이
+   *  쌓이면 그 뒤 예상일이 저절로 당겨지거나 밀린다. */
+  function projectedDates(p){
+    const out=new Map();
+    if(!p||!Array.isArray(p.steps))return out;
+    // 기준점: 날짜가 있는 마지막 단계(완료됐으면 실제 완료일). 없으면 계산하지 않는다.
+    let base=null;
+    for(const s of p.steps){
+      if(s.completed&&s.completedAt)base=s.completedAt;
+      else if(s.dueDate)base=s.dueDate;
+      else if(base){base=addDays(base,Math.max(0,Number(s.offset||0))||1);out.set(s.id,base)}
+    }
+    return out;
+  }
   function eventRecords(state){
     const rows=[];
     // 절차 단계에는 기간을 주지 않는다. 절차는 본질적으로 마감일이고, 기간을 주면 의미가 흐려진다.
-    state.projects.forEach(p=>p.steps.forEach(s=>{if(s.dueDate)rows.push({kind:'step',id:s.id,date:s.dueDate,endDate:null,name:s.name,completed:!!s.completed,vendorId:p.vendorId,projectId:p.id,memo:s.memo||p.memo||'',step:s})}));
+    state.projects.forEach(p=>{
+      const proj=projectedDates(p),cur=currentStep(p);
+      p.steps.forEach(s=>{
+        const guess=proj.get(s.id);
+        if(!s.dueDate&&!guess)return;
+        // 예상 = 계산으로 깐 날짜이고 지금 진행할 차례도 아니다. 확정 건과 형태로 구분하고,
+        // 급한 일 목록·지남 카운트에는 넣지 않는다 — 추측으로 경보를 울리면 안 된다.
+        const planned=!s.dueDate&&!!guess&&s.id!==cur?.id;
+        rows.push({kind:'step',id:s.id,date:s.dueDate||guess,endDate:null,name:s.name,
+          completed:!!s.completed,vendorId:p.vendorId,projectId:p.id,
+          memo:s.memo||p.memo||'',step:s,planned});
+      });
+    });
     state.manualEvents.forEach(m=>rows.push({kind:'manual',id:m.id,date:m.date,endDate:m.endDate||null,name:m.name,completed:!!m.completed,vendorId:m.vendorId,projectId:m.projectId||null,memo:m.memo||'',manual:m}));
     return rows;
   }
@@ -461,7 +495,7 @@
   function dueCards(state){
     const max=horizonDays(state.settings);
     return eventRecords(state)
-      .filter(e=>!e.completed&&e.date)
+      .filter(e=>!e.completed&&e.date&&!e.planned)
       .map(e=>({...e,dday:diffDays(sortDate(e))}))
       .filter(e=>e.dday<0||max===Infinity||e.dday<=max)
       .sort((a,b)=>sortDate(a).localeCompare(sortDate(b))||a.date.localeCompare(b.date));
@@ -642,7 +676,7 @@
     switch(phaseOf(r)){
       case 'during':return '진행중';
       case 'before':return `D-${diffDays(r.date)}`;
-      case 'on':return 'D-DAY';
+      case 'on':return '오늘';
       case 'after':return `D+${Math.abs(diffDays(endOf(r)))}`;
       default:return '';
     }
@@ -806,7 +840,7 @@
     if(moved)await saveState(state);
     return moved;
   }
-  window.WorkCore={KEY,STATE_VERSION,seed,defaultTerms,defaultVendorFields,labels,josa,demoData,hasDemoData,clone,uid,todayISO,parse,iso,addDays,diffDays,pretty,esc,isTauri,nativeFiles,migrate,normalizeState,initStorage,saveState,watchState,readState,vendor,project,currentStep,eventRecords,dueCards,ddayLabel,ddayClass,horizonDays,horizonLabel,vendorSummaries,groupSummaries,group,projectsOfGroup,budgetSummary,spendsOfRecord,formatMoney,searchAll,isPeriod,periodDays,spansDay,holidayName,isOffDay,lastWorkdayBefore,phaseOf,sortDate,endOf,projectBands,projectFromTemplate,completeEvent,reopenEvent,
+  window.WorkCore={KEY,STATE_VERSION,seed,defaultTerms,defaultVendorFields,labels,josa,demoData,hasDemoData,clone,uid,todayISO,parse,iso,addDays,diffDays,pretty,esc,isTauri,nativeFiles,migrate,normalizeState,initStorage,saveState,watchState,readState,vendor,project,currentStep,eventRecords,dueCards,ddayLabel,ddayClass,horizonDays,horizonLabel,vendorSummaries,groupSummaries,group,projectsOfGroup,budgetSummary,spendsOfRecord,formatMoney,searchAll,isPeriod,periodDays,spansDay,projectedDates,holidayName,isOffDay,lastWorkdayBefore,phaseOf,sortDate,endOf,projectBands,projectFromTemplate,completeEvent,reopenEvent,
     putAttachment,readAttachment,deleteAttachment,attachmentsOf,purgeAttachments,revealAttachment,migrateAttachmentsToDisk,formatBytes,
     buildBackup,readBackup,restoreBackup,writeBackupFile,listBackups,readBackupFile,rotateBackups,revealBackups,maybeAutoBackup};
 })();

@@ -209,7 +209,7 @@
       const pct=g.stepsTotal?Math.round(g.stepsDone/g.stepsTotal*100):0;
       const period=g.group.startDate?spanText({date:g.group.startDate,endDate:g.group.endDate}):'기간 미정';
       return `<div class="st-row"><div class="l1"><b>${C.esc(g.group.name)}</b><span>${C.esc(period)} · ${C.esc(L.groupVendors(g.vendorCount))}</span></div>
-        <div class="st-meter"><span class="track"><i style="width:${pct}%;background:#7a4dbe"></i></span><span class="n">${g.stepsDone} / ${g.stepsTotal}${g.overdueCount?` · <b style="color:var(--danger)">${L.boardOverdue} ${g.overdueCount}</b>`:''}</span></div></div>`;
+        <div class="st-meter"><span class="track"><i style="width:${pct}%;background:var(--accent)"></i></span><span class="n">${g.stepsDone} / ${g.stepsTotal}${g.overdueCount?` · <b style="color:var(--danger)">${L.boardOverdue} ${g.overdueCount}</b>`:''}</span></div></div>`;
     }).join(''):`<div class="empty" style="padding:8px">${L.groupEmpty}</div>`;
     $('stGroupMake')?.classList.toggle('hidden',gs.length>0);
     $('stGroupSec')?.classList.toggle('is-empty',!gs.length);
@@ -503,7 +503,10 @@
   function renderCalendar(){const y=currentMonth.getFullYear(),m=currentMonth.getMonth();$('monthTitle').textContent=`${y}년 ${m+1}월`;$('monthGrid').innerHTML='';const first=new Date(y,m,1),before=first.getDay(),days=new Date(y,m+1,0).getDate(),cells=Math.ceil((before+days)/7)*7,events=allEventRecords(),bands=C.projectBands(state);
     const MODE_C=chipMode(cellWidth()),CAP=MODE_C==='full'?3:2;
     for(let i=0;i<cells;i++){const d=new Date(y,m,1-before+i),ds=C.iso(d),inMonth=d.getMonth()===m,isToday=ds===C.todayISO(),dow=d.getDay(),hol=C.holidayName(ds),
-      all=events.filter(e=>C.spansDay(e,ds)),open=all.filter(e=>!e.completed),done=all.filter(e=>e.completed),
+      all=events.filter(e=>C.spansDay(e,ds)),done=all.filter(e=>e.completed),
+      // 기간 건은 칸이 이어져야 '하나의 띠'로 읽힌다. 접힘(＋N건)에 밀려 하루가 비면
+      // 띠가 끊겨 보이므로 칸 안에서 먼저 세운다. 하루짜리는 그 뒤에 서고, 넘치면 접힌다.
+      open=all.filter(e=>!e.completed).sort((a,b)=>Number(C.isPeriod(b))-Number(C.isPeriod(a))),
       dayBands=bands.filter(b=>C.spansDay(b,ds));
     const cell=document.createElement('div');
     cell.className=`day ${inMonth?'':'out'} ${dow===0?'sun':''} ${dow===6?'sat':''} ${hol?'hol':''} ${isToday?'today':''}`;
@@ -520,7 +523,7 @@
       body=`<div class="events">${show.map(r=>{const v=C.vendor(state,r.vendorId);
         const label=MODE_C==='full'?`${C.esc(v?.name||L.noVendor)} · ${C.esc(r.name)}`:C.esc(r.name);
         // 배지는 넓을 때만, 그것도 지남·오늘·예상에만 단다. 전건에 붙이면 폭을 다시 잃는다.
-        const dd=C.ddayClass(r),badge=MODE_C==='full'?(r.planned?'예상':(dd==='overdue'||dd==='today'?C.ddayLabel(r):'')):'';
+        const dd=r.planned?'':C.ddayClass(r),badge=MODE_C==='full'?(r.planned?'예상':(dd==='overdue'||dd==='today'?C.ddayLabel(r):'')):'';
         return `<button class="event ${r.planned?'planned':''} ${r.kind==='manual'?'manual':''} ${dd} ${edgeClass(r,ds)}"${r.planned?'':' draggable="true"'} data-event-kind="${r.kind}" data-event-id="${r.id}" title="${C.esc(v?.name||'')} · ${C.esc(r.name)} · ${spanText(r)}${r.planned?' · 예상 마감':''}"><span class="ev-name">${label}${C.isPeriod(r)&&r.date===ds?` (${C.periodDays(r)}일)`:''}</span>${badge?`<span class="ev-d">${C.esc(badge)}</span>`:''}</button>`}).join('')}</div>`
         +(rest>0?`<button class="more" data-more-day="${ds}">＋${rest}건</button>`:'');
     }
@@ -801,7 +804,7 @@
     ${vendorInfoRow(v)}
     <section class="worklog-section"><div class="section-headline"><div><b>${C.esc(L.worklog)}</b><span>진행 경과, 통화·협의 내용, 전달사항을 계속 남길 수 있습니다.</span></div></div><div class="log-compose"><textarea id="workLogText" placeholder="예: 업체 담당자와 통화. 평가서 보완본을 8/14 오전까지 제출하기로 함."></textarea><button class="btn primary" id="addWorkLogBtn">기록 추가</button></div><div class="worklog-list">${logs.length?logs.map(l=>`<div class="worklog-item"><div class="worklog-time">${new Intl.DateTimeFormat('ko-KR',{year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(l.time))}</div><div class="worklog-text">${C.esc(l.text)}</div><button class="tiny-link danger" data-delete-log="${l.id}">삭제</button></div>`).join(''):'<div class="section-empty">아직 기록이 없습니다.</div>'}</div></section>
     ${spendSection(selectedRecord)}
-    <section class="attachment-section"><div class="section-headline"><div><b>첨부파일</b><span>이 일정과 관련된 문서·사진을 로컬에 보관합니다.</span></div><label class="btn file-btn" for="detailFiles">+ 파일 첨부</label><input id="detailFiles" type="file" multiple hidden></div><div class="attachment-list">${files.length?files.map(f=>`<div class="attachment-item"><span class="file-icon">↳</span><span class="attachment-main"><b>${C.esc(f.name)}</b><small>${C.formatBytes(f.size)}</small></span><button class="tiny-link" data-download-file="${f.id}">열기/저장</button><button class="tiny-link danger" data-delete-file="${f.id}">삭제</button></div>`).join(''):'<div class="section-empty">첨부된 파일이 없습니다.</div>'}</div><div class="attachment-note">첨부파일은 이 PC/브라우저의 로컬 저장소에 보관됩니다. 다른 PC로 옮길 때는 파일 백업 기능을 별도로 추가하는 것이 안전합니다.</div></section>
+    <section class="attachment-section"><div class="section-headline"><div><b>첨부파일</b><span>이 일정과 관련된 문서·사진을 로컬에 보관합니다.</span></div><label class="btn file-btn" for="detailFiles">+ 파일 첨부</label><input id="detailFiles" type="file" multiple hidden></div><div class="attachment-list">${files.length?files.map(f=>`<div class="attachment-item"><span class="file-icon">↳</span><span class="attachment-main"><b>${C.esc(f.name)}</b><small>${C.formatBytes(f.size)}</small></span><button class="tiny-link" data-download-file="${f.id}">열기/저장</button><button class="tiny-link danger" data-delete-file="${f.id}">삭제</button></div>`).join(''):'<div class="section-empty">첨부된 파일이 없습니다.</div>'}</div><div class="attachment-note">첨부파일은 이 PC 안에 보관됩니다. 설정 › 백업에 첨부까지 함께 담깁니다.</div></section>
     ${p?`<div class="steps"><div class="steps-head"><div><div class="steps-title">${C.esc(L.allSteps)}</div><div class="steps-sub">완료된 단계와 아직 오지 않은 단계까지 모두 표시합니다.</div></div><button class="link" id="editProjectSteps">${C.esc(L.editSteps)}</button></div>${steps.map((s,i)=>{const st=stepStatus(p,s);return `<div class="step ${st.key}"><span class="step-mark">${s.completed?'✓':C.currentStep(p)?.id===s.id?'●':i+1}</span><span class="step-name">${C.esc(s.name)}</span><span class="step-status ${st.key}">${C.esc(st.label)}</span></div>`}).join('')}</div>`:''}`;
     show('detailModal');q('#editProjectSteps')?.addEventListener('click',()=>{hide('detailModal');openProjectSteps(p.id)});q('#addWorkLogBtn')?.addEventListener('click',addWorkLog);q('#workLogText')?.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();addWorkLog()}});q('#detailFiles')?.addEventListener('change',addAttachments);
     q('#detailAddSpend')?.addEventListener('click',()=>openSpend(null,{recordKind:selectedRecord.kind,recordId:selectedRecord.id,vendorId:selectedRecord.vendorId,projectId:selectedRecord.projectId,name:selectedRecord.name}));
