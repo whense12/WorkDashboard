@@ -96,7 +96,7 @@ console.log('\n[1] 최초 실행 — 예시 데이터 없이 빈 상태');
   check('가짜 공사/일정이 저장되지 않는다', state.p === 0 && state.m === 0, `projects=${state.p} events=${state.m}`);
   check('업체·업무 템플릿(기준정보)은 제공된다', state.v > 0 && state.w > 0);
   check('상태 버전이 9로 올라간다', state.ver === 9, `version=${state.ver}`);
-  check('빈 상태 안내가 보인다', (await page.innerText('#dueList')).includes('등록된 업무가 없습니다'));
+  check('빈 상태 안내가 보인다', (await page.innerText('#dueList')).includes('아직 업무가 없습니다'));
   check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
   await ctx.close();
 }
@@ -105,12 +105,22 @@ console.log('\n[2] 메인 화면 렌더 — 좌 D-day 레일 + 우 캘린더');
 {
   const { ctx, page, errors } = await open();
   const cards = await page.$$eval('.due-card', (e) => e.length);
-  check('업체별 카드가 렌더된다', cards === 4, `cards=${cards}`);
-  const sorted = await page.$$eval('.due-card', (els) => els.map((e) => e.querySelector('.due-sub').textContent.trim()));
-  check('D-day 카드가 존재하고 날짜순이다', sorted.length === 4);
+  // 업체로 묶어 첫 건만 세우던 것을 없앴다 — 묶으면 지남 건이 그 업체의 자리를 영구히
+  // 차지해, 뒤에 오는 마감이 화면에 아예 뜨지 않는다(누락 방지 화면이 건을 숨겼다).
+  check('미완료 건이 건별로 렌더된다', cards === 5, `cards=${cards}`);
+  const sorted = await page.$$eval('.due-card', (els) => els.map((e) => e.querySelector('.dc-l2').textContent.trim()));
+  check('D-day 카드가 존재하고 날짜순이다', sorted.length === 5);
+  check('접힘 문구(이후 일정 N건)가 사라졌다', !(await page.innerText('#dueList')).includes('이후 '));
   check('오늘 셀이 표시된다', (await page.$$('.day.today')).length === 1);
   const labels = await page.$$eval('.event', (e) => e.map((x) => x.textContent.trim()));
-  check('캘린더 이벤트 라벨이 "업체 · 일정명" 형식', labels.every((l) => l.includes(' · ')), labels[0]);
+  // 칩 표기는 칸 폭에 따라 물러난다: 170px 이상이면 「업체 · 업무」, 110px 이상이면 업무명만,
+  // 그 아래는 글자를 버리고 점으로 간다. 84px 칸에 13px 한글은 두 글자밖에 못 담기 때문이다.
+  const cw = await page.$eval('.day', (e) => e.getBoundingClientRect().width);
+  const mode = cw >= 170 ? 'full' : cw >= 110 ? 'name' : 'dot';
+  check('칸 폭에 맞는 칩 표기로 물러난다', mode === 'dot' ? labels.length === 0
+    : mode === 'full' ? labels.every((l) => l.includes(' · '))
+    : labels.every((l) => l.length > 0), `칸 ${Math.round(cw)}px · ${mode} · ${labels[0] || '(점)'}`);
+  check('업체명은 넓은 칸에서만 붙는다', mode !== 'full' || labels.every((l) => l.includes(' · ')), labels[0] || '');
   check('캘린더 라벨에 D-day 를 넣지 않는다', !labels.some((l) => /D[-+]\d|D-DAY/.test(l)), labels.find((l) => /D[-+]\d/.test(l)) || '');
   // 요일 헤더는 스크롤 컨테이너 밖에 있어 항상 보인다 (sticky 대신 구조로 해결)
   check('요일 헤더가 스크롤과 무관하게 남는다', await page.$eval('.weekdays', (e) => !e.closest('#calendarScroll')));
@@ -133,8 +143,16 @@ console.log('\n[3] 빈 날짜 더블클릭 → 일정 추가(날짜 프리필) /
   check('빈 날짜 두 번 클릭으로 일정 추가가 열린다', await page.$eval('#scheduleModal', (e) => e.classList.contains('show')));
   check('클릭한 날짜가 이미 채워져 있다', (await page.inputValue('#sDate')) === target, `${await page.inputValue('#sDate')} != ${target}`);
   await page.fill('#sName', '테스트 일정');
+  // 업체는 자동으로 채워 주지 않는다 — 채워 주면 업체 칸을 안 본 사람의 일정이
+  // 엉뚱한 업체 밑으로 조용히 들어간다. 고르지 않고 저장하면 그 칸을 가리킨다.
   await page.click('#saveScheduleBtn');
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(150);
+  check('업체를 고르지 않으면 저장되지 않는다', await page.$eval('#scheduleModal', (e) => e.classList.contains('show')));
+  check('무엇이 빠졌는지 말해 준다', (await page.innerText('#toast')).includes('업체'), await page.innerText('#toast'));
+  await page.selectOption('#sVendor', { index: 0 });
+  await page.waitForTimeout(150);
+  await page.click('#saveScheduleBtn');
+  await page.waitForTimeout(250);
   const added = await page.$$eval(`.day[data-date="${target}"] .event`, (e) => e.map((x) => x.textContent));
   check('저장 즉시 해당 날짜에 이벤트가 나타난다', added.some((t) => t.includes('테스트 일정')), added.join('|'));
 
@@ -217,9 +235,11 @@ console.log('\n[7] 완료 취소 — 잘못 누른 OK 를 되돌린다 (발주�
   await page.click('#completeBtn');
   await page.waitForTimeout(300);
 
-  // 완료된 항목을 다시 열어 되돌린다.
-  await page.click('.event.done >> nth=-1');
-  await page.waitForTimeout(200);
+  // 완료 건은 칸 안 칩에서 접히고 날짜 옆 초록 체크로 남는다. 그 체크를 눌러 목록에서 연다.
+  await page.click('.done-mark >> nth=-1');
+  await page.waitForSelector('#dayModal.show');
+  await page.click('#dayBody .board-item >> nth=0');
+  await page.waitForTimeout(250);
   const btns = await page.evaluate(() => ({
     reopen: !document.getElementById('reopenBtn').classList.contains('hidden'),
     complete: !document.getElementById('completeBtn').classList.contains('hidden'),
@@ -272,7 +292,7 @@ console.log('\n[9] D-day 기준 — 무제한 / 직접설정 / 프리셋');
   await page.selectOption('#horizonSelect', '3');
   await page.waitForTimeout(250);
   const d3 = await page.$$eval('.due-card', (e) => e.length);
-  check('무제한이 미래 일정을 제한하지 않는다', all === 4, `all=${all}`);
+  check('무제한이 미래 일정을 제한하지 않는다', all === 5, `all=${all}`);
   check('유한 기준이 실제로 걸러낸다', d3 < all, `d3=${d3} all=${all}`);
   check('지난 일정은 기준과 무관하게 남는다', d3 >= 2, `d3=${d3}`);
   await page.selectOption('#horizonSelect', 'custom');
@@ -400,7 +420,7 @@ console.log('\n[13] 예시 데이터 넣기/빼기 — 실제 업무는 건드�
   check('처음엔 "불러오기"로 표시된다', (await page.innerText('#demoToggleBtn')).includes('불러오기'));
   await page.click('#demoToggleBtn');
   await page.waitForTimeout(300);
-  check('예시 데이터가 들어온다', (await page.$$eval('.due-card', (e) => e.length)) === 4);
+  check('예시 데이터가 들어온다', (await page.$$eval('.due-card', (e) => e.length)) === 5);
   // 사용자가 직접 만든 업무를 하나 추가한 뒤 예시만 지운다.
   await page.evaluate(async () => {
     const C = window.WorkCore, s = await C.readState();
@@ -454,10 +474,10 @@ console.log('\n[14] 타이포그래피 하한 — 화면의 모든 글자가 13p
 
   const calEvent = await page.$eval('.event', (e) => parseFloat(getComputedStyle(e).fontSize));
   check('캘린더 이벤트가 13px 이상이다', calEvent >= FLOOR, `${calEvent}px`);
-  const vendor = await page.$eval('.due-vendor', (e) => parseFloat(getComputedStyle(e).fontSize));
-  const task = await page.$eval('.due-task', (e) => parseFloat(getComputedStyle(e).fontSize));
-  const sub = await page.$eval('.due-sub', (e) => parseFloat(getComputedStyle(e).fontSize));
-  check('정보 계층이 크기로 드러난다 (업체 > 일정명 > 부제)', vendor > task && task > sub, `${vendor}/${task}/${sub}`);
+  const l1 = await page.$eval('.dc-l1', (e) => parseFloat(getComputedStyle(e).fontSize));
+  const l2 = await page.$eval('.dc-l2', (e) => parseFloat(getComputedStyle(e).fontSize));
+  check('카드 첫 줄이 둘째 줄보다 크다', l1 > l2, `${l1}/${l2}`);
+  check('카드 둘째 줄도 13px 하한을 지킨다', l2 >= FLOOR, `${l2}px`);
 
   // 좁은 조각 창에서도 하한이 지켜진다
   const mini = await ctx.newPage();
@@ -480,12 +500,14 @@ console.log('\n[15] 레이아웃 — 좁은 화면에서도 가로 스크롤이 
     }));
     check(`${vp.width}x${vp.height} 가로 넘침 없음`, over.doc <= 0, `문서 +${over.doc}px`);
     check(`${vp.width}x${vp.height} 시트 머리가 넘치지 않음`, over.head <= 0, `+${over.head}px`);
-    // 발주서 §13: 캘린더는 하나의 세로 스크롤 컨테이너를 가지고, 주 행을 억지로 눌러
-    // 담지 않는다. 화면이 크면 한 달이 통째로 들어와 스크롤이 안 생기는 게 정상이다.
+    // 칸 높이를 창에서 역산하므로 한 달은 언제나 통째로 들어온다. 예전에는 칸이 112px 로
+    // 못박혀 있어 6주 달에서 한 주가 스크롤 밖으로 밀려났다 — 그 주가 조용히 사라졌다.
     const cal = await page.$eval('.calendar-scroll', (e) => ({
-      overflowY: getComputedStyle(e).overflowY,
+      overflow: e.scrollHeight - e.clientHeight,
+      rows: document.querySelectorAll('.month-grid .day').length / 7,
     }));
-    check(`${vp.width}x${vp.height} 캘린더가 세로 스크롤 컨테이너다`, cal.overflowY === 'auto' || cal.overflowY === 'scroll', cal.overflowY);
+    check(`${vp.width}x${vp.height} 한 달이 스크롤 없이 다 들어온다`, cal.overflow <= 0, `+${cal.overflow}px · ${cal.rows}주`);
+    check(`${vp.width}x${vp.height} 주 행이 잘리지 않는다`, cal.rows === 5 || cal.rows === 6, `${cal.rows}주`);
     // 주 행 높이를 줄여 억지로 맞추지 않는다.
     const rowH = await page.$eval('.day', (e) => e.getBoundingClientRect().height);
     check(`${vp.width}x${vp.height} 날짜 칸이 눌리지 않는다 (>=112px)`, rowH >= 112, `${Math.round(rowH)}px`);
@@ -855,10 +877,16 @@ console.log('\n[25] 조각 — 창이 아니라 악세사리로 보이고, 미�
 
   // 끌기 — data-tauri-drag-region 은 mousedown 대상 요소 자신에 있어야 동작한다.
   const drag = await mini.evaluate(() => {
-    const need = ['.mini-head', '.mini-tools', '#pieceCal .sheet-head'];
+    const need = ['.mini-head', '#pieceCal .sheet-head'];
     return need.filter((s) => !document.querySelector(s)?.hasAttribute('data-tauri-drag-region'));
   });
-  check('머리와 바닥을 잡아 끌 수 있다', drag.length === 0, drag.join(', '));
+  check('머리를 잡아 끌 수 있다', drag.length === 0, drag.join(', '));
+  // 버튼이 늘어선 푸터를 끌기 영역으로 두면 버튼 사이 4px 틈을 잘못 눌러 창이 딸려 온다.
+  check('버튼 줄(푸터)은 끌기 영역이 아니다',
+    !(await mini.evaluate(() => document.querySelector('.mini-tools')?.hasAttribute('data-tauri-drag-region'))));
+  // 끌 수 있다는 사실이 화면에 보여야 한다 — 지금까지 잡을 곳에 아무 표시가 없었다.
+  const grips = await mini.evaluate(() => document.querySelectorAll('.grip').length);
+  check('조각 머리에 끌기 손잡이가 보인다', grips === 3, `grip=${grips}`);
   const noDrag = await mini.evaluate(() =>
     ['.due-card', '#omni', '#omniAdd', '#settingsBtn', '.tabs [data-board="due"]']
       .filter((s) => document.querySelector(s)?.hasAttribute('data-tauri-drag-region')));
@@ -871,6 +899,8 @@ console.log('\n[25] 조각 — 창이 아니라 악세사리로 보이고, 미�
   await page.waitForSelector('#scheduleModal.show');
   check('+ 는 친 이름 그대로 일정 추가를 연다', (await page.inputValue('#sName')) === '비료 수급 확인');
   check('날짜가 오늘로 미리 채워진다', (await page.inputValue('#sDate')) === (await page.evaluate(() => window.WorkCore.todayISO())));
+  await page.selectOption('#sVendor', { index: 0 });
+  await page.waitForTimeout(150);
   await page.click('#saveScheduleBtn');
   await page.waitForTimeout(400);
   const saved = await page.evaluate(async () => {
@@ -1083,6 +1113,8 @@ console.log('\n[27] 기간 일정 — 시작과 끝이 있는 일을 한 건으�
   await page.fill('#sDate', await page.evaluate(() => window.WorkCore.addDays(window.WorkCore.todayISO(), 5)));
   await page.fill('#sEnd', await page.evaluate(() => window.WorkCore.addDays(window.WorkCore.todayISO(), 1)));
   await page.fill('#sName', '거꾸로 기간');
+  await page.selectOption('#sVendor', { index: 0 });
+  await page.waitForTimeout(150);
   await page.click('#saveScheduleBtn');
   await page.waitForTimeout(300);
   check('종료일이 시작일보다 빠르면 저장하지 않는다', await page.$eval('#scheduleModal', (e) => e.classList.contains('show')));
@@ -1369,6 +1401,9 @@ console.log('\n[30] 검색되는 선택 칸 — 치면 걸러지고, 없으면 �
   check('role=combobox 로 노출된다', aria.role === 'combobox' && aria.list, JSON.stringify(aria));
   check('원래 select 는 값의 주인으로만 남는다', aria.nativeHidden === 'true');
   check('처음에는 닫혀 있다', aria.expanded === 'false');
+  check('처음에는 비어 있다(자동 선택 없음)', (await page.inputValue('#sVendorInput')).length === 0);
+  await page.selectOption('#sVendor', { index: 0 });
+  await page.waitForTimeout(150);
   check('고른 값이 글자로 보인다', (await page.inputValue('#sVendorInput')).length > 0);
 
   // 치면 걸러진다
@@ -1639,8 +1674,20 @@ console.log('\n[33] 공통 일정 — 여러 업체에 한 번에, 업체별로 
   // 한 곳만 고르면 예전과 똑같다
   await page.click('#addScheduleBtn');
   await page.waitForSelector('#scheduleModal.show');
-  check('처음에는 업체 한 곳이 칩으로 들어와 있다', await page.$$eval('#sVendorChips .chip', (e) => e.length) === 1);
+  // 업체는 비워 둔 채 연다. 첫 업체를 미리 넣어 두면 업체 칸을 보지 않은 사람의 일정이
+  // 엉뚱한 업체 밑으로 조용히 들어간다.
+  check('처음에는 업체가 비어 있다', await page.$$eval('#sVendorChips .chip', (e) => e.length) === 0);
+  await page.selectOption('#sVendor', { index: 0 });
+  await page.waitForTimeout(150);
+  check('고르면 칩 한 개가 생긴다', await page.$$eval('#sVendorChips .chip', (e) => e.length) === 1);
   check('한 곳이면 업체별 조정 줄이 안 나온다', await page.$eval('#sPerVendorBox', (e) => e.classList.contains('hidden')));
+  // 다른 업체로 바꾸면 '교체'다. 예전에는 더해져서 두 업체에 일정이 생겼다.
+  await page.selectOption('#sVendor', { index: 1 });
+  await page.waitForTimeout(150);
+  check('업체를 바꾸면 교체된다(추가가 아니다)', await page.$$eval('#sVendorChips .chip', (e) => e.length) === 1,
+    `chips=${await page.$$eval('#sVendorChips .chip', (e) => e.length)}`);
+  await page.selectOption('#sVendor', { index: 0 });
+  await page.waitForTimeout(150);
   await page.fill('#sName', '단독 일정');
   await page.fill('#sDate', await d(3));
   await page.click('#saveScheduleBtn');
@@ -1655,9 +1702,15 @@ console.log('\n[33] 공통 일정 — 여러 업체에 한 번에, 업체별로 
   await page.fill('#sName', '행사 부스 운영');
   await page.fill('#sDate', await d(10));
   await page.fill('#sEnd', await d(40));
+  await combo(page, 'sVendor', '대한건설');
+  check('고르면 한 곳이 칩으로 선다', await page.$$eval('#sVendorChips .chip', (e) => e.length) === 1);
+  // [업체 더 넣기] 를 누른 다음 고르면 더해진다 — 그냥 고르면 교체다.
+  await page.click('#sAddVendor');
   await combo(page, 'sVendor', '미래토건');
+  await page.click('#sAddVendor');
   await combo(page, 'sVendor', '동성건설');
-  check('고른 업체가 칩으로 쌓인다', await page.$$eval('#sVendorChips .chip', (e) => e.length) === 3);
+  check('업체 더 넣기로 고른 곳이 칩으로 쌓인다', await page.$$eval('#sVendorChips .chip', (e) => e.length) === 3,
+    `chips=${await page.$$eval('#sVendorChips .chip', (e) => e.length)}`);
   check('둘 이상이면 업체별 조정 줄이 나온다', await page.$eval('#sPerVendorBox', (e) => !e.classList.contains('hidden')));
   const pvRows = await page.$$eval('#sPerVendor .pv-row', (e) => e.length);
   check('업체 수만큼 조정 줄이 선다', pvRows === 3, `${pvRows}`);
@@ -1741,7 +1794,9 @@ console.log('\n[34] 끌어서 날짜 이동 — 기간은 통으로, 완료는 �
   await page.reload();
   await page.waitForSelector('.due-card');
 
-  check('완료 건은 끌리지 않는다', await page.$eval('.event.done', (e) => e.getAttribute('draggable') !== 'true'));
+  // 완료 건은 칸 안 칩에서 아예 접힌다 — 끌 대상 자체가 화면에 없다.
+  check('완료 건은 칩으로 서지 않는다', (await page.$$('[data-event-id="drag-3"]')).length === 0);
+  check('완료 건은 날짜 옆 체크로 접힌다', (await page.$$(`.day[data-date] .done-mark`)).length > 0);
   check('진행 건은 끌린다', await page.$eval('[data-event-id="drag-1"]', (e) => e.getAttribute('draggable') === 'true'));
 
   // HTML5 DnD 를 이벤트로 흉내낸다 — Playwright 의 dragTo 는 파일시스템 밖 DataTransfer 를 못 만든다.

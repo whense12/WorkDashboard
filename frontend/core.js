@@ -15,6 +15,40 @@
   const endOf=r=>{const st=r?.date;if(!st)return null;const e=r.endDate;return e&&e>st?e:st};
   const isPeriod=r=>!!(r&&r.date&&r.endDate&&r.endDate>r.date);
   const periodDays=r=>isPeriod(r)?diffDays(r.endDate,r.date)+1:1;
+  // ── 비근무일 ──────────────────────────────────────────────────────────────
+  // 행정 마감은 근무일에 걸린다. 마감일이 토·일·공휴일이면 실제로는 그 앞 근무일까지
+  // 끝내야 하는데, 화면에 공휴일이 아예 없어서 앱을 믿을수록 늦었다.
+  // 음력·대체공휴일은 계산으로 낼 수 없으므로 관보 기준 날짜를 표로 동봉한다.
+  // (파일을 읽지 않는다 — 발주서 §26 의 임의 경로 접근이 아니다.)
+  const HOLIDAYS={
+    '2025-01-01':'신정','2025-01-28':'설날','2025-01-29':'설날','2025-01-30':'설날',
+    '2025-03-01':'삼일절','2025-03-03':'대체공휴일','2025-05-05':'어린이날·부처님오신날','2025-05-06':'대체공휴일',
+    '2025-06-06':'현충일','2025-08-15':'광복절','2025-10-03':'개천절','2025-10-05':'추석','2025-10-06':'추석',
+    '2025-10-07':'추석','2025-10-08':'대체공휴일','2025-10-09':'한글날','2025-12-25':'성탄절',
+    '2026-01-01':'신정','2026-02-16':'설날','2026-02-17':'설날','2026-02-18':'설날',
+    '2026-03-01':'삼일절','2026-03-02':'대체공휴일','2026-05-05':'어린이날','2026-05-24':'부처님오신날',
+    '2026-05-25':'대체공휴일','2026-06-06':'현충일','2026-08-15':'광복절','2026-09-24':'추석',
+    '2026-09-25':'추석','2026-09-26':'추석','2026-10-03':'개천절','2026-10-05':'대체공휴일',
+    '2026-10-09':'한글날','2026-12-25':'성탄절',
+    '2027-01-01':'신정','2027-02-06':'설날','2027-02-07':'설날','2027-02-08':'설날','2027-02-09':'대체공휴일',
+    '2027-03-01':'삼일절','2027-05-05':'어린이날','2027-05-13':'부처님오신날','2027-06-06':'현충일',
+    '2027-08-15':'광복절','2027-08-16':'대체공휴일','2027-09-14':'추석','2027-09-15':'추석','2027-09-16':'추석',
+    '2027-10-03':'개천절','2027-10-04':'대체공휴일','2027-10-09':'한글날','2027-12-25':'성탄절',
+    '2028-01-01':'신정','2028-01-26':'설날','2028-01-27':'설날','2028-01-28':'설날',
+    '2028-03-01':'삼일절','2028-05-02':'부처님오신날','2028-05-05':'어린이날','2028-06-06':'현충일',
+    '2028-08-15':'광복절','2028-10-02':'추석','2028-10-03':'추석·개천절','2028-10-04':'추석',
+    '2028-10-09':'한글날','2028-12-25':'성탄절'
+  };
+  const holidayName=ds=>HOLIDAYS[ds]||'';
+  /** 토·일·공휴일이면 true. 표에 없는 해는 주말만 걸러진다(거짓 경보를 만들지 않는다). */
+  const isOffDay=ds=>{if(!ds)return false;const d=parse(ds);return d.getDay()===0||d.getDay()===6||!!HOLIDAYS[ds]};
+  /** 그 날이 비근무일이면 앞으로 당긴 마지막 근무일을 준다. 근무일이면 빈 문자열. */
+  function lastWorkdayBefore(ds){
+    if(!ds||!isOffDay(ds))return '';
+    let cur=ds;
+    for(let i=0;i<20;i++){cur=addDays(cur,-1);if(!isOffDay(cur))return cur}
+    return '';
+  }
   const spansDay=(r,ds)=>{const st=r?.date;return !!st&&ds>=st&&ds<=endOf(r)};
   /** 'before' 시작 전 · 'on' 당일(단일) · 'during' 기간 중 · 'after' 지남 */
   function phaseOf(r,base=todayISO()){
@@ -72,7 +106,7 @@
       createdGroup:n=>`새 행사를 만들었습니다: ${n}`,
       noGroup:'행사 없음',
       groupCaption:`행사 하나에 참여하는 ${V} 전부를 한 줄로 봅니다. 줄을 누르면 참여 ${V} 목록이 펼쳐집니다.`,
-      groupEmpty:'등록된 행사가 없습니다.<br><b>'+P+' 추가</b>에서 행사를 만들면 여기에 모입니다.',
+      groupEmpty:'아직 행사가 없습니다.',
       groupVendors:n=>`참여 ${V} ${n}곳`,
       addGroupMember:`+ 참여 ${V} 추가`,
       groupPeriodNote:`행사 기간이 기본값입니다. ${V}마다 참여기간을 줄일 수 있습니다.`,
@@ -90,7 +124,7 @@
       boardNoDate:'날짜 미정', boardProgress:`${S} 진행`,
       boardEmpty:`진행 중인 ${j(P,['이','가'])} 없습니다.`,
       sideCaption:`${V}별 가장 가까운 ${j(E,['이','가'])} 날짜순으로 표시됩니다.`,
-      calHint:`빈 날짜 두 번 클릭 = ${E} 추가 · ${E}은 끌어서 날짜 이동`,
+      calHint:`빈 날짜를 두 번 누르면 ${j(E,['이','가'])} 생깁니다`,
       eventModalTitle:`${E} 추가`, saveEvent:`${E} 저장`,
       fVendor:V, fLinkedProject:`연결 ${P}`,
       fLinkedNote:`${j(P,['과','와'])} 무관한 ${j(E,['은','는'])} ‘일반 ${E}’을 선택합니다.`,
@@ -115,7 +149,7 @@
       stepsModalTitle:`${P} ${S} 편집`, addStep:'+ 단계 추가', saveSteps:`${S} 저장`,
       genericEvent:`일반 ${E}`, noVendor:`${V} 미지정`,
       laterCount:n=>`이후 ${E} ${n}건`,
-      emptyBlank:`등록된 ${j(P,['이','가'])} 없습니다.<br>위쪽 <b>${P} 추가</b>로 시작하거나,<br>설정에서 예시 데이터를 불러오세요.`,
+      emptyBlank:`아직 ${j(P,['이','가'])} 없습니다.<br>아래 <b>${P} 추가</b>로 시작하거나, 설정에서 예시 데이터를 불러오세요.`,
       emptyHorizon:`설정한 기준 안에 예정된 ${j(E,['이','가'])} 없습니다.`,
       selectedStep:`선택 ${S}`, allSteps:`전체 ${P} ${S}`, editSteps:`${S} 편집`,
       stepsSub:'완료된 단계와 아직 오지 않은 단계까지 모두 표시합니다.',
@@ -123,6 +157,9 @@
       vendorInfo:`${V} 정보`, vendorName:`${V}명`, newVendorTpl:`+ ${V} 템플릿`, saveVendor:`${V} 저장`,
       workSteps:`${P} ${S}`, newWorkTpl:`+ ${P} 템플릿`,
       needEventFields:`날짜, ${V}, ${E}명을 확인하세요.`,
+      needName:e=>`${e}명을 적어 주세요.`,
+      needVendor:v=>`${v}를 고르세요.`,
+      needDate:'날짜를 고르세요.',
       needProjectFields:`${V}, 템플릿, ${P}명, 첫 날짜를 확인하세요.`,
       savedEvent:`${j(E,['을','를'])} 추가했습니다.`,
       savedProject:`${j(P,['을','를'])} 등록했습니다.`,
@@ -143,7 +180,7 @@
       budgetCaption:`${BI}별로 얼마가 나갔는지 봅니다. 줄을 누르면 ${P}별로, 다시 누르면 ${V}별로 펼쳐집니다.`,
       budgetTotal:'총예산', budgetSpent:'기지출', budgetPlanned:'지출예정', budgetRemain:'잔액', budgetOver:'초과',
       editBudget:'합본예산서', addSpend:`+ ${SP} 등록`,
-      budgetEmpty:`등록된 ${j(BI,['이','가'])} 없습니다.<br>위 <b>합본예산서</b>에서 ${j(BI,['과','와'])} 예산액을 넣어 주세요.`,
+      budgetEmpty:`아직 ${j(BI,['이','가'])} 없습니다.`,
       unassignedItem:`${BI} 미지정`, noProjectGroup:`${P} 미지정`,
       budgetEmptyItem:`아직 ${j(SP,['이','가'])} 없습니다.`,
       budgetModalTitle:'합본예산서', budgetTitleLabel:'예산서 이름', budgetYear:'연도',
@@ -414,13 +451,20 @@
     return rows;
   }
   function horizonDays(settings){if(settings.horizon==='all')return Infinity;if(settings.horizon==='custom')return Math.max(1,Number(settings.customHorizon||1));return Number(settings.horizon||14)}
+  /** 기간 안의 미완료 건을 하나도 빠짐없이 날짜순으로 준다.
+   *
+   *  예전에는 업체로 묶어 첫 건만 카드로 만들고 나머지를 "이후 일정 N건" 한 줄로 접었다.
+   *  지남 건은 완료할 때까지 그 업체의 첫 자리를 영구히 차지하므로, 석 달 전 미완료 한 건을
+   *  방치한 업체는 그 뒤 어떤 마감이 와도 목록에 뜨지 않았다 — 누락 방지를 하겠다는 화면이
+   *  구조적으로 건을 숨기고 있었다. 접힘 문구에는 날짜도 D-day 도 없었고 기간 설정도 무시했다.
+   *  업체별로 보고 싶으면 바로 옆 [업체별] 탭이 그 일을 한다. */
   function dueCards(state){
-    const max=horizonDays(state.settings),future=eventRecords(state).filter(e=>!e.completed&&e.date);
-    const groups=new Map();
-    future.forEach(e=>{const arr=groups.get(e.vendorId)||[];arr.push(e);groups.set(e.vendorId,arr)});
-    const cards=[];
-    groups.forEach((arr,vendorId)=>{arr.sort((a,b)=>sortDate(a).localeCompare(sortDate(b))||a.date.localeCompare(b.date));const first=arr[0],d=diffDays(sortDate(first));if(d<=max||d<0||max===Infinity)cards.push({...first,extra:arr.length-1,dday:d})});
-    return cards.sort((a,b)=>sortDate(a).localeCompare(sortDate(b))||a.date.localeCompare(b.date));
+    const max=horizonDays(state.settings);
+    return eventRecords(state)
+      .filter(e=>!e.completed&&e.date)
+      .map(e=>({...e,dday:diffDays(sortDate(e))}))
+      .filter(e=>e.dday<0||max===Infinity||e.dday<=max)
+      .sort((a,b)=>sortDate(a).localeCompare(sortDate(b))||a.date.localeCompare(b.date));
   }
   // ── 업체별 요약 ──────────────────────────────────────────────────────────
   // 대시보드의 두 번째 축. 좌측 레일과 캘린더가 "언제"를 묻는다면 여기는
@@ -762,7 +806,7 @@
     if(moved)await saveState(state);
     return moved;
   }
-  window.WorkCore={KEY,STATE_VERSION,seed,defaultTerms,defaultVendorFields,labels,josa,demoData,hasDemoData,clone,uid,todayISO,parse,iso,addDays,diffDays,pretty,esc,isTauri,nativeFiles,migrate,normalizeState,initStorage,saveState,watchState,readState,vendor,project,currentStep,eventRecords,dueCards,ddayLabel,ddayClass,horizonDays,horizonLabel,vendorSummaries,groupSummaries,group,projectsOfGroup,budgetSummary,spendsOfRecord,formatMoney,searchAll,isPeriod,periodDays,spansDay,phaseOf,sortDate,endOf,projectBands,projectFromTemplate,completeEvent,reopenEvent,
+  window.WorkCore={KEY,STATE_VERSION,seed,defaultTerms,defaultVendorFields,labels,josa,demoData,hasDemoData,clone,uid,todayISO,parse,iso,addDays,diffDays,pretty,esc,isTauri,nativeFiles,migrate,normalizeState,initStorage,saveState,watchState,readState,vendor,project,currentStep,eventRecords,dueCards,ddayLabel,ddayClass,horizonDays,horizonLabel,vendorSummaries,groupSummaries,group,projectsOfGroup,budgetSummary,spendsOfRecord,formatMoney,searchAll,isPeriod,periodDays,spansDay,holidayName,isOffDay,lastWorkdayBefore,phaseOf,sortDate,endOf,projectBands,projectFromTemplate,completeEvent,reopenEvent,
     putAttachment,readAttachment,deleteAttachment,attachmentsOf,purgeAttachments,revealAttachment,migrateAttachmentsToDisk,formatBytes,
     buildBackup,readBackup,restoreBackup,writeBackupFile,listBackups,readBackupFile,rotateBackups,revealBackups,maybeAutoBackup};
 })();

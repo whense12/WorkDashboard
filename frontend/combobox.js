@@ -102,6 +102,9 @@
       e.preventDefault();pick([...list.querySelectorAll('.cb-opt')].indexOf(li));
     });
     input.addEventListener('blur',()=>{setTimeout(()=>{if(!wrap.contains(document.activeElement)){closeList();showText()}},0)});
+    // 원래 select 가 값의 주인이다. 값이 바깥에서 바뀌면(프로그램·키보드·보조기기)
+    // 보이는 글자도 따라가야 한다 — 안 그러면 화면과 실제 값이 조용히 갈라진다.
+    select.addEventListener('change',()=>{if(document.activeElement!==input)showText()});
 
     // app.js 가 fillSelects() 로 <option> 을 통째로 다시 그린다. 그때 표시 글자도 따라와야 한다.
     new MutationObserver(()=>{if(!open)showText()}).observe(select,{childList:true});

@@ -11,6 +11,24 @@ use tauri_plugin_window_state::StateFlags;
 /// 종료와 조각 보이기/숨기기는 트레이가 맡는다.
 const PIECES: [&str; 3] = ["cal", "mini", "status"];
 
+/// 입력 폼이 떠 있는 동안만 켜진다. 폼은 조각 안에서 열리므로, 이 때까지 바닥으로
+/// 되밀면 사용자가 글자를 넣는 창이 다른 프로그램 뒤로 숨는다. 폼을 닫으면 바로 꺼지고
+/// 그 순간 다시 바닥에 꽂으므로 '평상시 항상 아래'는 그대로다.
+static MODAL_OPEN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+#[tauri::command]
+fn set_modal_open(app: tauri::AppHandle, open: bool) {
+    MODAL_OPEN.store(open, std::sync::atomic::Ordering::Relaxed);
+    if !open {
+        // 폼이 닫혔다 — 유예 중 위로 올라와 있던 조각을 즉시 바닥으로 되돌린다.
+        for label in PIECES {
+            if let Some(w) = app.get_webview_window(label) {
+                let _ = w.set_always_on_bottom(true);
+            }
+        }
+    }
+}
+
 fn win(app: &tauri::AppHandle, label: &str) -> Result<WebviewWindow, String> {
     app.get_webview_window(label)
         .ok_or_else(|| format!("{label} window not found"))
@@ -293,7 +311,11 @@ pub fn run() {
                     // Windows 가 창을 다른 프로그램 위로 끌어올린다 — 위젯이 순간 '창'이
                     // 되어 작업 중인 화면을 덮는다(실측: 메모장 겹침 게이트에서 검출).
                     // 포커스를 받을 때마다 바닥으로 되밀어 넣는다. 입력은 그대로 받는다.
-                    if PIECES.contains(&label.as_str()) {
+                    // 단, 입력 폼이 떠 있는 동안은 유예한다 — 글자를 넣는 창을 바닥으로
+                    // 밀어 버리면 사용자가 자기가 쓰는 화면을 못 본다.
+                    if PIECES.contains(&label.as_str())
+                        && !MODAL_OPEN.load(std::sync::atomic::Ordering::Relaxed)
+                    {
                         let _ = window.set_always_on_bottom(true);
                     }
                 }
@@ -359,6 +381,7 @@ pub fn run() {
             piece_ready,
             pop_ready,
             close_pop,
+            set_modal_open,
             open_form,
             exit_app,
             set_autostart,

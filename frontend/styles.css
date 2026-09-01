@@ -16,6 +16,7 @@
   --accent-soft:#ecf2fe;   /* primary-5 */
   --today:#e3ecfd;
   --danger:#bd2c0f;--danger-soft:#fdefec;
+  --sat:#1a4fa0;          /* 토요일 — 근무일이 아니라는 표시 */
   --warn:#8a5c00;--warn-soft:#fff3db;
   --done:#267337;--done-soft:#eaf6ec;
   --shadow:0 10px 34px rgba(19,20,22,.20);
@@ -70,8 +71,8 @@ body{
 
 /* 조각 하나만 보이는 창 모드. 바깥 여백은 그림자가 그려질 실제 투명 영역이다. */
 body.win-mode{background:transparent;overflow:hidden}
-body.win-mode .desk{display:block;padding:10px;height:100vh}
-body.win-mode .piece{height:100%}
+body.win-mode .desk{display:flex;flex-direction:column;padding:10px;height:100vh}
+body.win-mode .piece{flex:1;min-height:0;height:auto}
 body.mode-cal #pieceMini,body.mode-cal #pieceStatus{display:none}
 body.mode-mini #pieceCal,body.mode-mini #pieceStatus{display:none}
 body.mode-status #pieceCal,body.mode-status #pieceMini{display:none}
@@ -98,6 +99,14 @@ body.mode-pop .modal-bg.show~.modal-bg.show .modal{width:min(560px,100%);max-hei
 .pbtn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .pbtn.primary:hover{background:#083891}
 
+/* 조각을 끄는 손잡이. 501줄 어디에도 cursor:move 가 없어서 "옮길 수 있다"는 사실이
+   화면에 한 번도 나타나지 않았다. 여섯 점은 창 손잡이의 보편 관례다. */
+.grip{width:10px;height:16px;flex:0 0 auto;cursor:move;
+  background-image:radial-gradient(circle,rgba(30,33,36,.30) 1.2px,transparent 1.3px);
+  background-size:5px 5px;background-position:0 2px}
+.sheet-head,.mini-head{cursor:move}
+.mini-tools,.mini-tools *{cursor:default}
+
 /* ── ① 달력 시트 ── */
 .sheet-head{flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:12px 14px 8px;
   -webkit-user-select:none;user-select:none}
@@ -108,29 +117,60 @@ body.mode-pop .modal-bg.show~.modal-bg.show .modal{width:min(560px,100%);max-hei
 .weekdays{flex:0 0 auto;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;padding:0 10px}
 .weekdays div{padding:3px 8px 4px;font-size:var(--fs-xs);color:var(--muted);font-weight:800}
 .weekdays div:first-child{color:var(--danger)}
-.calendar-scroll{flex:1;min-height:0;overflow:auto;scrollbar-gutter:stable;padding:0 10px 10px}
-.month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-auto-rows:minmax(112px,1fr);gap:3px;min-height:100%}
-.day{position:relative;min-height:112px;border-radius:10px;background:var(--cell);padding:5px 7px 18px}
+.weekdays div:last-child{color:var(--sat)}
+/* 격자는 창에서 역산한다. 칸 높이를 112px 로 못박아 두었더니 6주 달에서 109px 이
+   모자라 한 주가 스크롤 밖으로 밀려났다 — 지난달 말과 이번 주가 조용히 사라졌다.
+   minmax(0,1fr) 이면 6주 달은 94px, 5주 달은 113px 로 저절로 맞고 스크롤이 없다. */
+.calendar-scroll{flex:1;min-height:0;overflow:hidden;padding:0 10px 10px}
+.month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:3px;height:100%}
+.day{position:relative;min-height:0;border-radius:10px;background:var(--cell);padding:3px 5px 4px;overflow:hidden}
 .day:hover{background:#fff}
 .day.out{background:var(--cell-dim)}
-.day.out .day-num{color:rgba(30,33,36,.38)}
+.day.out .day-num{color:rgba(30,33,36,.58)}
 .day.today{background:#fff;box-shadow:inset 0 0 0 2px var(--accent-line)}
-.day-head{height:24px;display:flex;align-items:center;justify-content:space-between;gap:4px}
-.day-num{min-width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font-size:13px;font-weight:850}
-.weekend .day-num{color:var(--danger)}
+.day-head{height:21px;display:flex;align-items:center;gap:4px}
+.day-num{min-width:21px;height:21px;border-radius:6px;display:grid;place-items:center;font-size:13px;font-weight:700}
+/* 근무일/비근무일. 일요일·공휴일 빨강은 한국 달력 관례, 토요일 파랑도 마찬가지다.
+   토요일에 색이 없으면 마감일이 근무일인지 한눈에 안 보인다. */
+.sun .day-num,.hol .day-num{color:var(--danger)}
+.sat .day-num{color:var(--sat)}
 .today .day-num{background:var(--accent);color:#fff}
-.today-label{font-size:var(--fs-xs);font-weight:900;letter-spacing:.05em;color:var(--accent)}
-.events{display:grid;gap:3px;margin-top:3px}
-.event{width:100%;border:0;background:rgba(255,255,255,.92);border-radius:6px;padding:4px 7px 4px 9px;font-size:var(--fs-xs);line-height:1.35;text-align:left;color:var(--ink);white-space:normal;word-break:keep-all;overflow-wrap:anywhere;position:relative;box-shadow:0 1px 2px rgba(19,20,22,.06)}
+.hol-name{font-size:var(--fs-xs);color:var(--danger);font-weight:700;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 완료 건은 칸 안 한 줄을 영구히 먹었다. 초록 체크 하나로 접고, 누르면 그 날 목록이 열린다. */
+.done-mark{margin-left:auto;flex:0 0 auto;min-width:19px;height:19px;border:0;border-radius:5px;
+  background:var(--done-soft);color:var(--done);font-size:var(--fs-xs);font-weight:700;display:grid;place-items:center;padding:0 3px;line-height:1}
+.done-mark:hover{background:#d7ecdc}
+/* 칸이 110px 아래로 좁아지면 글자를 포기하고 점으로 물러난다 — 84px 칸에 13px 한글은
+   두 글자밖에 못 담는다. 점은 누르면 바로 그 건이 열리고, 숫자는 그 날 건수다. */
+.dots{display:flex;flex-wrap:wrap;align-items:center;gap:3px;margin-top:4px}
+.dot{width:9px;height:9px;padding:0;border:0;border-radius:50%;flex:0 0 auto;background:var(--accent)}
+.dot.overdue{background:var(--danger)}
+.dot.today{background:#a86f00}
+.dot.planned{background:transparent;border:1.5px dashed var(--line-strong)}
+.dot:hover{outline:2px solid var(--accent-line);outline-offset:1px}
+.dot-n{font-size:var(--fs-xs);color:var(--muted);font-weight:700;margin-left:2px}
+.more{height:16px;width:100%;border:0;background:transparent;text-align:left;padding:0 0 0 8px;
+  font-size:var(--fs-xs);color:var(--muted);font-weight:700;display:flex;align-items:center}
+.more:hover{color:var(--accent)}
+.day-list{display:grid;gap:6px}
+.events{display:grid;gap:3px;margin-top:2px}
+/* 칩은 한 줄이다. 두 줄로 흘리면 칸 높이가 들쭉날쭉해져 격자가 깨지고, 한 칸에 두 건이
+   못 들어간다. 넘치는 이름은 …로 줄이고 전문은 title 툴팁과 그 날 목록에 있다. */
+.event{width:100%;display:flex;align-items:center;gap:5px;border:0;background:rgba(255,255,255,.94);
+  border-radius:6px;height:23px;padding:0 5px 0 8px;font-size:var(--fs-xs);text-align:left;color:var(--ink);
+  white-space:nowrap;overflow:hidden;position:relative;box-shadow:0 1px 2px rgba(19,20,22,.06)}
 .event:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:6px 0 0 6px;background:var(--accent)}
 .event:hover{background:#fff}
-.event.done{color:#6d7882;background:rgba(244,245,246,.85);text-decoration:line-through}
-.event.done:before{background:var(--done)}
-.event.overdue:not(.done){background:var(--danger-soft);color:var(--danger)}
-.event.overdue:not(.done):before{background:var(--danger)}
-.event.today:not(.done){background:var(--warn-soft);color:var(--warn)}
-.event.today:not(.done):before{background:var(--warn)}
-.event.manual:not(.overdue):not(.today):not(.done):before{background:#8a949e}
+.ev-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ev-d{flex:0 0 auto;font-size:var(--fs-xs);font-weight:700}
+.event.overdue{background:var(--danger-soft);color:var(--danger)}
+.event.overdue:before{background:var(--danger)}
+.event.today{background:var(--warn-soft);color:var(--warn)}
+.event.today:before{background:var(--warn)}
+/* 예상 마감 — 절차 offset 으로 미리 깔아 둔 칸. 확정된 일정과 형태로 구분한다. */
+.event.planned{background:rgba(255,255,255,.55);border:1px dashed var(--line-strong);color:var(--muted)}
+.event.planned:before{display:none}
+.event.manual:not(.overdue):not(.today):not(.planned):before{background:#8a949e}
 .event[draggable="true"]{cursor:grab}
 .event.dragging{opacity:.45}
 .day.drop-ok{box-shadow:inset 0 0 0 2px var(--accent-line);background:rgba(236,242,254,.85)}
@@ -149,18 +189,19 @@ body.mode-pop .modal-bg.show~.modal-bg.show .modal{width:min(560px,100%);max-hei
 .day-band.start{border-top-left-radius:999px;border-bottom-left-radius:999px;margin-left:0;padding-left:9px}
 .day-band.end{border-top-right-radius:999px;border-bottom-right-radius:999px;margin-right:0}
 .day.out .day-band{opacity:.45}
-.add-hint{position:absolute;right:7px;bottom:4px;font-size:var(--fs-xs);color:#79828c;opacity:0}
+.add-hint{position:absolute;right:6px;bottom:3px;font-size:var(--fs-xs);color:var(--muted);opacity:0;pointer-events:none}
 .day:hover .add-hint{opacity:1}
 
 /* ── ② 미니 대시보드 ── */
 .mini-head{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:8px;
   padding:10px 11px 8px;-webkit-user-select:none;user-select:none}
-.piece-title{font-size:var(--fs-md);font-weight:900;letter-spacing:-.01em}
-.tabs{display:flex;gap:3px;padding:3px;background:rgba(30,33,36,.08);border-radius:9px;width:max-content}
-.tab{border:0;background:transparent;border-radius:7px;padding:5px 11px;font-size:var(--fs-xs);font-weight:800;color:var(--muted)}
+.piece-title{font-size:var(--fs-sm);font-weight:700;letter-spacing:-.01em;flex:0 0 auto}
+.mini-head .hint{flex:1;text-align:right;min-width:0}
+.tabs{display:flex;gap:3px;padding:3px;background:rgba(30,33,36,.08);border-radius:9px;width:max-content;flex:0 0 auto}
+.tab{border:0;background:transparent;border-radius:7px;padding:5px 9px;font-size:var(--fs-xs);font-weight:700;color:var(--muted);white-space:nowrap}
 .tab.active{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
-.horizon{display:flex;align-items:center;gap:5px;font-size:var(--fs-xs);color:var(--muted)}
-.horizon select,.horizon input{height:30px;border:1px solid rgba(30,33,36,.12);background:rgba(255,255,255,.8);border-radius:8px;padding:0 6px;font-size:var(--fs-xs);font-weight:750}
+.horizon{display:flex;align-items:center;gap:5px;font-size:var(--fs-xs);color:var(--muted);flex:0 0 auto;margin-left:auto}
+.horizon select,.horizon input{height:30px;border:1px solid rgba(30,33,36,.12);background:rgba(255,255,255,.8);border-radius:8px;padding:0 4px;font-size:var(--fs-xs);font-weight:700}
 .horizon input{width:64px}
 /* 추가·검색 한 칸 — 치면 다섯 종류를 찾고, 없으면 그대로 일정을 만든다 */
 .omni-box{position:relative;flex:0 0 auto;margin:0 11px 8px;display:flex;align-items:center;gap:7px;
@@ -180,19 +221,31 @@ body.mode-pop .modal-bg.show~.modal-bg.show .modal{width:min(560px,100%);max-hei
 .omni-opt:hover,.omni-opt.active{background:var(--accent-soft)}
 .omni-opt.create{color:var(--accent);font-weight:800;border-top:1px solid var(--line);border-radius:0 0 8px 8px;margin-top:4px;padding-top:9px}
 .omni-empty{padding:9px 10px;font-size:var(--fs-xs);color:var(--muted)}
-.due-list{flex:1;min-height:0;padding:2px 11px 8px;display:grid;grid-auto-rows:max-content;gap:6px;overflow:auto;align-content:start}
-.due-card{border:0;background:rgba(255,255,255,.9);box-shadow:0 1px 3px rgba(19,20,22,.07);border-radius:12px;padding:10px 11px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;text-align:left;width:100%;position:relative}
-.due-card:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:12px 0 0 12px;background:var(--accent)}
+.due-list{flex:1;min-height:0;padding:2px 11px 8px;display:grid;grid-auto-rows:max-content;gap:5px;overflow:auto;align-content:start}
+/* 3단 92.5px 카드를 2줄 58px 로 눌렀다 — 같은 창에 두 배 이상이 들어간다.
+   오른쪽 체크는 목록에서 바로 완료하는 길이다(되돌리기 그대로 붙는다). */
+.due-card{background:rgba(255,255,255,.94);box-shadow:0 1px 2px rgba(19,20,22,.07);border-radius:10px;
+  height:58px;padding:0 8px 0 11px;display:flex;align-items:center;gap:8px;position:relative}
+.due-card:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:10px 0 0 10px;background:var(--accent)}
 .due-card:hover{background:#fff}
 .due-card.today:before{background:var(--warn)}
 .due-card.overdue:before{background:var(--danger)}
-.due-vendor{display:block;font-size:var(--fs-md);font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.due-task{display:block;font-size:var(--fs-sm);font-weight:750;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.due-sub{display:block;font-size:var(--fs-xs);color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.due-dday{min-width:56px;height:40px;border-radius:9px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-size:var(--fs-sm);font-weight:900}
-.due-card.today .due-dday{background:var(--warn-soft);color:var(--warn)}
-.due-card.overdue .due-dday{background:var(--danger-soft);color:var(--danger)}
-.due-extra{font-size:var(--fs-xs);color:var(--muted);margin-top:4px}
+.dc-open{flex:1;min-width:0;border:0;background:transparent;text-align:left;padding:0;
+  display:flex;align-items:center;gap:8px;height:100%}
+.dc-main{flex:1;min-width:0;display:grid;gap:1px}
+.dc-l1{display:block;font-size:var(--fs-sm);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dc-l2{display:block;font-size:var(--fs-xs);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dc-dday{flex:0 0 auto;min-width:46px;height:28px;border-radius:8px;background:var(--accent-soft);color:var(--accent);
+  display:grid;place-items:center;font-size:var(--fs-xs);font-weight:700}
+.due-card.today .dc-dday{background:var(--warn-soft);color:var(--warn)}
+.due-card.overdue .dc-dday{background:var(--danger-soft);color:var(--danger)}
+.dc-ok{flex:0 0 auto;width:34px;height:34px;border-radius:9px;border:1px solid var(--line-strong);background:#fff;
+  color:var(--muted);display:grid;place-items:center;font-size:15px;font-weight:700;padding:0}
+.dc-ok:hover{background:var(--done-soft);border-color:var(--done);color:var(--done)}
+/* 지남 건수 — "지금 급한 게 있나"를 말하는 화면상 유일한 한 곳 */
+.overdue-pill{height:24px;padding:0 10px;border-radius:999px;background:var(--danger-soft);color:var(--danger);
+  font-size:var(--fs-xs);font-weight:700;display:inline-flex;align-items:center;white-space:nowrap;flex:0 0 auto}
+.overdue-pill.zero{background:rgba(30,33,36,.07);color:var(--muted)}
 .empty{padding:26px 14px;text-align:center;color:var(--muted);font-size:var(--fs-xs)}
 .mini-tools{flex:0 0 auto;display:flex;gap:4px;padding:7px 9px;border-top:1px solid rgba(30,33,36,.08);
   -webkit-user-select:none;user-select:none}
@@ -202,7 +255,17 @@ body.mode-pop .modal-bg.show~.modal-bg.show .modal{width:min(560px,100%);max-hei
 
 /* ── ③ 현황 ── */
 .status-scroll{flex:1;min-height:0;overflow:auto;padding:0 11px 10px;display:grid;grid-auto-rows:max-content;gap:8px;align-content:start}
-.st-sec{background:rgba(255,255,255,.9);border-radius:12px;box-shadow:0 1px 3px rgba(19,20,22,.07);overflow:hidden}
+.st-sec{background:rgba(255,255,255,.9);border-radius:12px;box-shadow:0 1px 3px rgba(19,20,22,.07);overflow:hidden;
+  display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center}
+.st-sec>.st-head{grid-column:1}
+.st-sec>.st-face,.st-sec>.vendor-board,.st-sec>.budget-board{grid-column:1/-1}
+/* 빈 상태를 문장이 아니라 그 줄에서 바로 여는 버튼으로 만든다. 별도 버튼 행을 두었더니
+   현황 창(341x195) 안에서 두 번째 버튼이 잘렸다 — 한 줄이면 넉넉히 들어간다. */
+.st-mk{grid-column:2;height:26px;margin-right:11px;border:1px solid var(--accent);background:#fff;
+  border-radius:999px;padding:0 10px;font-size:var(--fs-xs);font-weight:700;color:var(--accent);white-space:nowrap}
+.st-mk:hover{background:var(--accent-soft)}
+.st-sec.is-empty>.st-face{display:none}
+.st-sec.is-empty>.st-head .st-caret{visibility:hidden}
 .st-head{width:100%;display:flex;align-items:center;gap:8px;border:0;background:transparent;padding:10px 12px;text-align:left}
 .st-head:hover{background:#fff}
 .st-title{font-size:var(--fs-sm);font-weight:900}

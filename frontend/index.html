@@ -8,6 +8,7 @@
 <!-- ① 달력 시트 — 배경화면에 심어진 월 달력. 빈 날짜 더블클릭 = 일정 추가(DesktopCal 관례). -->
 <section class="piece piece-cal" id="pieceCal">
   <header class="sheet-head" data-tauri-drag-region>
+    <span class="grip" data-tauri-drag-region aria-hidden="true"></span>
     <h1 class="month-title" id="monthTitle" data-tauri-drag-region></h1>
     <div class="cal-nav" id="calNav"><button class="pbtn icon" id="prevMonth" aria-label="이전 달"><svg class="ico" aria-hidden="true"><use href="#i-chevron-left"/></svg></button><button class="pbtn icon" id="nextMonth" aria-label="다음 달"><svg class="ico" aria-hidden="true"><use href="#i-chevron-right"/></svg></button><button class="pbtn" id="todayBtn">오늘</button></div>
     <span class="hint" id="calHint" data-tauri-drag-region></span>
@@ -20,7 +21,9 @@
 <!-- ② 미니 대시보드 — 일정순/업체별 토글 하나. 지남·오늘·예정을 따로 나누지 않는다(색으로 구분). -->
 <aside class="piece piece-mini" id="pieceMini">
   <header class="mini-head" data-tauri-drag-region>
+    <span class="grip" data-tauri-drag-region aria-hidden="true"></span>
     <div class="tabs seg" role="tablist" aria-label="미니 대시보드 보기"><button class="tab" role="tab" data-board="due" data-t="viewDue"></button><button class="tab" role="tab" data-board="vendor" data-t="viewVendor"></button></div>
+    <span class="overdue-pill zero" id="overduePill" title="기한이 지난 미완료 건"></span>
     <div class="horizon"><select id="horizonSelect" aria-label="D-day 기준"><option value="3">D-3</option><option value="5">D-5</option><option value="7">D-7</option><option value="14">D-14</option><option value="30">D-30</option><option value="all">무제한</option><option value="custom">직접설정</option></select><input id="horizonCustom" type="number" min="1" max="3650" class="hidden" aria-label="직접 D-day 일수"></div>
   </header>
   <div class="omni-box" id="omniBox">
@@ -31,7 +34,7 @@
   </div>
   <div class="due-list" id="dueList"></div>
   <div class="vendor-board hidden" id="vendorBoard"></div>
-  <footer class="mini-tools" data-tauri-drag-region>
+  <footer class="mini-tools">
     <button class="tool" id="addWorkBtn"><svg class="ico" aria-hidden="true"><use href="#i-folder-plus"/></svg><span data-t="addProject"></span></button>
     <button class="tool" id="templateBtn"><svg class="ico" aria-hidden="true"><use href="#i-layout-template"/></svg>템플릿</button>
     <button class="tool" id="settingsBtn"><svg class="ico" aria-hidden="true"><use href="#i-settings"/></svg>설정</button>
@@ -40,15 +43,15 @@
 
 <!-- ③ 현황 — 행사·예산. 줄을 누르면 그 자리에서 펼쳐진다. -->
 <aside class="piece piece-status" id="pieceStatus">
-  <header class="mini-head" data-tauri-drag-region><span class="piece-title" data-tauri-drag-region>현황</span><span class="hint" id="statusHint" data-tauri-drag-region></span></header>
+  <header class="mini-head" data-tauri-drag-region><span class="grip" data-tauri-drag-region aria-hidden="true"></span><span class="piece-title" data-tauri-drag-region>현황</span><span class="hint" id="statusHint" data-tauri-drag-region></span></header>
   <div class="status-scroll">
     <section class="st-sec" id="stGroupSec">
-      <button class="st-head" data-board="group" aria-expanded="false"><span class="st-title" data-t="viewGroup"></span><span class="st-sum" id="stGroupSum"></span><span class="st-caret" aria-hidden="true"></span></button>
+      <button class="st-head" data-board="group" aria-expanded="false"><span class="st-title" data-t="viewGroup"></span><span class="st-sum" id="stGroupSum"></span><span class="st-caret" aria-hidden="true"></span></button><button class="st-mk hidden" id="stGroupMake">＋ 만들기</button>
       <div class="st-face" id="stGroupFace"></div>
       <div class="vendor-board hidden" id="groupBoard"></div>
     </section>
     <section class="st-sec" id="stBudgetSec">
-      <button class="st-head" data-board="budget" aria-expanded="false"><span class="st-title" data-t="viewBudget"></span><span class="st-sum" id="stBudgetSum"></span><span class="st-caret" aria-hidden="true"></span></button>
+      <button class="st-head" data-board="budget" aria-expanded="false"><span class="st-title" data-t="viewBudget"></span><span class="st-sum" id="stBudgetSum"></span><span class="st-caret" aria-hidden="true"></span></button><button class="st-mk hidden" id="stBudgetMake">＋ 합본예산서</button>
       <div class="st-face" id="stBudgetFace"></div>
       <div class="budget-board hidden" id="budgetBoard"></div>
     </section>
@@ -108,5 +111,6 @@
   <div class="field"><label for="spDate" data-t="fSpendDate"></label><input id="spDate" type="date"></div>
   <div class="field"><label for="spMemo">메모</label><input id="spMemo" placeholder="선택"></div>
 </div></div><div class="modal-foot"><button class="btn danger hidden" id="deleteSpendBtn" data-t="deleteSpend"></button><button class="btn" data-close="spendModal">취소</button><button class="btn primary" id="saveSpendBtn" data-t="saveSpend"></button></div></section></div>
+<div class="modal-bg" id="dayModal"><section class="modal narrow" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="dayTitle"><div class="modal-head"><h2 id="dayTitle">그 날 일정</h2><button class="close" data-close="dayModal" aria-label="닫기"><svg class="ico" aria-hidden="true"><use href="#i-x"/></svg></button></div><div class="modal-body" id="dayBody"></div><div class="modal-foot"><button class="btn" id="dayAddBtn">이 날에 일정 추가</button><button class="btn" data-close="dayModal">닫기</button></div></section></div>
 <div class="toast" id="toast"></div>
 <script src="zip.js"></script><script src="combobox.js"></script><script src="core.js"></script><script src="app.js"></script></body></html>

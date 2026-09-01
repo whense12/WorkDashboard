@@ -52,6 +52,9 @@
     await mutate();
     await C.saveState(state);render();
     pendingPurge=purge;
+    // 문구를 함수로 줄 수 있다 — 되돌리기 토스트 하나에 결과까지 담아야 하는 조작이 있다
+    // (완료: "완료 · 다음 일정 …"). 토스트를 두 번 띄우면 뒤엣것이 되돌리기 버튼을 지운다.
+    if(typeof message==='function')message=message();
     toast(message,{label:L.undo,onExpire:flushPurge,run:async()=>{
       pendingPurge=null;                // 되돌리면 실물도 지우지 않는다
       state=before;await C.saveState(state);render();
@@ -65,22 +68,42 @@
   const FOCUSABLE='a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
   const focusables=root=>[...root.querySelectorAll(FOCUSABLE)].filter(el=>el.offsetWidth||el.offsetHeight||el.getClientRects().length);
   // 좁은 조각(미니·현황)에서 폼이 열리면 창을 잠깐 폼 크기로 넓힌다. 닫으면 되돌린다.
-  let preModalSize=null;
+  //
+  // 넓히기만 하면 안 된다. 미니·현황은 layout_pieces 가 화면 오른쪽 끝에 못박아 두므로
+  // 좌상단을 고정한 채 폭만 키우면 창이 화면 밖으로 자라고, 모달 오른쪽에 있는 [저장]이
+  // 잘려 나간다(1024 화면에서 실측 325px 초과). 크기를 바꾼 뒤 반드시 작업영역 안으로
+  // 되끌어 넣고, 닫을 때 크기와 위치를 함께 되돌린다.
+  let preModalBox=null;
+  const clamp=(v,lo,hi)=>Math.max(lo,Math.min(v,hi));
   async function fitWindowForModal(){
-    if(!C.isTauri()||!MODE||preModalSize||window.innerWidth>=640)return;
+    if(!C.isTauri()||!MODE||preModalBox||window.innerWidth>=640)return;
     try{
-      const w=window.__TAURI__.window.getCurrentWindow();
-      preModalSize=await w.innerSize();
+      const W=window.__TAURI__.window,w=W.getCurrentWindow();
+      const size=await w.innerSize(),pos=await w.outerPosition();
+      preModalBox={size,pos};
       const dpr=window.devicePixelRatio||1;
-      await w.setSize(new window.__TAURI__.window.PhysicalSize(
-        Math.max(preModalSize.width,Math.round(680*dpr)),
-        Math.max(preModalSize.height,Math.round(700*dpr))));
-    }catch(e){console.warn('창 넓히기 실패',e);preModalSize=null}
+      const want={w:Math.max(size.width,Math.round(680*dpr)),h:Math.max(size.height,Math.round(700*dpr))};
+      await w.setSize(new W.PhysicalSize(want.w,want.h));
+      // 모달이 떠 있는 동안만 바닥 고정을 유예한다. 안 그러면 폼이 다른 창 뒤로 숨는다.
+      try{await window.__TAURI__.core.invoke('set_modal_open',{open:true})}catch(e){}
+      const mon=await W.currentMonitor();
+      if(mon){
+        const mp=mon.position,ms=mon.size;
+        await w.setPosition(new W.PhysicalPosition(
+          clamp(pos.x,mp.x,mp.x+ms.width-want.w),
+          clamp(pos.y,mp.y,mp.y+ms.height-want.h)));
+      }
+    }catch(e){console.warn('창 넓히기 실패',e);preModalBox=null}
   }
   async function unfitWindow(){
-    if(!preModalSize)return;
-    const s=preModalSize;preModalSize=null;
-    try{await window.__TAURI__.window.getCurrentWindow().setSize(new window.__TAURI__.window.PhysicalSize(s.width,s.height))}catch(e){}
+    if(!preModalBox)return;
+    const {size,pos}=preModalBox;preModalBox=null;
+    try{
+      const W=window.__TAURI__.window,w=W.getCurrentWindow();
+      await w.setSize(new W.PhysicalSize(size.width,size.height));
+      await w.setPosition(new W.PhysicalPosition(pos.x,pos.y));
+    }catch(e){}
+    try{await window.__TAURI__.core.invoke('set_modal_open',{open:false})}catch(e){}
   }
   let popShown=false;
   function show(id){
@@ -112,9 +135,38 @@
   async function persist(msg){await C.saveState(state);render();if(msg)toast(msg)}
   function render(){L=C.labels(state.terms);applyStaticLabels();renderHorizon();renderDue();renderCalendar();renderBoard();renderGroupBoard();renderBudget();renderStatus();applyMiniMode();applyStatus();fillSelects();renderTemplatePanes();}
   // 정적 HTML 의 data-t 를 사전 값으로 채운다. 마크업이 들어가는 문구만 innerHTML 로 넣는다.
-  function applyStaticLabels(){document.title=L.app;qa('[data-t]').forEach(el=>{const v=L[el.dataset.t];if(typeof v==='string')el.textContent=v});const o=$('omni');if(o)o.placeholder=L.omniPlaceholder;$('calHint').textContent=L.calHint;$('statusHint').textContent='줄을 누르면 펼쳐집니다'}
+  function applyStaticLabels(){document.title=L.app;qa('[data-t]').forEach(el=>{const v=L[el.dataset.t];if(typeof v==='string')el.textContent=v});const o=$('omni');if(o)o.placeholder=L.omniPlaceholder;$('calHint').textContent=L.calHint;$('statusHint').textContent=''}
   function renderHorizon(){const s=state.settings;$('horizonSelect').value=s.horizon;$('horizonCustom').value=s.customHorizon;$('horizonCustom').classList.toggle('hidden',s.horizon!=='custom')}
-  function renderDue(){const cards=C.dueCards(state),host=$('dueList');if(!cards.length){const blank=!state.projects.length&&!state.manualEvents.length;host.innerHTML=`<div class="empty">${blank?L.emptyBlank:L.emptyHorizon}</div>`;return}host.innerHTML=cards.map(r=>{const v=C.vendor(state,r.vendorId),p=C.project(state,r.projectId);return `<button class="due-card ${C.ddayClass(r)}" data-due-kind="${r.kind}" data-due-id="${r.id}"><span><span class="due-vendor">${C.esc(v?.name||L.noVendor)}</span><span class="due-task">${C.esc(r.name)}</span><span class="due-sub">${spanText(r)}${p?` · ${C.esc(p.name)}`:''}</span>${r.extra?`<span class="due-extra">${C.esc(L.laterCount(r.extra))}</span>`:''}</span><span class="due-dday">${C.ddayLabel(r)}</span></button>`}).join('');qa('[data-due-id]',host).forEach(b=>b.addEventListener('click',()=>openRecord(b.dataset.dueKind,b.dataset.dueId)))}
+  // 카드는 두 줄로 눌렀다(92.5px -> 58px). 같은 창에 두 배 이상이 들어간다.
+  // 오른쪽 체크는 목록에서 바로 완료하는 길이다 — 가장 자주 하는 조작이 상세 모달
+  // 안쪽 깊이에만 있을 이유가 없다.
+  function renderDue(){
+    const cards=C.dueCards(state),host=$('dueList');
+    const late=cards.filter(r=>C.ddayClass(r)==='overdue').length;
+    const pill=$('overduePill');
+    if(pill){pill.textContent=late?`지남 ${late}`:'지남 없음';pill.classList.toggle('zero',!late)}
+    if(!cards.length){const blank=!state.projects.length&&!state.manualEvents.length;host.innerHTML=`<div class="empty">${blank?L.emptyBlank:L.emptyHorizon}</div>`;return}
+    host.innerHTML=cards.map(r=>{const v=C.vendor(state,r.vendorId),p=C.project(state,r.projectId);
+      return `<div class="due-card ${C.ddayClass(r)}">
+        <button class="dc-open" data-due-kind="${r.kind}" data-due-id="${r.id}" title="${C.esc(v?.name||L.noVendor)} · ${C.esc(r.name)}">
+          <span class="dc-main">
+            <span class="dc-l1">${C.esc(v?.name||L.noVendor)} · ${C.esc(r.name)}</span>
+            <span class="dc-l2">${spanText(r)}${p?` · ${C.esc(p.name)}`:''}</span>
+          </span>
+          <span class="dc-dday">${C.ddayLabel(r)}</span>
+        </button>
+        <button class="dc-ok" data-ok-kind="${r.kind}" data-ok-id="${r.id}" title="완료 처리" aria-label="${C.esc(r.name)} 완료 처리">✓</button>
+      </div>`}).join('');
+    qa('[data-due-id]',host).forEach(b=>b.addEventListener('click',()=>openRecord(b.dataset.dueKind,b.dataset.dueId)));
+    qa('[data-ok-id]',host).forEach(b=>b.addEventListener('click',()=>completeFromList(b.dataset.okKind,b.dataset.okId)));
+  }
+  // 목록에서 바로 완료. 상세를 거치지 않지만 되돌리기는 똑같이 붙는다.
+  async function completeFromList(kind,id){
+    const rec=findRecord(kind,id);if(!rec||rec.completed)return;
+    let next=null;
+    await withUndo(()=>next?`완료 · 다음 일정 ${next.name} ${C.pretty(next.dueDate)}`:`완료 · ${rec.name}`,
+      ()=>{next=C.completeEvent(state,rec,C.todayISO())});
+  }
   // ── 미니 대시보드 토글 ───────────────────────────────────────────────────
   // 지남/오늘/예정을 머리글로 가르지 않는다 — 색(빨강/주황/파랑)이 이미 그 일을 한다.
   // 대신 한 토글로 '일정순'과 '업체별'을 오간다. 초안의 세그먼트 조작 언어 그대로다.
@@ -159,12 +211,17 @@
       return `<div class="st-row"><div class="l1"><b>${C.esc(g.group.name)}</b><span>${C.esc(period)} · ${C.esc(L.groupVendors(g.vendorCount))}</span></div>
         <div class="st-meter"><span class="track"><i style="width:${pct}%;background:#7a4dbe"></i></span><span class="n">${g.stepsDone} / ${g.stepsTotal}${g.overdueCount?` · <b style="color:var(--danger)">${L.boardOverdue} ${g.overdueCount}</b>`:''}</span></div></div>`;
     }).join(''):`<div class="empty" style="padding:8px">${L.groupEmpty}</div>`;
+    $('stGroupMake')?.classList.toggle('hidden',gs.length>0);
+    $('stGroupSec')?.classList.toggle('is-empty',!gs.length);
     const t=C.budgetSummary(state).total;
     $('stBudgetSum').textContent=t.amount?`${L.budgetRemain} ${C.formatMoney(t.remain)}원`:'미등록';
     $('stBudgetFace').innerHTML=t.amount||t.spent||t.planned
       ?`<div class="st-row"><div class="l1"><b>${C.esc(L.budgetTotal)} ${won(t.amount)}</b><span class="${t.remain<0?'neg':''}">${C.esc(t.remain<0?L.budgetOver:L.budgetRemain)} ${won(Math.abs(t.remain))}</span></div>
          <div class="st-meter"><span class="track">${budgetBarInner(t)}</span><span class="n">${C.esc(L.budgetSpent)} ${won(t.spent)} · ${C.esc(L.budgetPlanned)} ${won(t.planned)}</span></div></div>`
       :`<div class="empty" style="padding:8px">${L.budgetEmpty}</div>`;
+    const hasBudget=!!(t.amount||t.spent||t.planned);
+    $('stBudgetMake')?.classList.toggle('hidden',hasBudget);
+    $('stBudgetSec')?.classList.toggle('is-empty',!hasBudget);
   }
   const budgetBarInner=r=>`<i style="width:${r.spentRate}%;background:var(--done)"></i><i style="width:${r.plannedRate}%;background:${r.over?'var(--danger)':'var(--accent)'}"></i>`;
   function boardItemRow(it){
@@ -433,7 +490,41 @@
     refreshOpenDetail();
   }
   function allEventRecords(){return C.eventRecords(state)}
-  function renderCalendar(){const y=currentMonth.getFullYear(),m=currentMonth.getMonth();$('monthTitle').textContent=`${y}년 ${m+1}월`;$('monthGrid').innerHTML='';const first=new Date(y,m,1),before=first.getDay(),days=new Date(y,m+1,0).getDate(),cells=Math.ceil((before+days)/7)*7,events=allEventRecords(),bands=C.projectBands(state);for(let i=0;i<cells;i++){const d=new Date(y,m,1-before+i),ds=C.iso(d),inMonth=d.getMonth()===m,isToday=ds===C.todayISO(),rows=events.filter(e=>C.spansDay(e,ds)).sort((a,b)=>Number(a.completed)-Number(b.completed)),dayBands=bands.filter(b=>C.spansDay(b,ds));const cell=document.createElement('div');cell.className=`day ${inMonth?'':'out'} ${d.getDay()===0?'weekend':''} ${isToday?'today':''}`;cell.dataset.date=ds;cell.innerHTML=`<div class="day-head"><span class="day-num">${d.getDate()}</span>${isToday?'<span class="today-label">TODAY</span>':''}</div>${dayBands.length?`<div class="day-bands">${dayBands.map(b=>`<span class="day-band ${edgeClass(b,ds)}" title="${C.esc(b.name)} · ${spanText(b)}${b.count?` · ${C.esc(L.groupVendors(b.count))}`:''}">${b.date===ds||d.getDay()===0?C.esc(b.name)+(b.count?` (${b.count})`:''):''}</span>`).join('')}</div>`:''}<div class="events">${rows.map(r=>{const v=C.vendor(state,r.vendorId);return `<button class="event ${r.completed?'done':''} ${r.kind==='manual'?'manual':''} ${!r.completed?C.ddayClass(r):''} ${edgeClass(r,ds)}"${r.completed?'':' draggable="true"'} data-event-kind="${r.kind}" data-event-id="${r.id}" title="${C.esc(v?.name||'')} · ${C.esc(r.name)} · ${spanText(r)}">${r.completed?'✓ ':''}${C.esc(v?.name||L.noVendor)} · ${C.esc(r.name)}${C.isPeriod(r)&&r.date===ds?` (${C.periodDays(r)}일)`:''}</button>`}).join('')}</div>${inMonth?`<span class="add-hint">+ ${C.esc(state.terms.event)}</span>`:''}`;
+  // 칸 하나가 실제로 몇 px 인지 재서 칩 표기 수준을 정한다. 1920 화면이면 칸이 약 198px 라
+  // 「업체 · 업무」가 통째로 들어가지만, 1024 화면이면 84px 뿐이라 같은 규칙으로 그리면
+  // 「동… D+4」처럼 두 글자만 남는다 — 그건 지금보다 나쁘다. 좁으면 글자를 포기하고
+  // 점과 건수로 물러난다. 어느 쪽이든 누르면 그 날 목록이 열린다.
+  function cellWidth(){
+    const host=$('monthGrid');
+    const w=host?.clientWidth||host?.parentElement?.clientWidth||0;
+    return w?Math.floor((w-18)/7):120;   // gap 3px x 6
+  }
+  const chipMode=w=>w>=170?'full':(w>=110?'name':'dot');
+  function renderCalendar(){const y=currentMonth.getFullYear(),m=currentMonth.getMonth();$('monthTitle').textContent=`${y}년 ${m+1}월`;$('monthGrid').innerHTML='';const first=new Date(y,m,1),before=first.getDay(),days=new Date(y,m+1,0).getDate(),cells=Math.ceil((before+days)/7)*7,events=allEventRecords(),bands=C.projectBands(state);
+    const MODE_C=chipMode(cellWidth()),CAP=MODE_C==='full'?3:2;
+    for(let i=0;i<cells;i++){const d=new Date(y,m,1-before+i),ds=C.iso(d),inMonth=d.getMonth()===m,isToday=ds===C.todayISO(),dow=d.getDay(),hol=C.holidayName(ds),
+      all=events.filter(e=>C.spansDay(e,ds)),open=all.filter(e=>!e.completed),done=all.filter(e=>e.completed),
+      dayBands=bands.filter(b=>C.spansDay(b,ds));
+    const cell=document.createElement('div');
+    cell.className=`day ${inMonth?'':'out'} ${dow===0?'sun':''} ${dow===6?'sat':''} ${hol?'hol':''} ${isToday?'today':''}`;
+    cell.dataset.date=ds;
+    // 완료 건은 칸 안 한 줄을 영구히 먹었다. 날짜 옆 초록 체크 하나로 접고, 누르면 펼친다.
+    const doneMark=done.length?`<button class="done-mark" data-done-day="${ds}" title="${C.esc(done.map(x=>x.name).join(', '))}">✓${done.length>1?done.length:''}</button>`:'';
+    const head=`<div class="day-head"><span class="day-num">${d.getDate()}</span>${hol&&inMonth?`<span class="hol-name">${C.esc(hol)}</span>`:''}${doneMark}</div>`;
+    const bandHtml=dayBands.length?`<div class="day-bands">${dayBands.map(b=>`<span class="day-band ${edgeClass(b,ds)}" title="${C.esc(b.name)} · ${spanText(b)}${b.count?` · ${C.esc(L.groupVendors(b.count))}`:''}">${b.date===ds||dow===0?C.esc(b.name)+(b.count?` (${b.count})`:''):''}</span>`).join('')}</div>`:'';
+    let body='';
+    if(MODE_C==='dot'&&open.length){
+      body=`<div class="dots">${open.map(r=>`<button class="dot ${r.planned?'planned':C.ddayClass(r)}" data-event-kind="${r.kind}" data-event-id="${r.id}" title="${C.esc((C.vendor(state,r.vendorId)?.name)||'')} · ${C.esc(r.name)} · ${spanText(r)}"></button>`).join('')}${open.length>1?`<b class="dot-n">${open.length}</b>`:''}</div>`;
+    }else if(open.length){
+      const show=open.slice(0,CAP),rest=open.length-show.length;
+      body=`<div class="events">${show.map(r=>{const v=C.vendor(state,r.vendorId);
+        const label=MODE_C==='full'?`${C.esc(v?.name||L.noVendor)} · ${C.esc(r.name)}`:C.esc(r.name);
+        // 배지는 넓을 때만, 그것도 지남·오늘·예상에만 단다. 전건에 붙이면 폭을 다시 잃는다.
+        const dd=C.ddayClass(r),badge=MODE_C==='full'?(r.planned?'예상':(dd==='overdue'||dd==='today'?C.ddayLabel(r):'')):'';
+        return `<button class="event ${r.planned?'planned':''} ${r.kind==='manual'?'manual':''} ${dd} ${edgeClass(r,ds)}"${r.planned?'':' draggable="true"'} data-event-kind="${r.kind}" data-event-id="${r.id}" title="${C.esc(v?.name||'')} · ${C.esc(r.name)} · ${spanText(r)}${r.planned?' · 예상 마감':''}"><span class="ev-name">${label}${C.isPeriod(r)&&r.date===ds?` (${C.periodDays(r)}일)`:''}</span>${badge?`<span class="ev-d">${C.esc(badge)}</span>`:''}</button>`}).join('')}</div>`
+        +(rest>0?`<button class="more" data-more-day="${ds}">＋${rest}건</button>`:'');
+    }
+    cell.innerHTML=head+bandHtml+body+(inMonth?`<span class="add-hint">+ ${C.esc(state.terms.event)}</span>`:'');
     if(inMonth){
       // 시트는 바탕화면이다. 한 번 클릭으로 모달이 튀면 바탕화면을 잘못 건드릴 때마다 창이 뜬다.
       // DesktopCal 관례대로 빈 날짜는 두 번 클릭으로 연다.
@@ -445,6 +536,8 @@
         if(kind&&id)moveRecordTo(kind,id,ds);});
     }
     $('monthGrid').appendChild(cell)}
+    qa('[data-more-day]',$('monthGrid')).forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();openDay(b.dataset.moreDay)}));
+    qa('[data-done-day]',$('monthGrid')).forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();openDay(b.dataset.doneDay)}));
     qa('[data-event-id]',$('monthGrid')).forEach(b=>{
       b.addEventListener('click',e=>{e.stopPropagation();openRecord(b.dataset.eventKind,b.dataset.eventId)});
       if(b.getAttribute('draggable')==='true'){
@@ -452,6 +545,28 @@
         b.addEventListener('dragend',()=>b.classList.remove('dragging'));
       }
     })}
+  // ── 그 날 목록 ───────────────────────────────────────────────────────────
+  // 칸이 좁아 접은 것(＋N건)과 접어 둔 완료 건을 여는 하나뿐인 출구. 칸 안에서 억지로
+  // 늘리면 격자가 무너지므로 목록으로 연다. 여기서 누르면 늘 쓰던 상세가 그대로 열린다.
+  let dayModalDate=null;
+  function openDay(ds){
+    dayModalDate=ds;
+    const rows=allEventRecords().filter(e=>C.spansDay(e,ds))
+      .sort((a,b)=>Number(a.completed)-Number(b.completed));
+    const d=C.parse(ds),wd=['일','월','화','수','목','금','토'][d.getDay()],hol=C.holidayName(ds);
+    $('dayTitle').textContent=`${d.getMonth()+1}월 ${d.getDate()}일 (${wd})${hol?` · ${hol}`:''}`;
+    $('dayBody').innerHTML=rows.length?`<div class="day-list">${rows.map(r=>{
+      const v=C.vendor(state,r.vendorId),p=C.project(state,r.projectId);
+      const cls=r.completed?'done':C.ddayClass(r);
+      return `<button class="board-item ${cls}" data-due-kind="${r.kind}" data-due-id="${r.id}">
+        <span class="bi-main"><span class="bi-name">${C.esc(v?.name||L.noVendor)} · ${C.esc(r.name)}</span>
+        <span class="bi-sub">${C.esc([p?.name,spanText(r)].filter(Boolean).join(' · '))}</span></span>
+        <span class="bi-dday ${cls}">${r.completed?'완료':C.ddayLabel(r)}</span></button>`}).join('')}</div>`
+      :`<div class="section-empty">이 날에는 일정이 없습니다.</div>`;
+    qa('[data-due-id]',$('dayBody')).forEach(b=>b.addEventListener('click',()=>{
+      hide('dayModal');openRecord(b.dataset.dueKind,b.dataset.dueId)}));
+    show('dayModal');
+  }
   // 끌어서 날짜 이동. 기간 건은 길이를 지킨 채 통으로 움직이고, 완료 건은 애초에 끌리지 않는다.
   async function moveRecordTo(kind,id,ds){
     const r=findRecord(kind,id);
@@ -539,23 +654,39 @@
       const v=pickedVendors[+b.dataset.pvReset];v.date=null;v.endDate=null;renderVendorPicks();
     }));
   }
+  let vendorAddMode=false;   // [업체 더 넣기] 를 눌러 둔 상태인가
   function addPickedVendor(id){
     if(!id||pickedVendors.some(v=>v.id===id))return;
     pickedVendors.push({id,date:null,endDate:null});renderVendorPicks();
   }
-  async function openSchedule(date=C.todayISO(),preset={}){
+  // 기본 날짜는 '오늘'이 아니라 '지금 보고 있는 달'을 따른다. 9월을 펼쳐 놓고 일정을
+  // 추가했는데 8월에 저장돼 화면에서 사라지는 일이 있었다(달력 버튼·N 키·omni 전부).
+  function defaultScheduleDate(){
+    const t=C.todayISO(),d=C.parse(t);
+    if(currentMonth.getFullYear()===d.getFullYear()&&currentMonth.getMonth()===d.getMonth())return t;
+    return C.iso(new Date(currentMonth.getFullYear(),currentMonth.getMonth(),1));
+  }
+  async function openSchedule(date,preset={}){
+    date=date||defaultScheduleDate();
     if(await popOut('schedule',{date,...preset}))return;
     selectedRecord=null;$('scheduleTitle').textContent=L.eventModalTitle;
     $('sDate').value=date;$('sEnd').value='';fillSelects();$('sName').value=preset.name||'';$('sMemo').value='';
-    pickedVendors=[];
-    const first=state.vendorTemplates[0]?.id;
-    if(first){$('sVendor').value=first;addPickedVendor(first)}else renderVendorPicks();
+    // 업체는 비워 둔 채 연다. 첫 업체를 미리 넣어 두면 다른 업체를 고른 사람이
+    // 두 곳에 일정을 만들게 된다 — 고르는 행위로만 대상이 정해져야 한다.
+    pickedVendors=[];renderVendorPicks();
+    if($('sVendor'))$('sVendor').value='';
     show('scheduleModal');setTimeout(()=>$('sName').focus(),0);
   }
   async function saveSchedule(){
     const c=commonRange(),name=$('sName').value.trim(),memo=$('sMemo').value.trim();
     if(!pickedVendors.length&&$('sVendor').value)addPickedVendor($('sVendor').value);
-    if(!c.date||!pickedVendors.length||!name){toast(L.needEventFields);return}
+    if(!name){toast(L.needName(state.terms.event));$('sName').focus();return}
+    if(!c.date){toast(L.needDate);$('sDate').focus();return}
+    if(!pickedVendors.length){
+      // 예전에는 첫 업체가 자동으로 들어가 있어, 업체 칸을 보지 않은 사람의 일정이
+      // 엉뚱한 업체 밑으로 조용히 들어갔다. 이제는 반드시 고르게 하고 그 칸을 가리킨다.
+      toast(L.needVendor(state.terms.vendor));
+      (document.getElementById('sVendorInput')||$('sVendor')).focus();return}
     const rows=pickedVendors.map(v=>({vendorId:v.id,date:v.date??c.date,endDate:v.endDate??c.endDate}));
     for(const r of rows)if(r.endDate&&r.endDate<r.date){toast(L.badEndDate);return}
     // 여럿이면 같은 batchId 를 달아 '공통 일정에서 온 건'임만 알린다. 묶어서 잠그지 않는다.
@@ -678,7 +809,12 @@
   }
   async function refreshDetail(msg){const k=selectedRecord?.kind,id=selectedRecord?.id;await C.saveState(state);render();if(k&&id)openRecord(k,id);if(msg)toast(msg)}
   async function addWorkLog(){const entity=recordEntity(selectedRecord),text=q('#workLogText')?.value.trim();if(!entity||!text)return;entity.logs=Array.isArray(entity.logs)?entity.logs:[];entity.logs.push({id:C.uid('log'),time:new Date().toISOString(),text});await refreshDetail('업무 내용을 기록했습니다.')}
-  async function deleteWorkLog(id){const entity=recordEntity(selectedRecord);if(!entity)return;entity.logs=(entity.logs||[]).filter(x=>x.id!==id);await refreshDetail('기록을 삭제했습니다.')}
+  // 기록도 되돌릴 수 있어야 한다. 통화 내용을 다시 쓰라고 할 수는 없다.
+  async function deleteWorkLog(id){
+    const entity=recordEntity(selectedRecord);if(!entity)return;
+    await withUndo('기록을 삭제했습니다.',()=>{entity.logs=(entity.logs||[]).filter(x=>x.id!==id)});
+    refreshOpenDetail();
+  }
   async function addAttachments(e){const entity=recordEntity(selectedRecord),files=[...(e.target.files||[])];if(!entity||!files.length)return;entity.attachments=Array.isArray(entity.attachments)?entity.attachments:[];let saved=0;for(const file of files){if(file.size>50*1024*1024){toast(`${file.name}: 50MB 이하 파일만 첨부할 수 있습니다.`);continue}try{const meta=await C.putAttachment(file,entity.id);entity.attachments.push(meta);saved++}catch(err){console.warn(err);toast('파일 저장을 지원하지 않는 환경입니다.')}}if(saved)await refreshDetail(`${saved}개 파일을 첨부했습니다.`)}
   function attachmentMeta(id){return (recordEntity(selectedRecord)?.attachments||[]).find(x=>x.id===id)||null}
   async function downloadAttachment(id){
@@ -702,7 +838,16 @@
       {purge:()=>C.deleteAttachment(meta)});
     refreshOpenDetail();
   }
-  async function completeSelected(){if(!selectedRecord)return;const next=C.completeEvent(state,selectedRecord,C.todayISO());hide('detailModal');await persist(next?`완료 · 다음 일정 ${next.name} ${C.pretty(next.dueDate)}`:'완료 처리했습니다.')}
+  // 가장 자주 하는 조작인데 되돌리기가 없었다 — 삭제·드래그·지출에는 있는 것이
+  // 완료에만 빠져 있었다. 잘못 누르면 그 자리에서 되돌린다.
+  async function completeSelected(){
+    if(!selectedRecord)return;
+    const rec=selectedRecord;
+    hide('detailModal');
+    let next=null;
+    await withUndo(()=>next?`완료 · 다음 일정 ${next.name} ${C.pretty(next.dueDate)}`:'완료 처리했습니다.',
+      ()=>{next=C.completeEvent(state,rec,C.todayISO())});
+  }
   // 날짜 변경은 네이티브 prompt() 대신 앱 안의 date 입력으로 받는다.
   function openDateModal(){if(!selectedRecord||selectedRecord.completed)return;
     $('dNewDate').value=selectedRecord.date;
@@ -908,9 +1053,28 @@
     if(findRecord(sel.kind,sel.id))openRecord(sel.kind,sel.id);}
   async function setAutostart(){const enabled=$('autostart').checked;state.settings.autostart=enabled;await C.saveState(state);if(C.isTauri())try{await window.__TAURI__.core.invoke('set_autostart',{enabled})}catch(e){toast('자동실행 설정을 적용하지 못했습니다.')}}
   $('horizonSelect').addEventListener('change',async e=>{state.settings.horizon=e.target.value;$('horizonCustom').classList.toggle('hidden',e.target.value!=='custom');await persist()});$('horizonCustom').addEventListener('change',async e=>{state.settings.customHorizon=Math.max(1,Number(e.target.value||1));await persist()});
-  $('prevMonth').addEventListener('click',()=>{currentMonth=new Date(currentMonth.getFullYear(),currentMonth.getMonth()-1,1);renderCalendar()});$('nextMonth').addEventListener('click',()=>{currentMonth=new Date(currentMonth.getFullYear(),currentMonth.getMonth()+1,1);renderCalendar()});$('todayBtn').addEventListener('click',()=>{const d=C.parse(C.todayISO());currentMonth=new Date(d.getFullYear(),d.getMonth(),1);renderCalendar();setTimeout(()=>q('.day.today')?.scrollIntoView({block:'center',behavior:'smooth'}),10)});
-  $('addScheduleBtn').addEventListener('click',()=>openSchedule());$('saveScheduleBtn').addEventListener('click',saveSchedule);$('sVendor').addEventListener('change',()=>{updateProjectSelect();addPickedVendor($('sVendor').value)});
-  $('sAddVendor').addEventListener('click',()=>{document.getElementById('sVendorInput')?.focus()});$('addWorkBtn').addEventListener('click',()=>openWork());$('saveWorkBtn').addEventListener('click',saveWork);$('wVendor').addEventListener('change',applyWorkMode);$('wTemplate').addEventListener('change',applyWorkMode);
+  $('prevMonth').addEventListener('click',()=>{currentMonth=new Date(currentMonth.getFullYear(),currentMonth.getMonth()-1,1);renderCalendar()});$('nextMonth').addEventListener('click',()=>{currentMonth=new Date(currentMonth.getFullYear(),currentMonth.getMonth()+1,1);renderCalendar()});$('todayBtn').addEventListener('click',()=>{const d=C.parse(C.todayISO());currentMonth=new Date(d.getFullYear(),d.getMonth(),1);renderCalendar()});
+  $('dayAddBtn').addEventListener('click',()=>{const ds=dayModalDate;hide('dayModal');if(ds)openSchedule(ds)});
+  // 창 크기가 바뀌면 칸 폭이 달라진다 — 칩 표기 수준을 다시 정해야 한다.
+  let calResizeT=null;
+  window.addEventListener('resize',()=>{clearTimeout(calResizeT);calResizeT=setTimeout(()=>{if(hasPiece('cal'))renderCalendar()},150)});
+  $('addScheduleBtn').addEventListener('click',()=>openSchedule());$('saveScheduleBtn').addEventListener('click',saveSchedule);// 업체 칸을 바꾸면 '교체'다. 예전에는 더해서, 다른 업체를 고르려던 사람이
+  // 두 업체에 같은 일정을 만들었다. 여러 곳에 함께 넣을 때는 아래 [업체 더 넣기]를 쓴다.
+  $('sVendor').addEventListener('change',()=>{
+    const id=$('sVendor').value;
+    if(id&&!pickedVendors.some(v=>v.id===id)){
+      if(vendorAddMode)pickedVendors.push({id,date:null,endDate:null});
+      else pickedVendors=[{id,date:null,endDate:null}];
+    }
+    vendorAddMode=false;
+    renderVendorPicks();updateProjectSelect();
+  });
+  // [업체 더 넣기] — 다음 한 번의 고르기만 '교체'가 아니라 '추가'로 만든다.
+  $('sAddVendor').addEventListener('click',()=>{
+    vendorAddMode=true;
+    const inp=document.getElementById('sVendorInput');
+    if(inp){inp.value='';inp.focus()}else $('sVendor').focus();
+  });$('addWorkBtn').addEventListener('click',()=>openWork());$('saveWorkBtn').addEventListener('click',saveWork);$('wVendor').addEventListener('change',applyWorkMode);$('wTemplate').addEventListener('change',applyWorkMode);
   $('wGroup').addEventListener('change',()=>{
     const g=C.group(state,$('wGroup').value);if(!g)return;
     if(!$('wProject').value.trim())$('wProject').value=g.name;
@@ -932,6 +1096,9 @@
   }
   qa('.tabs [data-board]').forEach(b=>b.addEventListener('click',()=>setMiniMode(b.dataset.board)));
   qa('.st-head[data-board]').forEach(b=>b.addEventListener('click',()=>toggleStatus(b.dataset.board)));
+  // 빈 상태에서 「없습니다」라고만 말하고 끝내지 않는다 — 그 줄에서 바로 만든다.
+  $('stGroupMake')?.addEventListener('click',e=>{e.stopPropagation();openWork()});
+  $('stBudgetMake')?.addEventListener('click',e=>{e.stopPropagation();openBudget()});
   // ── 추가·검색 한 칸 (미니 대시보드) ──────────────────────────────────────
   let omniItems=[],omniIdx=-1;
   function closeOmni(clear){const host=$('omniList');host.classList.add('hidden');$('omni').setAttribute('aria-expanded','false');omniIdx=-1;if(clear)$('omni').value=''}
@@ -978,8 +1145,12 @@
     $('omni').addEventListener('keydown',e=>{
       if(e.key==='ArrowDown'){e.preventDefault();moveOmni(1)}
       else if(e.key==='ArrowUp'){e.preventDefault();moveOmni(-1)}
+      // Enter 는 찾던 것을 연다. 예전에는 고르지 않았으면 무조건 마지막 항목
+      // (= '새로 만들기')으로 떨어져서, 찾으려던 사람이 같은 이름을 하나 더 만들었다.
+      // 결과가 하나도 없을 때만 새로 만들기로 간다.
       else if(e.key==='Enter'){e.preventDefault();const qv=$('omni').value.trim();if(!qv)return;
-        pickOmni(omniIdx>=0?omniIdx:omniItems.length-1)}   // 고르지 않았으면 '새로 만들기'
+        if(omniIdx>=0)pickOmni(omniIdx);
+        else pickOmni(omniItems.length>1?0:omniItems.length-1)}
       else if(e.key==='Escape'&&!$('omniList').classList.contains('hidden')){e.preventDefault();e.stopPropagation();closeOmni(false)}
     });
     $('omniAdd').addEventListener('click',()=>{const qv=$('omni').value.trim();closeOmni(true);openSchedule(C.todayISO(),qv?{name:qv}:{})});
@@ -994,7 +1165,9 @@
       if(k==='ArrowLeft'){e.preventDefault();$('prevMonth').click();return}
       if(k==='ArrowRight'){e.preventDefault();$('nextMonth').click();return}
     }
-    if(k==='n'||k==='N'){e.preventDefault();openSchedule();return}
+    // N 은 달력·미니에서만 받는다. 현황 조각(341x264)에서도 발동해서, 폼을 담으려고
+    // 창이 680px 로 부풀어 우하단 구석이 화면 밖으로 나가는 일이 있었다.
+    if((k==='n'||k==='N')&&(hasPiece('cal')||hasPiece('mini'))){e.preventDefault();openSchedule();return}
     if(k==='/'&&hasPiece('mini')){e.preventDefault();$('omni').focus()}
   });
   $('bAddItem').addEventListener('click',()=>{budgetDraft.push(blankBudgetRow());renderBudgetItems()});
@@ -1004,7 +1177,30 @@
   qa('[data-template-tab]').forEach(b=>b.addEventListener('click',()=>{templateTab=b.dataset.templateTab;qa('[data-template-tab]').forEach(x=>x.classList.toggle('active',x===b));$('vendorTemplatePane').classList.toggle('hidden',templateTab!=='vendor');$('workTemplatePane').classList.toggle('hidden',templateTab!=='work');$('termsPane').classList.toggle('hidden',templateTab!=='terms')}));qa('[data-close]').forEach(b=>b.addEventListener('click',()=>hide(b.dataset.close)));qa('.modal-bg').forEach(bg=>bg.addEventListener('mousedown',e=>{if(e.target===bg)hide(bg.id)}));document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modalStack.length)hide(modalStack[modalStack.length-1].id)});
   await C.watchState(v=>{state=v;render();consumePendingSelection()});
   const d=C.parse(C.todayISO());currentMonth=new Date(d.getFullYear(),d.getMonth(),1);render();consumePendingSelection();  // 사용자가 버튼을 눌러야 보호된다면 그건 또 하나의 업무다. 시작할 때 조용히 처리한다.
-  (async()=>{try{const moved=await C.migrateAttachmentsToDisk(state);if(moved)console.info('첨부 '+moved+'개를 앱 폴더로 옮겼습니다.');const ab=await C.maybeAutoBackup(state);if(ab&&ab.ok===false)toast('자동 백업에 실패했습니다: '+ab.error);}catch(e){console.warn(e)}})();setTimeout(()=>q('.day.today')?.scrollIntoView({block:'center'}),50);
+  // ── 자정 넘김 ────────────────────────────────────────────────────────────
+  // 24시간 켜 두는 위젯인데 부팅할 때 한 번 그리고 끝이었다. 자정을 넘기면 오늘 테두리가
+  // 어제 칸에 남고, 오늘 마감이 D-1 파랑으로 보이며, 어제 마감이 지남 빨강으로 올라오지
+  // 않는다 — 누락이 가장 잘 나는 그 하루에 정확히 틀린다. 데이터를 건드리지 않으니
+  // 저장도 필요 없다. 절전에서 깨어난 경우를 위해 1분마다 날짜만 대조한다.
+  let shownDay=C.todayISO();
+  function rollOver(){
+    const now=C.todayISO();
+    if(now===shownDay)return;
+    shownDay=now;
+    const t=C.parse(now);
+    // 오늘이 있는 달을 보고 있었다면 함께 넘어간다. 다른 달을 펼쳐 뒀으면 건드리지 않는다.
+    const prev=C.parse(C.addDays(now,-1));
+    if(currentMonth.getFullYear()===prev.getFullYear()&&currentMonth.getMonth()===prev.getMonth())
+      currentMonth=new Date(t.getFullYear(),t.getMonth(),1);
+    render();
+  }
+  function armMidnight(){
+    const n=new Date(),next=new Date(n.getFullYear(),n.getMonth(),n.getDate()+1,0,0,5);
+    setTimeout(()=>{rollOver();armMidnight()},Math.max(1000,next-n));
+  }
+  armMidnight();
+  setInterval(rollOver,60000);
+  (async()=>{try{const moved=await C.migrateAttachmentsToDisk(state);if(moved)console.info('첨부 '+moved+'개를 앱 폴더로 옮겼습니다.');const ab=await C.maybeAutoBackup(state);if(ab&&ab.ok===false)toast('자동 백업에 실패했습니다: '+ab.error);}catch(e){console.warn(e)}})();
   // pop 창이면 요청된 폼을 바로 연다. 폼이 못 열리면(대상이 그 사이 지워졌으면) 스스로 닫는다.
   if(IS_POP){
     const form=PARAMS.get('form');let payload={};
