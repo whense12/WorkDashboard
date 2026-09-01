@@ -204,11 +204,17 @@ fn layout_pieces(app: &tauri::AppHandle) {
     let margin = px(14.0);
     let gap = px(12.0);
     let taskbar = px(52.0); // 작업 표시줄 자리
+    // 바탕화면 아이콘 첫 열을 비우고 시작한다. 예전에는 달력 왼쪽 변이 x=24 라
+    // 휴지통을 포함한 아이콘 한 열을 덮어, 그 아이콘들을 누를 수 없게 만들었다.
+    // 조각은 아이콘 레이어 위에 뜨므로 자리를 비켜 주는 것 말고는 방법이 없다.
+    let gutter = px(96.0);
     let col_w = px(352.0).min(ms.width as i32 / 3);
     let usable_h = ms.height as i32 - taskbar - margin * 2;
     let right_x = mp.x + ms.width as i32 - margin - col_w;
-    let cal_w = (right_x - gap) - (mp.x + margin);
-    let mini_h = usable_h * 3 / 5;
+    let cal_w = (right_x - gap) - (mp.x + gutter);
+    // 급한 일 목록에 자리를 더 준다(3/5 -> 7/10). 현황은 접힌 머리 두 줄이면 충분하고,
+    // 빈 상태도 한 줄 버튼으로 줄여 남는 높이가 필요 없어졌다.
+    let mini_h = usable_h * 7 / 10;
     let status_h = usable_h - mini_h - gap;
     let place = |label: &str, x: i32, y: i32, w: i32, h: i32| {
         if let Some(win) = app.get_webview_window(label) {
@@ -216,7 +222,7 @@ fn layout_pieces(app: &tauri::AppHandle) {
             let _ = win.set_position(tauri::PhysicalPosition::new(x, y));
         }
     };
-    place("cal", mp.x + margin, mp.y + margin, cal_w, usable_h);
+    place("cal", mp.x + gutter, mp.y + margin, cal_w, usable_h);
     place("mini", right_x, mp.y + margin, col_w, mini_h);
     place("status", right_x, mp.y + margin + mini_h + gap, col_w, status_h);
 }

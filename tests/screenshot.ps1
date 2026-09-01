@@ -8,7 +8,8 @@
 #   C 저장     : 이름을 붙여넣고 파란 저장 버튼을 눌러 폼이 닫히지 않으면 실패
 #   D 토글     : 미니 [업체별] 탭 클릭에 화면이 안 바뀌면 실패
 #   E 설정     : 설정 버튼 클릭으로 좁은 조각이 넓어지지 않으면 실패 (모달 열림의 물증)
-#   F 닫기     : Escape 로 설정이 닫혀 원래 크기로 돌아오지 않으면 실패
+#   F 닫기     : Escape 로 설정이 닫혀 원래 크기·자리로 돌아오지 않으면 실패
+#   J 화면안   : 폼이 열리며 넓어진 창이 작업영역 밖으로 나가면 실패 ([저장]에 손이 닿는가)
 #   G 종료     : 세 조각을 Alt+F4 로 거뒀는데 프로세스가 살아 있으면 실패
 #   H 구버전정리: 프로세스가 살아 있는 채 새로 실행했을 때 이전 PID 가 살아 있으면 실패
 #   W 위젯     : 조각이 다른 창의 자식으로 끌려 들어가 있으면(위젯이 아니면) 실패
@@ -273,12 +274,16 @@ $d = Get-DiffPct "$OutDir/5-미니-토글전.png" "$OutDir/5-미니-업체별.pn
 Write-Host "토글 전후 변화: $d%"
 if ($d -lt 2) { $failures.Add("D: [업체별] 토글에 화면이 반응하지 않았습니다 ($d%).") }
 
-# ==== 6. 설정 열기(조각이 넓어짐) + 게이트 E — 제목의 버전은 스크린샷으로 남는다 ====
-# 좁은 조각은 모달이 열리면 680 논리폭으로 잠깐 넓어진다. 오른쪽 일부가 화면 밖으로
-# 나가도 모달 제목(버전 표시)은 왼쪽에 있어 스크린샷에 남는다. 조각을 옮기면
-# 달력과 겹쳐 클릭이 엉뚱한 창에 갈 수 있으므로 옮기지 않는다.
+# ==== 6. 설정 열기(조각이 넓어짐) + 게이트 E·J ====
+# 좁은 조각은 모달이 열리면 680 논리폭으로 잠깐 넓어진다.
+#
+# v0.6.1 까지 이 자리에 "오른쪽 일부가 화면 밖으로 나가도 제목은 왼쪽에 남는다"고 적어 두고
+# 넘어갔다. 그게 곧 결함이었다 — 미니·현황은 화면 오른쪽 끝에 못박혀 있어서 폭을 680 으로
+# 키우면 1024 화면 기준 325px 가 밖으로 나가고, 모달 오른쪽 끝의 [저장]이 잘려 눌리지 않는다.
+# 입력 경로 전체가 거기서 끊긴다. 이제는 창이 작업영역 안에 온전히 들어와야 통과다(게이트 J).
 $mr = Get-Rect $pieces['mini']
 $wBefore = $mr.Right - $mr.Left
+$posBefore = "$($mr.Left),$($mr.Top)"
 Click ([int]($mr.Left + 0.85 * ($mr.Right - $mr.Left))) ($mr.Bottom - 25) 1
 Start-Sleep -Seconds 3
 $mr2 = Get-Rect $pieces['mini']
@@ -288,13 +293,30 @@ Save-ScreenCrop "$OutDir/6-설정-전체.png" $mr2 "$OutDir/6-설정-버전표�
 Write-Host "설정 열기 전/후 조각 폭: $wBefore -> $wAfter"
 if ($wAfter -lt $wBefore + 150) { $failures.Add("E: 설정 버튼을 눌러도 모달이 열리지 않았습니다 (조각 폭 불변).") }
 
+$work = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+Write-Host "작업영역 $($work.Left),$($work.Top) ~ $($work.Right),$($work.Bottom) / 넓어진 창 $($mr2.Left),$($mr2.Top) ~ $($mr2.Right),$($mr2.Bottom)"
+$outR = $mr2.Right - $work.Right
+$outB = $mr2.Bottom - $work.Bottom
+$outL = $work.Left - $mr2.Left
+$outT = $work.Top - $mr2.Top
+if ($outR -gt 8 -or $outB -gt 8 -or $outL -gt 8 -or $outT -gt 8) {
+  $failures.Add("J: 폼이 열리자 창이 화면 밖으로 나갔습니다 — 오른쪽 +$outR, 아래 +$outB, 왼쪽 +$outL, 위 +$outT px. [저장] 버튼에 손이 닿지 않습니다.")
+} else {
+  Write-Host "게이트 J 통과: 폼이 열려도 창이 작업영역 안에 있습니다."
+}
+
 # ==== 7. Escape 로 설정 닫기 + 게이트 F ====
 [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
 Start-Sleep -Seconds 2
 $mr3 = Get-Rect $pieces['mini']
 $wClosed = $mr3.Right - $mr3.Left
-Write-Host "Escape 후 조각 폭: $wClosed"
+$posAfter = "$($mr3.Left),$($mr3.Top)"
+Write-Host "Escape 후 조각 폭: $wClosed / 위치 $posBefore -> $posAfter"
 if ($wClosed -gt $wBefore + 50) { $failures.Add("F: Escape 로 설정이 닫히지 않았습니다.") }
+# 넓히면서 옮겼으면 닫을 때 제자리로 돌려놓아야 한다 — 안 그러면 쓸 때마다 조각이 이사한다.
+if ([Math]::Abs($mr3.Left - $mr.Left) -gt 12 -or [Math]::Abs($mr3.Top - $mr.Top) -gt 12) {
+  $failures.Add("F2: 폼을 닫은 뒤 조각이 원래 자리로 돌아오지 않았습니다 ($posBefore -> $posAfter).")
+}
 
 # ==== 7.5 겹침: 다른 프로그램이 조각 위에 온다 + 게이트 I ====
 # 메모장을 실제로 띄워 달력에 겹친다. (1) 메모장이 달력을 덮어야 하고,
@@ -389,5 +411,5 @@ if ($failures.Count -gt 0) {
   foreach ($f in $failures) { Write-Host "::error::$f" }
   exit 1
 }
-Write-Host "화면 증거 수집 완료 — 위젯·렌더링·더블클릭·저장·토글·설정·닫기·겹침·종료·구버전정리 게이트 전부 통과."
+Write-Host "화면 증거 수집 완료 — 위젯·렌더링·더블클릭·저장·토글·설정·화면안클램프·닫기·복귀·겹침·종료·구버전정리 게이트 전부 통과."
 exit 0

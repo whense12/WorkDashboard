@@ -1,6 +1,6 @@
 {
   "name": "work-calendar-helper",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "private": true,
   "description": "업체별 업무 일정 · D-day 도우미 — 프론트엔드 검증/빌드 도구",
   "type": "module",
