@@ -685,12 +685,14 @@
     if(!pickedVendors.length&&$('sVendor').value)addPickedVendor($('sVendor').value);
     if(!name){toast(L.needName(state.terms.event));$('sName').focus();return}
     if(!c.date){toast(L.needDate);$('sDate').focus();return}
-    if(!pickedVendors.length){
-      // 예전에는 첫 업체가 자동으로 들어가 있어, 업체 칸을 보지 않은 사람의 일정이
-      // 엉뚱한 업체 밑으로 조용히 들어갔다. 이제는 반드시 고르게 하고 그 칸을 가리킨다.
-      toast(L.needVendor(state.terms.vendor));
-      (document.getElementById('sVendorInput')||$('sVendor')).focus();return}
-    const rows=pickedVendors.map(v=>({vendorId:v.id,date:v.date??c.date,endDate:v.endDate??c.endDate}));
+    // 업체는 **선택**이다. 업체와 무관한 사무 일정(복명서 제출, 정기교육 이수, 회의)이
+    // 당연히 있고, 그것도 놓치면 안 되는 일이다. 업체를 강제하면 그런 일정이 이 앱에
+    // 아예 들어오지 못하고, 사용자는 결국 다른 데 적게 된다 — 누락 방지가 무너진다.
+    // 자동 선택을 없앤 것은 맞지만 필수로 만든 것은 틀렸다.
+    // (렌더·집계는 이미 vendorId 없는 건을 '업체 미지정'으로 다룬다.)
+    const rows=pickedVendors.length
+      ? pickedVendors.map(v=>({vendorId:v.id,date:v.date??c.date,endDate:v.endDate??c.endDate}))
+      : [{vendorId:null,date:c.date,endDate:c.endDate}];
     for(const r of rows)if(r.endDate&&r.endDate<r.date){toast(L.badEndDate);return}
     // 여럿이면 같은 batchId 를 달아 '공통 일정에서 온 건'임만 알린다. 묶어서 잠그지 않는다.
     const batchId=rows.length>1?C.uid('b'):null;

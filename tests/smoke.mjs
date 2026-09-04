@@ -143,12 +143,8 @@ console.log('\n[3] 빈 날짜 더블클릭 → 일정 추가(날짜 프리필) /
   check('빈 날짜 두 번 클릭으로 일정 추가가 열린다', await page.$eval('#scheduleModal', (e) => e.classList.contains('show')));
   check('클릭한 날짜가 이미 채워져 있다', (await page.inputValue('#sDate')) === target, `${await page.inputValue('#sDate')} != ${target}`);
   await page.fill('#sName', '테스트 일정');
-  // 업체는 자동으로 채워 주지 않는다 — 채워 주면 업체 칸을 안 본 사람의 일정이
-  // 엉뚱한 업체 밑으로 조용히 들어간다. 고르지 않고 저장하면 그 칸을 가리킨다.
-  await page.click('#saveScheduleBtn');
-  await page.waitForTimeout(150);
-  check('업체를 고르지 않으면 저장되지 않는다', await page.$eval('#scheduleModal', (e) => e.classList.contains('show')));
-  check('무엇이 빠졌는지 말해 준다', (await page.innerText('#toast')).includes('업체'), await page.innerText('#toast'));
+  // 업체는 자동으로 채워 주지도 않고, 강제하지도 않는다. 업체와 무관한 사무 일정이
+  // 당연히 있고 그것도 놓치면 안 된다.
   await page.selectOption('#sVendor', { index: 0 });
   await page.waitForTimeout(150);
   await page.click('#saveScheduleBtn');
@@ -1778,12 +1774,14 @@ console.log('\n[33] 공통 일정 — 여러 업체에 한 번에, 업체별로 
 
 console.log('\n[34] 끌어서 날짜 이동 — 기간은 통으로, 완료는 못 끌고, 되돌릴 수 있다');
 {
-  const { ctx, page, errors } = await open();
+  // 예시 데이터를 빼고 이 검사가 심은 세 건만 둔다. 섞어 두면 칸 접힘(＋N건)에
+  // 밀려 대상 칩이 화면에서 사라져, 앱이 아니라 검사가 날짜에 따라 흔들린다.
+  const { ctx, page, errors } = await open({ demo: false });
   const d = (n) => page.evaluate((k) => window.WorkCore.addDays(window.WorkCore.todayISO(), k), n);
-  // 이번 달 안에서 이동을 확인할 수 있게 일정을 직접 심는다.
   await page.evaluate(async () => {
     const C = window.WorkCore, s = await C.readState();
     const t = C.parse(C.todayISO()), y = t.getFullYear(), m = String(t.getMonth() + 1).padStart(2, '0');
+    s.projects = []; s.manualEvents = [];
     s.manualEvents.push(
       { id: 'drag-1', vendorId: s.vendorTemplates[0].id, projectId: null, date: `${y}-${m}-03`, endDate: null, name: '끌기 단일', memo: '', completed: false, completedAt: null, logs: [], attachments: [] },
       { id: 'drag-2', vendorId: s.vendorTemplates[1].id, projectId: null, date: `${y}-${m}-05`, endDate: `${y}-${m}-08`, name: '끌기 기간', memo: '', completed: false, completedAt: null, logs: [], attachments: [] },
@@ -2033,6 +2031,22 @@ console.log('\n[38] v0.7 — 절차 사슬 예상 마감 · 비근무일 · 자�
   await page.waitForTimeout(400);
   check('되돌리면 다시 미완료가 된다', (await doneOf(firstId)) === false);
   check('되돌리면 카드가 살아난다', (await page.$$(`.dc-ok[data-ok-id="${firstId}"]`)).length === 1);
+
+  // 업체 없는 사무 일정 — 이 앱에 들어올 수 있어야 한다
+  await page.click('#addScheduleBtn');
+  await page.waitForSelector('#scheduleModal.show');
+  await page.fill('#sName', '복명서 제출');
+  await page.click('#saveScheduleBtn');
+  await page.waitForTimeout(400);
+  const solo = await page.evaluate(async () => {
+    const s = await window.WorkCore.readState();
+    const m = s.manualEvents.find((x) => x.name === '복명서 제출');
+    return m ? { vendorId: m.vendorId } : null;
+  });
+  check('업체 없이도 일정이 저장된다', !!solo, JSON.stringify(solo));
+  check('업체 없는 건은 vendorId 가 비어 있다', solo && !solo.vendorId, JSON.stringify(solo));
+  check('업체 없는 건도 목록에 뜬다', (await page.innerText('#dueList')).includes('복명서 제출'));
+  check('업체 자리는 "미지정"으로 읽힌다', (await page.innerText('#dueList')).includes('미지정'));
 
   check('콘솔/페이지 에러 없음', errors.length === 0, errors.join(' | '));
   await ctx.close();
