@@ -139,7 +139,51 @@
   --ac-subtle: #d0f7f9;
 }
 
-/* 다크: Windows 추종. 순흑 금지. warm tilt 해제 */
+/* 다크: Windows/시스템 추종. 순흑 금지. warm tilt 해제 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg1: #292929;
+    --bg1h: #3d3d3d;
+    --bg1p: #1f1f1f;
+    --bg1sel: #383838;
+    --bg2: #242424;
+    --bg3: #1f1f1f;
+    --bg4: #141414;
+    --bg5: #0a0a0a;
+    --fg1: #ffffff;
+    --fg2: #d6d6d6;
+    --fg3: #adadad;
+    --fg4: #999999;
+    --fgdis: #5c5c5c;
+    --stroke1: #666666;
+    --stroke2: #525252;
+    --stroke3: #3d3d3d;
+    --focus1: #000000;
+    --focus2: #ffffff;
+    --shadow16: 0 0 2px rgba(0,0,0,.24), 0 8px 16px rgba(0,0,0,.28);
+    --shadow28: 0 0 8px rgba(0,0,0,.24), 0 14px 28px rgba(0,0,0,.48);
+    --widget: #292929;
+    --paneWarm: #292929;
+    --st-needs_attention: #f19266;
+    --st-changed: #c79de6;
+    --st-confirmed: #7ccd8e;
+    --st-cancelled: #717171;
+  }
+  :root:not([data-theme="light"])[data-accent="A"] {
+    --ac-rest: #60aaf3;
+    --ac-hover: #4d97de;
+    --ac-pressed: #3a84ca;
+    --ac-selected: #60aaf3;
+    --ac-subtle: #dbf1ff;
+  }
+  :root:not([data-theme="light"])[data-accent="B"] {
+    --ac-rest: #48b7bd;
+    --ac-hover: #30a4aa;
+    --ac-pressed: #0d9298;
+    --ac-selected: #48b7bd;
+    --ac-subtle: #d0f7f9;
+  }
+}
 [data-theme="dark"] {
   --bg1: #292929;
   --bg1h: #3d3d3d;

@@ -131,7 +131,20 @@ for (const cand of ["A_ink_blue", "B_teal_steel"]) {
   push("}");
 }
 push();
-push("/* 다크: Windows 추종. 순흑 금지. warm tilt 해제 */");
+/* 다크는 3상태로 정의한다: (1) 명시 light 스탬프 (2) 스탬프 없음 = 시스템 추종
+ * (3) 명시 dark 스탬프. 스탬프가 없을 때 prefers-color-scheme만이 두 테마를 가른다. */
+push("/* 다크: Windows/시스템 추종. 순흑 금지. warm tilt 해제 */");
+push("@media (prefers-color-scheme: dark) {");
+push('  :root:not([data-theme="light"]) {');
+push(...neutralVars("dark").map((l) => "  " + l));
+push(...statusVars("dark").map((l) => "  " + l));
+push("  }");
+for (const cand of ["A_ink_blue", "B_teal_steel"]) {
+  push(`  :root:not([data-theme="light"])[data-accent="${cand[0]}"] {`);
+  push(...accentVars(cand, "dark").map((l) => "  " + l));
+  push("  }");
+}
+push("}");
 push('[data-theme="dark"] {');
 push(...neutralVars("dark"));
 push(...statusVars("dark"));
