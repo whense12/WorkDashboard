@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ko" data-direction="A" data-density="normal" data-theme="light" data-accent="A" data-mode="all" data-inspector="on" data-view="month" data-gray="off">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>직거래 일정관리 — 시안 v0.1</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+
+<!-- ══ 시안 제어 막대: 시안 전용 chrome. 제품 UI가 아님 ══════════════ -->
+<div id="rig" role="group" aria-label="시안 제어 (제품 UI 아님)">
+  <fieldset><legend>방향</legend>
+    <button data-set="direction" data-val="A" aria-pressed="true">A 조용한 계기</button>
+    <button data-set="direction" data-val="B" aria-pressed="false">B Fluent 공간</button>
+    <button data-set="direction" data-val="C" aria-pressed="false">C 스위스 운영</button>
+  </fieldset>
+  <fieldset><legend>밀도</legend>
+    <button data-set="density" data-val="normal" aria-pressed="true">normal</button>
+    <button data-set="density" data-val="compact" aria-pressed="false">compact</button>
+  </fieldset>
+  <fieldset><legend>테마</legend>
+    <button data-set="theme" data-val="light" aria-pressed="true">라이트</button>
+    <button data-set="theme" data-val="dark" aria-pressed="false">다크</button>
+  </fieldset>
+  <fieldset><legend>액센트</legend>
+    <button data-set="accent" data-val="A" aria-pressed="true">ink blue</button>
+    <button data-set="accent" data-val="B" aria-pressed="false">teal steel</button>
+  </fieldset>
+  <fieldset><legend>검사</legend>
+    <button data-set="gray" data-val="on" aria-pressed="false">회색조</button>
+    <button data-set="mode" data-val="flow" aria-pressed="false">공개 리듬(클릭 1회 전진 / Esc 후퇴)</button>
+  </fieldset>
+  <span class="note" id="fontguard">서체 확인 중…</span>
+</div>
+
+<main>
+
+<!-- ══ Layer 0 — Ambient Widget ═══════════════════════════════════ -->
+<section class="spec" id="s-l0" data-stage="0">
+  <h2>Layer 0 · 바탕화면 위젯 320×110 고정</h2>
+  <p class="why">표시는 4개(날짜 · 오늘 N · 확인 필요 N · 가장 가까운 일정 1건)뿐. rest에 버튼·입력·아이콘 줄·테두리·그림자 0, 텍스트 입력 0, 초 단위 시계 없음(분 단위 갱신·83ms 크로스페이드만). 앵커는 건수가 아니라 '다음 일정 한 줄' — 건수는 행동을 유발하지 않고 다음 일정은 유발한다.</p>
+  <div class="specimens" id="l0-specimens"></div>
+</section>
+
+<!-- ══ Layer 1 — Today / Upcoming ═════════════════════════════════ -->
+<section class="spec" id="s-l1" data-stage="1">
+  <h2>Layer 1 · 오늘 / 다음</h2>
+  <p class="why">데이터로 시작한다. 제목은 결론형 한 줄뿐 — KPI 타일·통계 행 없음. 행의 열 x좌표는 모든 행에서 동일(정렬축이 상자를 대신한다). Space=체크(즉시 저장+되돌리기), Enter=인스펙터. 주 CTA는 [캘린더 열기] 하나.</p>
+  <div class="specimens" id="l1-specimens"></div>
+</section>
+
+<!-- ══ Layer 2 + 3 — Calendar Workspace + Inspector ═══════════════ -->
+<section class="spec" id="s-l2" data-stage="2">
+  <h2>Layer 2 · 캘린더 작업공간 &nbsp;+&nbsp; Layer 3 · 인스펙터</h2>
+  <p class="why">창을 채운다(max-width 중앙 컨테이너·햄버거·페이지네이션 없음). 월간은 업체명을 직접 표시하고 <strong>+N more를 쓰지 않는다</strong> — 존재 이유가 '누가 오는가'이므로 접기는 기능 실패다. 9곳↑ 셀 내부 2열, 17곳↑ 주 행 성장 + 기간표 전환 제안. 오늘 = 열 배경 + 날짜 Bold + 1px 상단 룰(액센트 원형 배지 아님).</p>
+  <div class="cmdrow" id="cmdrow"></div>
+  <div class="ws">
+    <div class="cal" id="cal"></div>
+    <aside class="l3" id="l3" aria-label="인스펙터"></aside>
+  </div>
+</section>
+
+<!-- ══ 대화상자 · 되돌리기 · 오류 ═════════════════════════════════ -->
+<section class="spec" id="s-dlg" data-stage="3">
+  <h2>대화상자 · 되돌리기 · 오류</h2>
+  <p class="why">되돌릴 수 있으면 묻지 않고, 되돌릴 수 없으면 보여주고 묻는다. 전체 변경과 하루만 변경은 <strong>진입점</strong>으로 범위를 분리하고, 골격·제목·버튼 라벨이 범위를 말한다. 확인 버튼 = 동사 + 범위 + 영향 수.</p>
+  <div class="specimens" id="dlg-specimens"></div>
+</section>
+
+<!-- ══ 판정 메모 ══════════════════════════════════════════════════ -->
+<section class="spec" id="s-notes">
+  <h2>이 시안이 하드코딩한 기본값 · 미검증 항목</h2>
+  <div id="notes" class="prose"></div>
+</section>
+
+<div id="solo"></div>
+</main>
+
+<script src="fixtures.js"></script>
+<script src="expand.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
