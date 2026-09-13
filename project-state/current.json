@@ -1,0 +1,429 @@
+{
+  "_comment": "프로젝트 통제 상태. Claude 는 discrepancies 에 '등록'만 한다 — 수정 여부는 orchestrator 가 결정한다.",
+  "generated_at_commit": "769ac2d59ab1cd5ec5b69a372993093679f42fd9",
+  "generated_on_branch": "orchestration/bootstrap",
+  "schema_version": 1,
+  "baseline": {
+    "product_branch": "origin/claude/schedule-dashboard-spec-mockup-zo4ymd",
+    "product_branch_role": "실행 제품의 기준. 구현은 여기서만 파생한다.",
+    "source_only_branch": "origin/claude/practical-dijkstra-s7zstq",
+    "source_only_branch_role": "요구사항·디자인 자료를 선별 참고만 한다. merge / cherry-pick 금지.",
+    "main_branch": "origin/main",
+    "main_branch_role": "현재 비어 있음 (커밋 1개, README 1줄). 건드리지 않는다.",
+    "merge_base_product_vs_source": "720f653 (초기 커밋뿐 — 두 브랜치는 공유 코드가 없다)"
+  },
+  "product": {
+    "name": "업체별 업무 일정 (work-calendar-helper)",
+    "version": "0.7.0",
+    "identifier": "kr.go.goseong.work-calendar-helper",
+    "state_version": 9,
+    "stack": [
+      "Tauri 2.11.5",
+      "Rust (edition 2021)",
+      "vanilla JS (번들러·프레임워크 없음)"
+    ],
+    "windows": [
+      "cal",
+      "mini",
+      "status"
+    ],
+    "persistence": {
+      "desktop": "tauri-plugin-store -> %LOCALAPPDATA%/kr.go.goseong.work-calendar-helper/work-calendar.json",
+      "browser": "localStorage 'work-calendar-state-v5'",
+      "attachments_desktop": "AppLocalData/attachments/<entityId>/<attId>.<ext>",
+      "attachments_browser": "IndexedDB 'work-calendar-attachments-v1'",
+      "backups": "AppLocalData/backups/backup-YYYY-MM-DD.zip (BACKUP_KEEP=7)"
+    },
+    "note": "위 값은 모두 저장소에서 직접 확인한 것이다. 추측 없음."
+  },
+  "contract": {
+    "files": [
+      "AGENTS.md",
+      "CODEX_IMPLEMENTATION_BRIEF.md",
+      "CODEX_START_PROMPT.txt"
+    ],
+    "frozen_at_commit": "01b656d (2026-08-14)",
+    "amended_since": false,
+    "commits_since_freeze_on_product_branch": 51,
+    "register": "contracts/requirements.yaml",
+    "register_totals": {
+      "requirements": 433,
+      "APPROVED": 268,
+      "PROVISIONAL": 98,
+      "REJECTED": 56,
+      "UNKNOWN": 11
+    },
+    "provenance_caveat": "이 세 계약 파일은 커밋 01b656d 에서 저장소에 배치되었고 그 커밋의 author 는 Claude 다 (커밋 본문: '원본 그대로 배치한다'). 즉 저장소 안에는 사용자 서명 아티팩트가 없다. 계약으로서의 권위는 2026-09-13 사용자 지시(decisions.jsonl D-006)에 근거한다."
+  },
+  "discrepancies": {
+    "_comment": "계약 대비 현재 구현의 차이. 이번 작업에서 코드를 고치지 않았다. 전부 REGISTERED_NOT_FIXED 다.",
+    "total": 42,
+    "by_kind": {
+      "beyond-scope": 5,
+      "missing": 8,
+      "violates": 15,
+      "weakened-test": 3,
+      "stale-doc": 5,
+      "dead-code": 6
+    },
+    "by_confidence": {
+      "confirmed": 30,
+      "probable": 11,
+      "unknown": 1
+    },
+    "items": [
+      {
+        "id": "DISC-SYS-01",
+        "kind": "beyond-scope",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"- budget/payment accounting,\" — CODEX_IMPLEMENTATION_BRIEF.md:1187, under \"# 27. Out of scope for this iteration\" (:1177) / \"Do not add these unless separately requested:\" (:1179)",
+        "implementation": "Budget/payment accounting is fully implemented as a first-class feature. State: frontend/core.js:215 `budget:{title:'',year:null,items:[]}` and :216 `spends:[]` in the seed; :296-298 and :325-327 normalize them. Domain logic: frontend/core.js:563-611 `budgetSummary(state)` (총예산/기지출/지출예정/잔액/초과), :613 `spendsOfRecord`, :594-595 `spentRate`/`plannedRate`. Labels: frontend/core.js:179-198 (viewBudget '예산', budgetTotal '총예산', budgetSpent '기지출', budgetPlanned '지출예정', budgetRemain '잔액', budgetOver '초과', editBudget '합본예산서', addSpend, spendModalTitle …). UI: frontend/index.html:53-56 budget section inside the status piece, :96-102 `budgetModal` (합본예산서 editor), :104-113 `spendModal` (지출 등록/삭제); frontend/app.js:367-405 `renderBudget()`, :407-447 budget-item draft editor + `saveBudget`, :449+ `openSpend`, :352-358 `spendSection(rec)` inside the detail surface, :216-226 budget summary face with a spend/plan meter. CSS: frontend/styles.css:491-495 `.bg-bar`. Release notes shipped with the installer also advertise it: .github/workflows/windows-build.yml:226 \"예산 - 총예산·기지출·지출예정·잔액\"."
+      },
+      {
+        "id": "DISC-SYS-02",
+        "kind": "beyond-scope",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"- project completion percentage,\" — CODEX_IMPLEMENTATION_BRIEF.md:1188 (§27 out of scope). Reinforced by AGENTS.md:22 \"Do not add KPI cards, progress percentages, analytics, charts, status dashboards …\" and CODEX_IMPLEMENTATION_BRIEF.md:85-86 \"- progress percentages,\" / \"- progress bars,\" (§2.2 Rejected), :95 \"The user specifically objected to these because the system cannot know the true project progress merely from checked steps.\"",
+        "implementation": "Step-completion percentages and progress bars are computed and rendered in three places. frontend/app.js:209 `const pct=g.stepsTotal?Math.round(g.stepsDone/g.stepsTotal*100):0;` then :212 renders `.st-meter` with `width:${pct}%` and a `stepsDone / stepsTotal` counter; frontend/app.js:244 same `pct` computation, :250 renders `<span class=\"bh-bar\" role=\"img\" aria-label=\"${L.boardProgress} ${pct}%\"><i style=\"width:${pct}%\"></i>`; frontend/app.js:309 + :315 the same for the group (행사) board. The label itself is a progress label: frontend/core.js:124 `boardProgress:`${S} 진행``. CSS for the bars: frontend/styles.css:280-283 `.st-meter`, :302-303 `.bh-bar`. README.md:23 documents it as a feature: \"| 미니 대시보드 · 업체별 | … | 진행률·지연·가장 가까운 일정, 펼치면 업무별 |\" and :25 \"누르면 참여 업체·진행률·지출로 펼쳐짐\"."
+      },
+      {
+        "id": "DISC-SYS-03",
+        "kind": "beyond-scope",
+        "confidence": "probable",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"- analytics dashboards,\" — CODEX_IMPLEMENTATION_BRIEF.md:1191 (§27); AGENTS.md:22 \"… analytics, charts, status dashboards …\"; CODEX_IMPLEMENTATION_BRIEF.md:84 \"- KPI cards,\" and :91 \"- completion analytics,\"",
+        "implementation": "A dedicated aggregate/summary window exists: src-tauri/tauri.conf.json:51-69 declares a third window `\"label\": \"status\", \"title\": \"현황 (status)\"`; frontend/index.html:45-56 `<aside class=\"piece piece-status\" id=\"pieceStatus\">` containing a 행사별 roll-up board (`groupBoard`) and a 예산 roll-up board (`budgetBoard`), each with aggregate counters and meters (frontend/app.js:206-226 `renderStatus()`, :240-256 `renderBoard()` with 진행 중 / 완료 / 지연 counts, :305-320 `renderGroupBoard()`). I am flagging this as probable rather than confirmed because the contract never defines \"analytics dashboard\" precisely; the counted-aggregate + meter + money roll-up composition is what §2.2/§27 describe, but the mapping is my reading, not a verbatim clause."
+      },
+      {
+        "id": "DISC-SYS-04",
+        "kind": "missing",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"## 23.3 Rust/Tauri checks\" / \"When toolchain exists:\" / \"- `cargo fmt --check`\" / \"- `cargo check`\" / \"- build with current Tauri CLI\" — CODEX_IMPLEMENTATION_BRIEF.md:1099-1105. Also §23.4 item 5 \"5. run Rust checks,\" :1115, and AGENTS.md:78 \"3. `cargo check` for the Tauri crate when Rust is available.\"",
+        "implementation": "Neither `cargo fmt --check` nor `cargo check` is run anywhere in the repository. A repo-wide grep for `cargo (fmt|check|clippy)` across *.yml, *.ps1, *.json, *.md, *.mjs returns only the contract's own text (CODEX_IMPLEMENTATION_BRIEF.md:1103, :1104, AGENTS.md:78) — zero hits in .github/workflows/windows-build.yml, package.json, build_windows.ps1 or tests/. The only Rust compilation is the implicit one inside `npx tauri build --bundles nsis` (.github/workflows/windows-build.yml:78) and build_windows.ps1:13, which satisfies \"build with current Tauri CLI\" but not the two named checks. package.json:7-12 defines only `check`, `build:standalone`, `test`, `test:e2e` — no Rust script."
+      },
+      {
+        "id": "DISC-SYS-05",
+        "kind": "violates",
+        "confidence": "probable",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"GitHub Actions on `windows-latest` must:\" … \"4. run JS/browser checks,\" — CODEX_IMPLEMENTATION_BRIEF.md:1109, :1114",
+        "implementation": "The JS/browser checks are not run on windows-latest. .github/workflows/windows-build.yml:18-20 puts them in a separate `web` job on `runs-on: ubuntu-latest` (:20), with the explicit comment at :16-17 that Windows runners are reserved for the native build. The `windows` job (:52-54, `runs-on: windows-latest`) runs npm ci, the NSIS build, a PE-subsystem check, a window-existence check and a screenshot script — but never `npm run check` or `npm test`. Whether the contract's \"must\" attaches to the runner or merely to the pipeline is not stated, so the severity is a judgement call; the literal clause places item 4 under the windows-latest job."
+      },
+      {
+        "id": "DISC-SYS-06",
+        "kind": "weakened-test",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"## 23.1 Browser automated tests\" … \"Minimum flows:\" (CODEX_IMPLEMENTATION_BRIEF.md:1068-1085) and §23.4 \"8. make build logs easy to inspect.\" (:1118); AGENTS.md:74 \"Run all checks that exist or that you add.\"",
+        "implementation": "tests/e2e.mjs degrades three failed assertions into non-failing SKIPs, and SKIPs do not affect the exit code. Exact sites: (a) tests/e2e.mjs:222-224 — `const calTop = ps('topmost', ['-Kind','cal']);` then `if (calTop === 'NOWINDOW' || calTop.startsWith('PSERROR')) skip('조각이 TOPMOST 가 아니다', calTop); else check(...)`, so a missing cal window or any PowerShell error turns the always-on-bottom assertion into a SKIP. (b) tests/e2e.mjs:250-252 — `const moved = ps('move', ...); const movedOk = /^\\d+,\\d+$/.test(moved); if (!movedOk) skip('창 위치 복원', ...)`, and :270 `if (movedOk) { ... }` gates the entire restart position-restore assertion, so a failed window move silently removes the check. (c) tests/e2e.mjs:272-273 — `const rect = ps('rect', ['-Kind','cal']); if (!/^\\d+,\\d+$/.test(rect)) skip('창 위치 복원', `재기동 후 창을 찾지 못함 (${rect})`)`, so \"the window did not come back after restart\" is reported as unverified rather than as a failure. The gate: tests/e2e.mjs:53 `const skip = (name, why) => { skips.push(...); console.log(...) }` never touches `exitCode`; tests/e2e.mjs:344-350 sets `exitCode = 1` only `if (failures.length)`, and :349 prints `통과 ... 실패 없음 (확인 못 함 N건)`. So a run in which all three assertions were skipped exits 0 and reads as green. (The skips are at least printed at :343, so they are not wholly silent in the log.)"
+      },
+      {
+        "id": "DISC-SYS-07",
+        "kind": "stale-doc",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"Do not label a Windows build \"verified\" until the Windows job is green.\" — CODEX_IMPLEMENTATION_BRIEF.md:1122; AGENTS.md:83 \"Do not claim Windows-native functionality is verified unless the Windows build/job actually ran successfully.\"",
+        "implementation": "tests/e2e.mjs is NOT run on push or pull_request. .github/workflows/windows-build.yml:299-304 defines job `windows-e2e` with `if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_e2e }}` (:302), i.e. it requires a manual dispatch AND the opt-in boolean input `run_e2e` whose `default: false` (:6-9). The workflow comment at :289-298 states the reason (WebView2/DevToolsActivePort on the runner). The push/PR triggers at :10-13 therefore run only the `web` job and the `windows` job. README.md:197 nonetheless states \"CI의 `windows-e2e` 잡이 돌립니다.\" (\"CI's windows-e2e job runs it\"), which is stale/misleading about what actually runs."
+      },
+      {
+        "id": "DISC-SYS-08",
+        "kind": "weakened-test",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"3. automated browser smoke tests,\" — CODEX_IMPLEMENTATION_BRIEF.md:1257 (§29); AGENTS.md:74 \"Run all checks that exist or that you add.\"",
+        "implementation": "`npm run test:e2e` (package.json:11) is a silent no-op pass on any non-Windows host: tests/e2e.mjs:25-28 `if (process.platform !== 'win32') { console.log('Windows 전용 E2E 입니다. …— 건너뜁니다.'); process.exit(0); }`. So invoking the e2e suite on Linux/macOS returns exit 0 with zero assertions executed. This is documented behaviour (tests/e2e.mjs:16 \"Windows 전용. 다른 OS 에서는 아무것도 하지 않고 통과한다.\"), but it means the command cannot distinguish \"passed\" from \"never ran\". By contrast tests/smoke.mjs is a hard gate (tests/smoke.mjs:2060-2063 `process.exit(1)` on any failure, no skip mechanism)."
+      },
+      {
+        "id": "DISC-SYS-09",
+        "kind": "missing",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"## 23.2 Visual regression screenshots\" / \"Generate at least:\" / \"- `1440x900` main dashboard,\" / \"- `1280x720` main dashboard,\" / \"- simulated 125% density check if practical,\" / \"- `330x430` helper,\" / \"- detail modal with full procedure + logs + attachments.\" / \"Inspect screenshots, not only DOM assertions.\" — CODEX_IMPLEMENTATION_BRIEF.md:1087-1097. Also AGENTS.md:81 \"6. Produce/update screenshots at desktop and helper sizes for visual regression.\"",
+        "implementation": "The browser harness generates no screenshots at all: a grep for `screenshot` in tests/smoke.mjs returns zero hits. tests/smoke.mjs does exercise the named viewports as DOM assertions only (tests/smoke.mjs:61 default `viewport = { width: 1440, height: 900 }`, :491 loops 1920x1080 / 1440x900 / 1280x720, :993 and :1373 loop 1280x720 / 1920x1080, :480 and :855 `setViewportSize({ width: 362, height: 640 })`), which is precisely the \"only DOM assertions\" the clause says is insufficient. The `330x430` helper size does not appear anywhere. Windows screenshots do exist (tests/screenshot.ps1:209-397 writes proof/*.png, uploaded at .github/workflows/windows-build.yml:157-163) but they are full-desktop/piece crops at runner resolution, not the five artifacts §23.2 enumerates, and they are CI artifacts rather than committed regression baselines."
+      },
+      {
+        "id": "DISC-SYS-10",
+        "kind": "missing",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"8. a short `IMPLEMENTATION_REPORT.md` containing:\" / \"   - what changed,\" / \"   - migration behavior,\" / \"   - tests executed,\" / \"   - Windows build result/link or artifact name,\" / \"   - known limitations.\" — CODEX_IMPLEMENTATION_BRIEF.md:1262-1267 (§29 \"Deliverables expected from Codex\", :1251-1253 \"A completed implementation should leave the repository with:\")",
+        "implementation": "VERIFIED ABSENT. No IMPLEMENTATION_REPORT.md exists at the repository root (ls of /home/user/WorkDashboard lists AGENTS.md, CLAUDE.md, CODEX_IMPLEMENTATION_BRIEF.md, CODEX_START_PROMPT.txt, README.md and no report). A repo-wide grep for the string `IMPLEMENTATION_REPORT` outside .git returns exactly one hit — the contract's own line CODEX_IMPLEMENTATION_BRIEF.md:1262. `git log --all --name-only` shows the file has never existed on any branch in this checkout."
+      },
+      {
+        "id": "DISC-SYS-11",
+        "kind": "stale-doc",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"7. updated screenshots,\" — CODEX_IMPLEMENTATION_BRIEF.md:1261 (§29); AGENTS.md:81 \"6. Produce/update screenshots at desktop and helper sizes for visual regression.\"",
+        "implementation": "The three committed screenshots are untouched since the pre-implementation baseline. `git log -1` for each of /home/user/WorkDashboard/preview_main.png, preview_helper.png and preview_v5_detail.png all return the same single commit `01b656d 2026-08-14 baseline: v5 핸드오프 내용물 그대로 반영` — the v5 hand-off commit, dated the same day the contract was frozen. HEAD is `769ac2d 2026-09-04`, with v0.7 UI work in between (`e46db16 2026-09-01 v0.7 (3/3)…`, `5a8f6d0 2026-09-01 v0.7 (2/3)…`). They depict the v5 main-window/helper UI, whereas the shipped UI is the three desktop pieces (src-tauri/tauri.conf.json:12-69, frontend/index.html:45). Nothing in the repo references or regenerates them: a grep for `preview_` outside .git returns no hits in any script, workflow, test or doc — they are orphaned files as well as stale ones."
+      },
+      {
+        "id": "DISC-SYS-12",
+        "kind": "missing",
+        "confidence": "unknown",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"5. NSIS build artifact from a successful Windows run when CI is available,\" — CODEX_IMPLEMENTATION_BRIEF.md:1259 (§29)",
+        "implementation": "UNKNOWN / not determinable from the working tree. The workflow does produce and upload the artifact (.github/workflows/windows-build.yml:268 `cp src-tauri/target/release/bundle/nsis/*.exe dist-notes/`, :270-275 upload as `work-calendar-helper-windows-x64`), and README.md:176-178 documents it. But whether a Windows run has actually gone green — the thing §23.4:1122 and AGENTS.md:83 forbid claiming without evidence — cannot be established from files on disk, and no run link, run id or artifact name is recorded anywhere in the repo (there is no IMPLEMENTATION_REPORT.md to record it in; see DISC-SYS-10). Reporting as unresolved rather than asserting either way."
+      },
+      {
+        "id": "DISC-SYS-13",
+        "kind": "violates",
+        "confidence": "probable",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"- no arbitrary user-controlled path concatenation,\" / \"- generated IDs for physical storage names,\" / \"- protect against `..`/separator path injection,\" — CODEX_IMPLEMENTATION_BRIEF.md:1169-1171 (§26)",
+        "implementation": "The WRITE path is compliant: frontend/core.js:344 `SAFE_ID=/^[A-Za-z0-9_-]+$/`, :351-355 `attachPath()` rejects non-matching entityId/attId and clamps the extension, :374 the filename is a generated `uid('att')`, never `file.name`; backups are gated by frontend/core.js:735 `SAFE_BACKUP=/^[A-Za-z0-9_.-]+\\.zip$/` at :780, :794. The READ/DELETE/REVEAL path, however, trusts `meta.relativePath` straight out of persisted state without re-validating: frontend/core.js:382-383 `fs.exists/readFile(meta.relativePath, {baseDir:appDir()})`, :392 `fsApi().remove(meta.relativePath, …)`, :403 `openerApi().openPath(await pathApi().join(base, meta.relativePath))`. A crafted backup zip can reach this: frontend/core.js:763-775 `restoreBackup` only rewrites an attachment's `relativePath` when a matching payload entry exists (`const data=byId.get(list[i].id); if(!data)continue;` at :769), so a state.json entry carrying a traversal `relativePath` and no matching zip member survives into state. Marked probable, not confirmed: Tauri 2's `fs:allow-appdata-*-recursive` scope (src-tauri/capabilities/main.json:7-9) very likely rejects the resolved out-of-scope path at the Rust layer, and I did not execute this. The rest of §26 is satisfied — see notes."
+      },
+      {
+        "id": "DISC-SYS-14",
+        "kind": "dead-code",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "§12 \"### Deep-link behavior\" / \"- clicking a helper card should open/focus main,\" / \"- main should open the corresponding schedule detail automatically.\" / \"Implement with a simple cross-window event/message or shared selection state.\" — CODEX_IMPLEMENTATION_BRIEF.md:611-618; §22 H checklist \"- [ ] Helper card click opens/focuses main and opens matching detail.\" :1059; AGENTS.md acceptance flow \"- Click helper card -> main window opens focused on the corresponding detail.\"",
+        "implementation": "`state.pendingSelection` — the shared-selection mechanism — has a consumer but no producer. Every occurrence in shipped code: frontend/core.js:213 seed `pendingSelection:null`, :276-277 v5→v6 migration note + backfill, :317 normalize; frontend/app.js:1056-1058 `consumePendingSelection()` reads it, nulls it and calls `openRecord`, wired at :1183 (`watchState`) and :1184 (startup). Nothing anywhere in frontend/ or src-tauri/ ever assigns a non-null value — grep for `pendingSelection` across frontend/ and src-tauri/ returns only those six lines. The only writers are the test suites: tests/smoke.mjs:381, :1761 and tests/e2e.mjs:240, which inject it by hand. So the field is dead in production and the deep-link is unreachable by any user gesture."
+      },
+      {
+        "id": "DISC-SYS-15",
+        "kind": "dead-code",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"- optional always-on-top,\" — CODEX_IMPLEMENTATION_BRIEF.md:603 (§12); §22 H \"- [ ] Always-on-top setting works.\" :1060",
+        "implementation": "`settings.helperAlwaysOnTop` is written into the default state at frontend/core.js:212 `settings:{horizon:'14',customHorizon:45,helperAlwaysOnTop:true,autostart:false}` and is never read anywhere — grep across frontend/ and src-tauri/ for `helperAlwaysOnTop|alwaysOnTop|always_on_top` returns only that one definition (the only other hits are tests/smoke.mjs:805, which just mirrors the shape in a fixture, and a prose comment at tests/e2e.mjs:7). There is no settings control bound to it and no Tauri call consuming it. The shipped windows go the opposite way: src-tauri/tauri.conf.json:28, :47, :66 set `\"alwaysOnBottom\": true` on all three pieces, and tests/e2e.mjs:221-224 asserts the app is deliberately NOT topmost. Note that §12:603 hedges with \"optional\", so the dead field is the confirmed finding; whether its absence also violates the §22:1060 checkbox is a harder call I am not resolving."
+      },
+      {
+        "id": "DISC-SYS-16",
+        "kind": "dead-code",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "§18 technical style / §28 Phase 1 \"- read current code,\" \"- document migration risks.\" CODEX_IMPLEMENTATION_BRIEF.md:1205-1210; AGENTS.md:100 \"Do not add speculative UI. Ask a focused question or preserve the simpler behavior.\"",
+        "implementation": "The entire pop-window path is retained but unreachable from the running app. The single entry point is stubbed out: frontend/app.js:16 `async function popOut(){return false}`, with the comment at :13-15 explaining the mechanism was abandoned (\"별도 pop 창으로 내보내던 방식은 … 폐지한다\"). All seven call sites therefore fall through to the in-window modal: frontend/app.js:423, :451, :674, :738, :800, :979, :981 (`if(await popOut(...))return;`). Consequently the Rust command `open_form` (src-tauri/src/lib.rs:109-150, registered at :391) is never invoked by the frontend — the only invocations in the repo are tests/e2e.mjs:228 and :233. That makes the whole chain dead: src-tauri/src/lib.rs:74-81 `pop_ready`, :84-89 `close_pop` (registered :388-389), :120 the `index.html?w=pop&form=…` URL, :123-148 the pop WebviewWindowBuilder, :278 `.with_denylist(&[\"pop\"])`; frontend/app.js:9 `IS_POP`, :11 `mode-pop` class, :19-25 `closePopSoon` (which invokes `close_pop`), :114 `pop_ready`, :1210-1221 the `form`/`payload` bootstrap; frontend/styles.css:80-86 the six `body.mode-pop` rules. The path is still *reachable by URL* (`index.html?w=pop&form=…`) — tests/smoke.mjs:362-365 navigates it directly — so it is dead with respect to app gestures, not literally unreachable code."
+      },
+      {
+        "id": "DISC-SYS-17",
+        "kind": "dead-code",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"Use official Tauri 2 APIs/plugins and keep capabilities narrowly scoped.\" — AGENTS.md:60; \"- least-privilege fs capability scope,\" CODEX_IMPLEMENTATION_BRIEF.md:1168 (§26)",
+        "implementation": "Both capability files still grant permissions to a window label `\"pop\"` that no longer exists at runtime: src-tauri/capabilities/default.json:5 `\"windows\": [\"cal\", \"mini\", \"status\", \"pop\"]` and src-tauri/capabilities/main.json:5 identical, whose description at :4 explicitly justifies it (\"pop 창은 상세(첨부)와 설정(백업)을 담으므로 포함한다\"). src-tauri/tauri.conf.json:12-69 declares only `cal`, `mini` and `status`; the `pop` window is only ever created by the dead `open_form` (see DISC-SYS-16). The grant is latent rather than exploitable — a pop window can still be materialised via `open_form` from a privileged context — but it is a stale widening of the capability surface against a least-privilege clause."
+      },
+      {
+        "id": "DISC-SYS-18",
+        "kind": "stale-doc",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"6. updated `README.md`,\" — CODEX_IMPLEMENTATION_BRIEF.md:1260 (§29)",
+        "implementation": "build_windows.ps1:9 is `git diff --exit-code -- web_standalone.html helper_preview.html`, but /home/user/WorkDashboard/helper_preview.html does not exist (ls: No such file or directory) and is never produced — tools/build-standalone.mjs:48 emits exactly one artifact, `['index.html', ['zip.js','combobox.js','core.js','app.js'], 'web_standalone.html']`. The file is a v5 leftover (the v5 inventory at CODEX_IMPLEMENTATION_BRIEF.md:799-800 lists `frontend/helper.html` / `frontend/helper.js`, both now gone). I verified the failure mode: git tolerates the unmatched pathspec, `git diff --exit-code -- web_standalone.html helper_preview.html` returns exit 0, so the drift guard does not break — it simply checks one file fewer than it reads as checking. The equivalent CI step is correct (.github/workflows/windows-build.yml:44 diffs only `web_standalone.html`), so the two guards have silently diverged."
+      },
+      {
+        "id": "DISC-SYS-19",
+        "kind": "stale-doc",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"6. updated `README.md`,\" — CODEX_IMPLEMENTATION_BRIEF.md:1260 (§29)",
+        "implementation": "README.md documents the pop-window architecture that DISC-SYS-16 shows is dead. Exact stale lines: README.md:27 `| 상세 (pop 창) | 지금까지 뭘 했고 다음은 뭔가 | 업무 기록, 첨부, 지출, 절차 전단계 |` — the detail surface is now an in-window modal, not a pop window (frontend/app.js:800 falls through `popOut`); README.md:195 \"…조각 창 세 개가 실제로 뜨는지, pop 창이 열리는지,\" — describes e2e coverage of a path the app no longer takes; README.md:197 \"CI의 `windows-e2e` 잡이 돌립니다.\" — false, that job is workflow_dispatch + opt-in only (see DISC-SYS-07); README.md:204 \"?w=cal|mini|status|pop 파라미터로 창마다 필요한 조각만 렌더\"; README.md:206 \"app.js 화면 UI (조각·팝·드래그·키보드)\"; README.md:211 \"src-tauri/ Tauri 2 네이티브 셸 (조각 3창·트레이·pop 창), 아이콘, NSIS 설정\". The three release-note lines shipped with the installer are consistent with the new behaviour (.github/workflows/windows-build.yml:229-234 \"별도 창이 새로 뜨지 않습니다\"), which confirms the README is the stale half."
+      },
+      {
+        "id": "DISC-SYS-20",
+        "kind": "weakened-test",
+        "confidence": "probable",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "§12 \"### Deep-link behavior\" … \"- main should open the corresponding schedule detail automatically.\" — CODEX_IMPLEMENTATION_BRIEF.md:611-616",
+        "implementation": "tests/e2e.mjs:236-246 no longer tests what its comment claims. It writes `s.pendingSelection` (:240), waits, then asserts at :246 `check('딥링크가 상세 pop 창을 연다', afterRelay.includes('(pop)'), afterRelay)`. But the consumer at frontend/app.js:1058 calls `openRecord(sel.kind, sel.id)`, which at frontend/app.js:800 hits the stubbed `popOut` and opens an in-window modal — no `(pop)` window is created by the deep link. The assertion can still pass, because the pop window opened 16 lines earlier by the direct `open_form` call (tests/e2e.mjs:228-232, form 'schedule') is still on screen and `closePopSoon` only fires once its modal stack empties (frontend/app.js:19-25, :124). So the check is vacuous — it observes the earlier window. Marked probable: I did not run the suite (it is Windows-only and CI-disabled, DISC-SYS-07/08), so the precise pass/fail is inferred from the control flow rather than observed. The neighbouring assertion at :244 (`소비 후 딥링크 상태가 비워진다`) is genuine."
+      },
+      {
+        "id": "DISC-SYS-21",
+        "kind": "missing",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"The current Rust code already uses `--helper-only`; audit and preserve/fix this behavior.\" — CODEX_IMPLEMENTATION_BRIEF.md:1159 (§25); \"### OS autostart\" / \"- launch with helper-only argument,\" / \"- main stays hidden,\" :1152-1155; §22 H \"- [ ] Autostart helper-only mode works.\" :1061",
+        "implementation": "`--helper-only` no longer exists. A grep for `helper-only|helper_only` across src-tauri/ returns zero hits; src-tauri/src/lib.rs:12 defines `const PIECES: [&str; 3] = [\"cal\", \"mini\", \"status\"];` and the autostart plugin is initialised with no launch arguments at src-tauri/src/lib.rs:272 `.plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))`. Autostart itself works (src-tauri/src/lib.rs:160-175 `set_autostart`/`is_autostart_enabled`, exercised at tests/e2e.mjs:200-212), but it starts the full three-piece app, not a helper-only mode. The contract says \"preserve/fix\", and the behaviour was removed rather than preserved; whether the three-piece redesign moots the clause is not something the contract addresses, so I am reporting the removal, not adjudicating it."
+      },
+      {
+        "id": "DISC-SYS-22",
+        "kind": "violates",
+        "confidence": "probable",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"1. Main screen = **left upcoming D-day vendor cards + right monthly calendar**.\" — AGENTS.md:21; \"14. The desktop helper window must remain minimal…\" AGENTS.md:39; \"- Main and helper windows must share state reliably.\" AGENTS.md:57; \"Current Tauri configuration already defines a small `helper` window. Preserve the concept and improve behavior.\" CODEX_IMPLEMENTATION_BRIEF.md:581; \"Tauri main window currently starts around 1380×900. This is acceptable as a baseline…\" :196",
+        "implementation": "The main-window + helper-window architecture the contract presupposes has been replaced by three decoration-less always-on-bottom desktop pieces. src-tauri/tauri.conf.json:12-69 declares labels `cal` (964x700), `mini` (362x700) and `status` (362x284), every one with `\"decorations\": false`, `\"alwaysOnBottom\": true`, `\"skipTaskbar\": true`; there is no window labelled `main` or `helper` anywhere. frontend/app.js:3-6 states the intent outright: \"이 앱에는 메인 창이 없다\" (\"this app has no main window\"). The release notes shipped to users say the same (.github/workflows/windows-build.yml:181 \"[이 앱에는 창이 없습니다]\"). I am flagging the architectural fact against the clauses that name a main window and a helper window; the contract never authorises or forbids this specific restructuring, so whether it is a violation or an unreviewed redesign is genuinely open — hence probable rather than confirmed."
+      },
+      {
+        "id": "DISC-SYS-23",
+        "kind": "dead-code",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "§28 Phase 1 \"- read current code,\" — CODEX_IMPLEMENTATION_BRIEF.md:1207; §30 \"choose **clarity and fewer interactions**.\" :1279",
+        "implementation": "frontend/app.js:2 initialises `let currentMonth=new Date(2026,7,1);` — a hardcoded August 2026 — which is dead: frontend/app.js:1184 unconditionally overwrites it during bootstrap with `const d=C.parse(C.todayISO()); currentMonth=new Date(d.getFullYear(),d.getMonth(),1); render();` before any render that reads it. The literal is a leftover of the contract-freeze era (2026-08-14) and has no runtime effect, but it is a live trap: any future code path that renders before line 1184 would display August 2026."
+      },
+      {
+        "id": "DISC-UI-01",
+        "kind": "violates",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"1. Main screen = **left upcoming D-day vendor cards + right monthly calendar**.\" — AGENTS.md:21; reinforced by CODEX_START_PROMPT.txt:9 \"The required main UI is left-side upcoming vendor D-day cards plus a large vertically-scrollable monthly calendar.\" and the ASCII layout at CODEX_IMPLEMENTATION_BRIEF.md:122-140 (left column \"다가오는 일정\", right column calendar).",
+        "implementation": "There is no main screen at all, and the two halves are mirrored. src-tauri/tauri.conf.json:12-69 declares three windowless always-on-bottom widgets (`cal` x=96, `mini` x=1080, `status` x=1080/y=776) and no main window. frontend/app.js:4 states outright: \"이 앱에는 메인 창이 없다\" (\"this app has no main window\"). In the single-page/browser composition frontend/styles.css:58-60 lays out `.desk{grid-template-columns:minmax(0,1fr) 352px}` with `.piece-cal{grid-row:1/3}` as the first child — i.e. calendar LEFT, vendor cards RIGHT. src-tauri/src/lib.rs:225-227 does the same in Tauri: `place(\"cal\", mp.x + gutter, ...)` then `place(\"mini\", right_x, ...)`, `place(\"status\", right_x, ...)`. The contracted left rail is on the right, and the contracted right calendar is on the left, in a separate OS window."
+      },
+      {
+        "id": "DISC-UI-02",
+        "kind": "violates",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"6. The calendar body must be vertically scrollable; do not compress week rows until text becomes unreadable.\" — AGENTS.md:26. Also CODEX_IMPLEMENTATION_BRIEF.md:262-264 \"Calendar body itself is vertically scrollable. / Week row/day-cell height is allowed to grow to preserve readable event text. / Do not shrink event text to unreadable sizes just to force the entire month into one viewport.\" and :633 \"month week rows are not artificially squashed.\"",
+        "implementation": "The calendar body is explicitly non-scrollable and sized to the window. frontend/styles.css:124 `.calendar-scroll{flex:1;min-height:0;overflow:hidden;padding:0 10px 10px}` — `overflow:hidden`, despite the element id `calendarScroll` (frontend/index.html:18). frontend/styles.css:125 `.month-grid{...grid-auto-rows:minmax(0,1fr);gap:3px;height:100%}` forces all week rows to divide the fixed window height. The code comment at frontend/styles.css:121-123 states the intent verbatim: \"minmax(0,1fr) 이면 6주 달은 94px, 5주 달은 113px 로 저절로 맞고 스크롤이 없다\" (\"...fits automatically and there is no scroll\"). frontend/styles.css:126 `.day{...overflow:hidden}` clips whatever does not fit in the squashed row."
+      },
+      {
+        "id": "DISC-UI-03",
+        "kind": "violates",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"- Weekday header remains visible/sticky while the calendar body scrolls.\" — CODEX_IMPLEMENTATION_BRIEF.md:261; \"- right calendar has one vertical scroll container, / - weekday header is sticky inside that container,\" — CODEX_IMPLEMENTATION_BRIEF.md:630-632.",
+        "implementation": "The weekday header is not inside the scroll container and is not sticky. frontend/index.html:17-18 places `<div class=\"weekdays\">` as a sibling BEFORE `<div class=\"calendar-scroll\" id=\"calendarScroll\">`, and frontend/styles.css:117 styles it `.weekdays{flex:0 0 auto;display:grid;...}` with no `position:sticky` anywhere in the file. (Moot in practice only because DISC-UI-02 removed scrolling entirely.)"
+      },
+      {
+        "id": "DISC-UI-04",
+        "kind": "violates",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"2. Do not add KPI cards, progress percentages, analytics, charts, status dashboards, ...\" — AGENTS.md:22; \"Do **not** add: / - KPI cards, / - progress percentages, / - progress bars,\" — CODEX_IMPLEMENTATION_BRIEF.md:82-86; \"No progress bar. No project-health status. No invented state badge.\" — CODEX_IMPLEMENTATION_BRIEF.md:250; \"Do not add KPI cards, progress percentages, analytics, arbitrary status filters, vendor color coding, or dashboard widgets that are not explicitly required.\" — CODEX_START_PROMPT.txt:7.",
+        "implementation": "Percentages and meter bars are computed and rendered in three places. frontend/app.js:209 `const pct=g.stepsTotal?Math.round(g.stepsDone/g.stepsTotal*100):0;` then :212 `<span class=\"track\"><i style=\"width:${pct}%;...\"></i></span>`. frontend/app.js:244 same `pct` computation, rendered at :250 as `<span class=\"bh-bar\" role=\"img\" aria-label=\"${L.boardProgress} ${pct}%\"><i style=\"width:${pct}%\"></i></span>` — an explicit \"진행 N%\" progress bar on every vendor row. frontend/app.js:309/315 repeats it for the 행사 board. frontend/app.js:207 renders a roll-up KPI line `${gs.length}건 · 진행 ${done}/${total}`; :217 renders a budget KPI `잔액 …원`. Supporting CSS: frontend/styles.css:280-283 `.st-meter .track i`, :302-303 `.bh-bar i{...}`, :491-495 `.bg-bar i`."
+      },
+      {
+        "id": "DISC-UI-05",
+        "kind": "violates",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"4. D-day belongs in the **left vendor cards and detail surfaces**, not inside the calendar event label.\" — AGENTS.md:24; \"Do **not** include D-day in the event label.\" — CODEX_IMPLEMENTATION_BRIEF.md:291; §2.4 \"**Wrong** / `대한건설 · D-2`\" — CODEX_IMPLEMENTATION_BRIEF.md:110-111.",
+        "implementation": "The calendar event label carries a D-day badge. frontend/app.js:526 `const dd=r.planned?'':C.ddayClass(r),badge=MODE_C==='full'?(r.planned?'예상':(dd==='overdue'||dd==='today'?C.ddayLabel(r):'')):'';` and :527 emits it inside the event button: `...<span class=\"ev-name\">${label}</span>${badge?`<span class=\"ev-d\">${C.esc(badge)}</span>`:''}</button>`. `C.ddayLabel` produces the `D-?`/`D+?` string. Styled at frontend/styles.css:165 `.ev-d{flex:0 0 auto;font-size:var(--fs-xs);font-weight:700}`. Scope is limited to overdue/today events in wide cells, but the contract's prohibition is unconditional."
+      },
+      {
+        "id": "DISC-UI-06",
+        "kind": "violates",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"3. The calendar event text must show **`vendor name · actual schedule/task name`**, not `D-?`.\" — AGENTS.md:23; \"Display: / `업체명 · 일정명`\" — CODEX_IMPLEMENTATION_BRIEF.md:281-283; \"Prefer showing real event names over collapsing too early.\" — CODEX_IMPLEMENTATION_BRIEF.md:646; \"Do not shrink event text to unreadable sizes just to force the entire month into one viewport.\" — :264.",
+        "implementation": "The vendor name is conditionally dropped, and at narrow widths all text is dropped. frontend/app.js:502 `const chipMode=w=>w>=170?'full':(w>=110?'name':'dot');` frontend/app.js:524 `const label=MODE_C==='full'?`${C.esc(v?.name||L.noVendor)} · ${C.esc(r.name)}`:C.esc(r.name);` — below a 170px cell the label degrades to the task name only (no vendor). frontend/app.js:519-520: below a 110px cell the whole `.events` list is replaced by `<button class=\"dot ...\"></button>` markers plus a count `<b class=\"dot-n\">`, i.e. zero event text in the calendar. The author's comment at :493-496 acknowledges the tradeoff (\"좁으면 글자를 포기하고 점과 건수로 물러난다\" — \"when narrow, give up the text and fall back to dots and a count\"). Cell width is derived from the window (`cellWidth()` at :497-501), which is itself fixed because of DISC-UI-02, so a narrowed `cal` window silently erases the contracted label."
+      },
+      {
+        "id": "DISC-UI-07",
+        "kind": "violates",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"7. Clicking an **empty date cell** must open “Add schedule” with that date already selected.\" — AGENTS.md:21-40 item 7, AGENTS.md:27; \"Clicking unused space in an in-month date cell must open the Add Schedule modal with: / - date prefilled,\" — CODEX_IMPLEMENTATION_BRIEF.md:301-303; \"- blank day area -> add schedule\" — :938; \"Click a blank calendar date -> create schedule -> event appears on that exact date.\" — AGENTS.md:88.",
+        "implementation": "A single click does nothing; the shipped handler requires a DOUBLE click. frontend/app.js:534 `cell.addEventListener('dblclick',e=>{if(e.target.closest('[data-event-id]'))return;openSchedule(ds)});` — there is no `click` listener on the day cell (the only `click` listeners in renderCalendar are on `[data-more-day]`, `[data-done-day]`, `[data-event-id]` at :542-545). The deviation is deliberate per the comment at :532-533 (\"DesktopCal 관례대로 빈 날짜는 두 번 클릭으로 연다\"). The affordance shown on hover, frontend/app.js:530 `<span class=\"add-hint\">+ ${state.terms.event}</span>` / frontend/styles.css:192-193, does not disclose that a double click is required. Date IS correctly prefilled once opened (`openSchedule(ds)`), so only the click gesture deviates."
+      },
+      {
+        "id": "DISC-UI-08",
+        "kind": "violates",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"Do not add a `+N` collapse merely because there are four events.\" — CODEX_IMPLEMENTATION_BRIEF.md:650; \"Because the calendar itself can scroll, allow day/week height to grow with content.\" — :648.",
+        "implementation": "frontend/app.js:504 `const MODE_C=chipMode(cellWidth()),CAP=MODE_C==='full'?3:2;` and :522-528 `const show=open.slice(0,CAP),rest=open.length-show.length; ... (rest>0?`<button class=\"more\" data-more-day=\"${ds}\">＋${rest}건</button>`:'')`. With four events in a wide cell exactly the prohibited `＋1건` collapse appears; in a medium-width cell it collapses at three. Row height cannot grow with content because of DISC-UI-02. The contract's one mitigation IS satisfied — \"Any overflow UI must still allow a one-click view of all events on that date\" (:650) — via frontend/app.js:542 `openDay(b.dataset.moreDay)`."
+      },
+      {
+        "id": "DISC-UI-09",
+        "kind": "beyond-scope",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"# 27. Out of scope for this iteration / Do not add these unless separately requested: ... - construction-cost management, / - budget/payment accounting,\" — CODEX_IMPLEMENTATION_BRIEF.md:1177-1187.",
+        "implementation": "A full budget/expenditure accounting subsystem ships as one of the three desktop pieces. frontend/index.html:53-57 declares the 예산 section inside the `status` window (including a `합본예산서` creation button); frontend/index.html:96-113 declares `#budgetModal` (budget title/year/line items) and `#spendModal` (amount, spent-vs-planned status, date, vendor, linked project). Logic: frontend/app.js:216-226 (budget summary, `잔액`/`초과` figures, `budgetBarInner` spend/plan meter), :273-299 (`won`, `budgetBar`, `budgetFigures`, `spendRows`, `budgetGroups`), :354 total accumulation, :452-490 (`openSpend`, save, `deleteSpend`). It is also injected into the required detail modal at frontend/app.js:808 `${spendSection(selectedRecord)}` with an `detailAddSpend` button (:355, :812). Money is surfaced on the vendor board too: frontend/app.js:250 `<span class=\"bh-money\">${L.vendorSpendLine(...)}</span>`. Data model carries it: frontend/core.js:72 terms include `budgetItem:'예산항목',spend:'지출'`."
+      },
+      {
+        "id": "DISC-UI-10",
+        "kind": "beyond-scope",
+        "confidence": "probable",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"Do not infer missing product requirements from generic dashboard conventions.\" — AGENTS.md:7; \"Do not add speculative UI. Ask a focused question or preserve the simpler behavior.\" — AGENTS.md:100; \"... or other invented management states.\" — AGENTS.md:22; \"- invented work-state taxonomies.\" — CODEX_IMPLEMENTATION_BRIEF.md:93.",
+        "implementation": "A 행사/group (\"event\") dimension exists that appears nowhere in the contract — grepping 행사|group|Group across AGENTS.md and CODEX_IMPLEMENTATION_BRIEF.md returns only unrelated hits (\"## 4.3 Visual noise budget\", \"- budget/payment accounting,\", \"- must have a clear drag area\"). Shipped: frontend/index.html:48-52 the 행사 section of the status piece; frontend/app.js:205-215 `renderStatus` group summaries; :303-340 `renderGroupBoard` with its own expand/collapse board, per-group vendor counts, done counts, overdue counts and progress bar; :517 `day-bands` painting group period bands across calendar cells (frontend/styles.css:185-191); frontend/core.js:99 label `viewGroup:'행사별'`. The contract is silent on this concept, so it is added UI, not contracted UI. Confidence is \"probable\" rather than \"confirmed\" only because contractual silence is not an explicit prohibition — AGENTS.md:100 is the closest binding text."
+      },
+      {
+        "id": "DISC-UI-11",
+        "kind": "missing",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"## 5.2 Header / Recommended height: 56–64 px. / Left: / - app title: `업체별 업무 일정` / - optional one-line microcopy, visually subordinate / Right: / - `D-day 도우미` / - `템플릿` / - `설정` / - `+ 업무` / - primary `+ 일정`\" — CODEX_IMPLEMENTATION_BRIEF.md:198-211; \"- Primary controls remain in stable positions.\" — :164; \"header is fixed within app layout,\" — :629.",
+        "implementation": "There is no application header and the listed controls are scattered across two separate OS windows. Grepping `업체별 업무 일정` across frontend/ finds it only in the document `<title>` (frontend/index.html:1) and as a data string in frontend/core.js:72 and :214 — it is never rendered as an on-screen app title. `+ 일정` lives in the cal window header (frontend/index.html:15 `#addScheduleBtn`), while `+ 업무`, `템플릿` and `설정` live in the mini window's footer (frontend/index.html:37-41 `.mini-tools`). `D-day 도우미` does not exist (see DISC-UI-14). Because §5.2's height is hedged (\"Recommended\") but the control inventory is not, this is recorded as missing rather than a hedge deviation."
+      },
+      {
+        "id": "DISC-UI-12",
+        "kind": "violates",
+        "confidence": "probable",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"Header: / - title `다가오는 일정` / - D-day horizon selector\" — CODEX_IMPLEMENTATION_BRIEF.md:219-222; \"Overdue dates naturally appear before today; do not create a separate status category/tab.\" — :237.",
+        "implementation": "The D-day rail header has no `다가오는 일정` title (grep finds the string nowhere in frontend/). frontend/index.html:25 puts a two-way view tablist in its place: `<div class=\"tabs seg\" role=\"tablist\" aria-label=\"미니 대시보드 보기\"><button ... data-board=\"due\"><button ... data-board=\"vendor\">`, labelled 일정순 / 업체별 (frontend/core.js:99). The horizon selector IS present and complete (frontend/index.html:27, including 무제한/직접설정). Whether the 일정순/업체별 toggle counts as the prohibited \"separate status category/tab\" is ambiguous — :237 names status categories specifically, and this tab switches grouping, not status — so confidence is probable for the tab half; the missing title is confirmed."
+      },
+      {
+        "id": "DISC-UI-13",
+        "kind": "violates",
+        "confidence": "probable",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"Card contents — keep it strict: / ```text / 대한건설                         D-2 / 안전보건수준평가 / 8.14. · 배수로 정비공사 / ```\" — CODEX_IMPLEMENTATION_BRIEF.md:242-248; priority order \"1. vendor/company name, / 2. actual schedule/task name,\" — :155-156.",
+        "implementation": "The shipped card collapses the contracted vendor line and task line into a single line. frontend/app.js:150-152: `<span class=\"dc-l1\">${C.esc(v?.name||L.noVendor)} · ${C.esc(r.name)}</span>` followed by `<span class=\"dc-l2\">${spanText(r)}${p?` · ${C.esc(p.name)}`:''}</span>` and `<span class=\"dc-dday\">${C.ddayLabel(r)}</span>`. Both lines are single-line-ellipsised (frontend/styles.css:236-237 `white-space:nowrap;overflow:hidden;text-overflow:ellipsis`), so in a 352px-wide rail the vendor name and the task name compete for one line and the task name is what gets truncated — inverting the visual hierarchy of :155-156. The card also carries an extra inline `✓` complete button not in the contracted shape (frontend/app.js:158)."
+      },
+      {
+        "id": "DISC-UI-14",
+        "kind": "missing",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"14. The desktop helper window must remain minimal: vendor, nearest task, date, D-day. No dashboard clutter.\" — AGENTS.md:39; \"Current helper click merely opens/focuses the main window. Improve this: / - clicking a helper card should open/focus main, / - main should open the corresponding schedule detail automatically.\" — CODEX_IMPLEMENTATION_BRIEF.md:613-616; \"Click helper card -> main window opens focused on the corresponding detail.\" — AGENTS.md:96; \"Open helper -> it uses the same D-day horizon/state as main app.\" — AGENTS.md:95.",
+        "implementation": "No helper window and no main window exist, so the contracted helper→main deep link is unimplementable as specified. src-tauri/src/lib.rs:12 `const PIECES: [&str; 3] = [\"cal\", \"mini\", \"status\"];` — no `helper` label; src-tauri/tauri.conf.json:14/34/52 confirms the three labels. The tray menu offers only `toggle-cal` / `toggle-mini` / `toggle-status` (src-tauri/src/lib.rs:362-364). The nearest analogue, the `mini` piece, is not minimal in the contracted sense: it also carries a view tablist, an overdue pill, an omni search combobox and three footer tool buttons (frontend/index.html:25-41). Clicking a mini card opens the detail modal inside the mini window itself (frontend/app.js:159 → `openRecord`), since cross-window pop-out was disabled at frontend/app.js:16."
+      },
+      {
+        "id": "DISC-UI-15",
+        "kind": "violates",
+        "confidence": "probable",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"- Avoid nested cards and excessive badges/chips.\" — AGENTS.md:47; \"On the default main view, avoid: / - multiple badge systems, ... / - secondary filters that are not essential.\" — CODEX_IMPLEMENTATION_BRIEF.md:171-179; \"... or other invented management states.\" — AGENTS.md:22.",
+        "implementation": "Several coexisting badge systems render on the default view. frontend/app.js:146-147 an overdue count pill `지남 ${late}` / `지남 없음` (frontend/styles.css:246-248) — a derived management count the contract does not define. frontend/app.js:232 and :324 a per-row step-count badge `<span class=\"bi-steps\">${it.stepsDone}/${it.stepsTotal}</span>` (frontend/styles.css:321). frontend/app.js:250 an overdue sub-badge `<span class=\"bh-late\">` plus a money badge `<span class=\"bh-money\">` on the same row as the progress bar. frontend/app.js:515 a `done-mark` `✓N` chip in the day cell head. frontend/app.js:526-527 the `ev-d` D-day chip (DISC-UI-05). frontend/index.html:29-34 adds an omni search/filter combobox to the rail. Nested cards: frontend/styles.css:288 `.board-row{border:1px solid var(--line);border-radius:12px;background:#fff}` sits inside `.piece` (:61-63), and `.bg-project`/`.bg-vendor` nest a third level inside the budget board. Marked probable because \"excessive\" and \"essential\" are the contract's own undefined thresholds."
+      },
+      {
+        "id": "DISC-UI-16",
+        "kind": "violates",
+        "confidence": "probable",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"- Work-tool aesthetic, not a decorative consumer dashboard.\" — AGENTS.md:44; \"- Default palette is neutral/light.\" — AGENTS.md:45; \"## 19.1 Tone / - Korean government/office utility, / - calm, / - precise, / - neutral, / - not flashy,\" — CODEX_IMPLEMENTATION_BRIEF.md:884-890; \"- neutral warm/cool background, / - white panels,\" — :897-898.",
+        "implementation": "The page background is a decorative three-layer wallpaper, not a neutral ground: frontend/styles.css:51-57 `body{background: radial-gradient(1200px 500px at 75% -10%, #ffe9c7 0%, transparent 55%), radial-gradient(1600px 900px at 20% 110%, #1e5b48 0%, transparent 60%), linear-gradient(180deg,#8db8d8 0%, #bcd3e2 38%, #dde5d2 62%, #6f9c7c 100%); background-attachment:fixed;}`, and panels are translucent \"glass\" rather than white: :28-31 `--glass:rgba(249,250,252,.97); --cell:rgba(255,255,255,.92)` with `--shadow:0 10px 34px rgba(19,20,22,.20)` (:22). This is confined to the browser/preview composition — frontend/styles.css:73 `body.win-mode{background:transparent}` removes it in Tauri, where the real Windows desktop shows through instead. The accent-color rules ARE honored: a single `--accent:#0b50d0` (:14), red reserved for `--danger` urgency (:18), and grepping for per-vendor color assignment (hsl(/hue/vendorColor/palette) across frontend/ returns nothing — AGENTS.md:46 \"Do not assign arbitrary colors per vendor\" is satisfied. Marked probable because \"decorative\" and \"not flashy\" are qualitative and the wallpaper never ships in the Tauri target."
+      },
+      {
+        "id": "DISC-UI-17",
+        "kind": "dead-code",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"8. Clicking a D-day card or calendar event must open a **detail dialog/popover**, not navigate to a new page.\" — AGENTS.md:28 — this clause is SATISFIED, but the disabled cross-window pop-out left its Rust half in place. Relevant obligation: \"Use official Tauri 2 APIs/plugins and keep capabilities narrowly scoped.\" — AGENTS.md:61.",
+        "implementation": "frontend/app.js:16 `async function popOut(){return false}` unconditionally disables the pop-out path, so all seven call sites (frontend/app.js:423, 451, 674, 738, 800, 979, 981) fall through to the in-place modal — AGENTS.md:28 holds. But the Rust side is now unreachable: src-tauri/src/lib.rs:109 `fn open_form(app, form, payload)` builds an `index.html?w=pop&form=...` window (:120, :135) and is registered in the invoke handler at :391, yet grepping `open_form` across frontend/ returns zero hits. `pop_ready` (:75) and `close_pop` (:85) survive only because frontend/app.js:24 still calls `close_pop` from `closePopSoon`, which itself returns immediately when `IS_POP` is false (:20) — and no code path can now set `IS_POP`. The `pop` window mode CSS (frontend/styles.css:80-86) is likewise unreachable."
+      },
+      {
+        "id": "DISC-UI-18",
+        "kind": "missing",
+        "confidence": "probable",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"At startup / Today button: / - move current month into view, / - position Today reasonably near the visible center of the calendar scroll area.\" — CODEX_IMPLEMENTATION_BRIEF.md:637-640; \"- Today -> current month + scroll Today into good visible position\" — :939.",
+        "implementation": "The month-switch half is implemented, the scroll-positioning half cannot be and is absent. frontend/app.js:1061 `$('todayBtn').addEventListener('click',()=>{const d=C.parse(C.todayISO());currentMonth=new Date(d.getFullYear(),d.getMonth(),1);renderCalendar()})` and frontend/app.js:1184 at startup set the month but never scroll — there is no `scrollTo`/`scrollIntoView` call against `#calendarScroll` anywhere in frontend/app.js. This follows directly from DISC-UI-02 (`overflow:hidden`, so there is no scroll offset to set). Whether this is separately a violation is arguable — with the whole month always visible, Today is trivially \"in view\" — hence it is reported as a missing sub-behavior of the scroll clause rather than an independent defect."
+      },
+      {
+        "id": "DISC-UI-19",
+        "kind": "stale-doc",
+        "confidence": "confirmed",
+        "status": "REGISTERED_NOT_FIXED",
+        "contract_clause": "\"Keep a migration path from existing v5 state.\" — AGENTS.md:56; \"# 15. Data model target (v6 suggested)\" — CODEX_IMPLEMENTATION_BRIEF.md:654 (note: §15 is explicitly hedged as \"suggested\").",
+        "implementation": "The shipped document title still advertises v5 while the app is at 0.7.0. frontend/index.html:1 `<title>업체별 업무 일정 v5</title>`, versus src-tauri/tauri.conf.json:5 `\"version\": \"0.7.0\"`. The title is what the Windows taskbar/window manager shows for the browser-mode page. Purely a stale label — no behavioral consequence found."
+      }
+    ]
+  },
+  "protected_paths": [
+    "contracts/**",
+    "project-state/decisions.jsonl",
+    "project-state/rejections.jsonl",
+    "visual/baseline/**",
+    "tests/acceptance/**",
+    "AGENTS.md",
+    "CODEX_IMPLEMENTATION_BRIEF.md",
+    "CODEX_START_PROMPT.txt"
+  ],
+  "protected_paths_note": "hook 으로 강제하지 않는다 (CLAUDE.md §6). visual/baseline/ 과 tests/acceptance/ 는 아직 존재하지 않는다.",
+  "not_created_in_this_task": [
+    "visual/baseline/  — 사용자가 생성을 지시하지 않았다. 보호 목록에만 등재.",
+    "tests/acceptance/ — 동일.",
+    "IMPLEMENTATION_REPORT.md — 계약 §29-8 이 요구하지만 제품 산출물이므로 이번 범위 밖 (DISC-SYS-10)."
+  ]
+}
