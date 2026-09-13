@@ -1,0 +1,12 @@
+node_modules/
+dist/
+target/
+.vite/
+*.log
+.DS_Store
+Thumbs.db
+# Playwright artifacts (screenshots are committed only under design/prototype/results/)
+test-results/
+playwright-report/
+# stand-in Korean fonts for Linux rendering are never committed
+design/prototype/public/fonts-standin/

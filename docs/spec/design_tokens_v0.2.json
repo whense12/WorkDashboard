@@ -1,0 +1,463 @@
+{
+  "version": "0.2",
+  "supersedes": "design_tokens_v0.1.json (v0.1은 무수정 보존; 충돌 시 v0.2 우선 — ADR-0002)",
+  "principles": {
+    "visual": [
+      "quiet-at-rest",
+      "fluent-behavior",
+      "swiss-information-hierarchy"
+    ],
+    "priority": "usability-first: 오류·시행착오 없는 사용 > 차별화 [사용자 결정]",
+    "color_rule": "semantic colors communicate status as a SECONDARY channel; shape+label first; vendor identity never relies on color",
+    "accent_rule": "액센트는 'Enter가 향하는 곳'(선택 레일·포커스·활성 탭·화면당 primary 버튼 1개)에만. 상태·브랜딩·오늘 표시에 금지"
+  },
+  "typography": {
+    "decision": "[사용자 결정] 공무원 서식 기반 → 부서 보고서 양식의 본문 서체 '맑은 고딕'(시스템). HY헤드라인M·휴먼명조·굴림은 한컴 동봉 인쇄용 서체라 UI 본문 부적합·재배포 불가 → 화면 UI 미사용, 인쇄/보고 뷰(Phase 6)에서 설치 시 선택 [Claude 제안]. ADR-0003",
+    "font_stack": {
+      "ui": "\"Malgun Gothic\", \"맑은 고딕\", \"Segoe UI Variable Text\", \"Segoe UI\", \"NanumGothic\", \"Noto Sans KR\", sans-serif",
+      "note": "맑은 고딕을 선두에 두어 한글·라틴·숫자를 한 서체로 조판(기준선 불일치 방지). NanumGothic/Noto Sans KR은 Linux 개발 환경 대체 렌더 전용(저장소 미포함). Fluent v9 fontFamilyBase는 테마에서 이 스택으로 오버라이드. fontFamilyNumeric(Bahnschrift) 사용 금지.",
+      "numeric": "본문과 동일 스택 + font-variant-numeric: tabular-nums (별도 mono 패밀리 금지). 맑은 고딕의 tnum 지원 여부는 Windows 실측 항목 [미확인]; 미지원 시 숫자 슬롯 고정폭(ch 대신 px)으로 대체",
+      "print_optional": "HY헤드라인M(제목) / 휴먼명조(1단 항목) — local() 존재 시에만, 인쇄 뷰 한정 [Claude 제안]"
+    },
+    "weights": {
+      "regular": 400,
+      "bold": 700,
+      "note": "맑은 고딕 실체 굵기는 Regular/Bold/Semilight. 600 요청 시 합성 굵기 → 독트린의 600 슬롯은 전부 700으로 치환. 300·600·italic 금지",
+      "bold_budget_per_view": 2
+    },
+    "ramp": {
+      "normal": {
+        "anchor": {
+          "size": 28,
+          "line": 36,
+          "weight": 700,
+          "use": "위젯 날짜(뷰당 큰 글자 1개)"
+        },
+        "title": {
+          "size": 20,
+          "line": 28,
+          "weight": 700,
+          "use": "인스펙터 엔티티명·월 제목"
+        },
+        "subtitle": {
+          "size": 16,
+          "line": 22,
+          "weight": 700,
+          "use": "섹션·선택 항목명"
+        },
+        "body": {
+          "size": 14,
+          "line": 20,
+          "weight": 400,
+          "use": "업체명·일정 제목·값"
+        },
+        "bodyStrong": {
+          "size": 14,
+          "line": 20,
+          "weight": 700,
+          "use": "결론형 요약 한 줄(❖ 요약 대응)"
+        },
+        "caption": {
+          "size": 12,
+          "line": 16,
+          "weight": 400,
+          "use": "라벨·상태 문구·건수·요일 헤더"
+        },
+        "micro": {
+          "size": 11,
+          "line": 14,
+          "weight": 400,
+          "use": "라틴/숫자 전용(단축키 칩). 한글 금지"
+        }
+      },
+      "compact": {
+        "anchor": {
+          "size": 24,
+          "line": 32,
+          "weight": 700
+        },
+        "title": {
+          "size": 18,
+          "line": 24,
+          "weight": 700
+        },
+        "subtitle": {
+          "size": 14,
+          "line": 20,
+          "weight": 700
+        },
+        "body": {
+          "size": 14,
+          "line": 20,
+          "weight": 400
+        },
+        "bodyStrong": {
+          "size": 14,
+          "line": 20,
+          "weight": 700
+        },
+        "caption": {
+          "size": 12,
+          "line": 16,
+          "weight": 400
+        },
+        "micro": {
+          "size": 11,
+          "line": 14,
+          "weight": 400
+        },
+        "note": "compact는 글자 크기를 내리지 않고 행 높이·패딩만 줄인다(한글 12px 하한·램프 밖 13/15px 금지)"
+      },
+      "fluent_v9_map": {
+        "anchor": "title2 28/36",
+        "title": "subtitle1 20/28",
+        "subtitle": "subtitle2 16/22",
+        "body": "body1 14/20",
+        "bodyStrong": "body1Strong 14/20",
+        "caption": "caption1 12/16"
+      }
+    },
+    "hangul": {
+      "min_px": 12,
+      "tracking": {
+        "hangul": "0",
+        "latin_caps_label": "+0.05em",
+        "widget_date_digits": "-0.01em"
+      },
+      "wrap": "word-break: keep-all; overflow-wrap: anywhere(극단만)",
+      "names": "업체명 말줄임 대신 2행 + 툴팁; 고정 높이 구간(위젯·기간표)은 말줄임 + 툴팁 전체명",
+      "line_height": {
+        "ui": "램프 px 고정, normal 금지",
+        "prose": 1.55
+      },
+      "measure": "65ch 무효(ch='0' 폭). 산문 폭 상한 480–560px",
+      "align": "전부 좌측; 가운데는 요일 1자·모노그램 글자만; 숫자 열 우측"
+    },
+    "form_mapping": {
+      "source": "고성군 농식품유통과 보고서 양식(form-spec): 제목 HY헤드라인M 25pt / 소제목 HY헤드라인M 18pt / ❍ 1단 휴먼명조 15pt / • 2단 맑은 고딕 13pt / ❖ 요약 맑은 고딕 15pt / ▣ 추진부서 굴림 14pt",
+      "map": {
+        "제목·소제목": "anchor/title (맑은 고딕 700)",
+        "❖ 요약": "bodyStrong 결론형 요약 한 줄",
+        "❍ 1단 항목": "section caption 라벨(명조 미사용)",
+        "• 2단 항목": "body 14/20",
+        "▣ 추진부서": "미사용"
+      }
+    }
+  },
+  "color": {
+    "layering": "1계층 Fluent v9 theme 토큰 → 2계층 제품 semantic(surface/state/accent) → 3계층 컴포넌트. hex 직접 기입·#fff/#000 금지",
+    "accent": {
+      "default": "A_ink_blue [Claude 제안]",
+      "candidates": {
+        "A_ink_blue": {
+          "oklch": "oklch(0.50 0.14 250)",
+          "light": {
+            "rest": "#0465af",
+            "hover": "#00539b",
+            "pressed": "#004288",
+            "selected": "#0465af",
+            "subtle": "#dbf1ff"
+          },
+          "dark": {
+            "rest": "#60aaf3",
+            "hover": "#4d97de",
+            "pressed": "#3a84ca",
+            "selected": "#60aaf3",
+            "subtle": "#dbf1ff"
+          }
+        },
+        "B_teal_steel": {
+          "oklch": "oklch(0.48 0.10 200)",
+          "light": {
+            "rest": "#006e74",
+            "hover": "#005c62",
+            "pressed": "#004b52",
+            "selected": "#006e74",
+            "subtle": "#d0f7f9"
+          },
+          "dark": {
+            "rest": "#48b7bd",
+            "hover": "#30a4aa",
+            "pressed": "#0d9298",
+            "selected": "#48b7bd",
+            "subtle": "#d0f7f9"
+          }
+        },
+        "C_system_accent": {
+          "note": "Windows 시스템 강조색 추종. needs_attention/changed hue와 60° 미만이면 A로 폴백 [Claude 제안: 미채택]"
+        }
+      },
+      "usage": [
+        "selection-rail",
+        "focus",
+        "active-tab",
+        "primary-button (화면당 1개)"
+      ],
+      "forbidden": [
+        "status",
+        "today",
+        "branding",
+        "vendor-identity"
+      ]
+    },
+    "status": {
+      "lightness_order": "cancelled(가장 흐림) < linked < confirmed < changed < needs_attention(가장 진함) — 회색조 검증 필수",
+      "values": {
+        "needs_attention": {
+          "oklch": "oklch(0.45 0.15 45)",
+          "light": "#942e00",
+          "dark": "#f19266"
+        },
+        "changed": {
+          "oklch": "oklch(0.52 0.12 310)",
+          "light": "#7e539c",
+          "dark": "#c79de6"
+        },
+        "confirmed": {
+          "oklch": "oklch(0.58 0.13 150)",
+          "light": "#348f4f",
+          "dark": "#7ccd8e"
+        },
+        "linked": {
+          "oklch": null,
+          "light": null,
+          "dark": null,
+          "note": "색 없음 — 아이콘(Link regular)만"
+        },
+        "cancelled": {
+          "oklch": "oklch(0.72 0 0)",
+          "light": "#a4a4a4",
+          "dark": "#717171"
+        }
+      },
+      "shapes": {
+        "confirmed": "filled-dot 6px",
+        "needs_attention": "left-rule 2px + ring 6px",
+        "changed": "diagonal-tick + 원계획 고스트",
+        "cancelled": "text line-through + Foreground3",
+        "linked": "Link regular icon, hairline connector"
+      }
+    },
+    "surface": {
+      "window": "colorNeutralBackground1 (창 Base는 Mica 후보)",
+      "widget": "Mica(불투명, Win11, Tauri windowEffects; 폴백 colorNeutralBackground2) + 라이트 한정 warm tilt chroma ≤0.02",
+      "pane": "colorNeutralBackground1 + 1px colorNeutralStroke2 + radius 8",
+      "flyout": "colorNeutralBackground1 + shadow16 (Acrylic은 light-dismiss 표면에만)",
+      "selected": "colorNeutralBackground1Selected + 좌측 2px accent rail",
+      "attention": "채움 없음; 좌측 2px status.needs_attention rail + Foreground1 텍스트"
+    },
+    "stroke": {
+      "hairline": "1px colorNeutralStroke2",
+      "today": "열 배경 colorNeutralBackground3 + 1px 상단 룰 + 날짜 700",
+      "weekend": "열 배경 colorNeutralBackground2"
+    },
+    "theme": {
+      "light": true,
+      "dark": "Windows 추종(Fluent dark 토큰, 순흑 금지)",
+      "forced_colors": {
+        "text": "CanvasText",
+        "selected": "Highlight/HighlightText",
+        "hairline": "1px CanvasText",
+        "today_weekend": "배경 대신 1px 경계",
+        "status_shapes": "유지(forced-color-adjust:none 금지)",
+        "accent": "Highlight",
+        "disabled": "GrayText"
+      }
+    }
+  },
+  "monogram": {
+    "slot": {
+      "normal": "28x20",
+      "compact": "24x16"
+    },
+    "radius": 4,
+    "stroke": "1px colorNeutralStroke1",
+    "fill": "none",
+    "text": "12px 700 colorNeutralForeground1",
+    "prefix_strip": [
+      "주식회사",
+      "㈜",
+      "(주)",
+      "농업회사법인",
+      "영농조합법인",
+      "합자회사",
+      "유한회사",
+      "사단법인",
+      "재단법인"
+    ],
+    "collision": "1음절 → 2음절 → 2음절+지역 → 사용자 지정(Vendor.monogram_override)",
+    "placement": "목록 행 선두만(월간 셀·기간표 셀 제외; 이름이 들어갈 폭이 있으면 이름 우선)",
+    "forbidden": [
+      "원형",
+      "채색",
+      "이름 해시 색",
+      "Avatar"
+    ]
+  },
+  "office_schedule_marker": "6px outline square (모노그램과 같은 x축)",
+  "spacing": [
+    2,
+    4,
+    6,
+    8,
+    12,
+    16,
+    20,
+    24,
+    32
+  ],
+  "spacing_usage": {
+    "pane_gap": "20/24",
+    "section_gap": "12/16",
+    "row_gap": "0 (행 높이가 리듬) 또는 6",
+    "inline_gap": "4/2",
+    "rule": "한 화면에 spacing 4종 이상"
+  },
+  "radius": {
+    "control": 4,
+    "compact_surface": 6,
+    "pane": 8,
+    "floating_widget": 12,
+    "flyout": 12,
+    "forbidden": "999px 알약, 카드 안 카드"
+  },
+  "grid": {
+    "base": 4,
+    "week_row_height": "헤더 24 + row_unit×n + 8 (4의 배수)",
+    "month_cell_two_column_threshold": {
+      "normal": 9,
+      "compact": 12
+    },
+    "month_row_growth_threshold": 17,
+    "matrix_vendor_col_px": {
+      "normal": 200,
+      "compact": 160
+    },
+    "workspace_ratio": "calendar:inspector ≈ 2.4:1 (사용자 조절값 저장)",
+    "min_click_target": 24,
+    "fluent_control_height": {
+      "normal": 32,
+      "compact": 28
+    }
+  },
+  "density": {
+    "modes": [
+      "compact",
+      "normal"
+    ],
+    "default": "normal [Claude 제안: 업체 20곳↑ compact 제안]",
+    "compact": {
+      "row": 24,
+      "cell_pad": 4,
+      "monogram": "24x16",
+      "control": 28
+    },
+    "normal": {
+      "row": 28,
+      "cell_pad": 6,
+      "monogram": "28x20",
+      "control": 32
+    },
+    "note": "v0.1의 '중간' 폐기(F38)"
+  },
+  "motion_ms": {
+    "hover_in": 120,
+    "hover_out": 100,
+    "selection_in": 140,
+    "selection_out": 120,
+    "pane_expand": 200,
+    "pane_collapse": 160,
+    "layout": 220,
+    "widget_data_crossfade": 83,
+    "curves": {
+      "enter": "cubic-bezier(0,0,0,1)",
+      "ease": "cubic-bezier(0.33,0,0.67,1)",
+      "exit": "cubic-bezier(0.7,0,1,0.5)"
+    },
+    "keyframes_allowed": [
+      "paneExpand",
+      "attentionOnce"
+    ],
+    "reduced_motion": "translate→opacity 83ms linear, stagger 0, 진행 표시 유지",
+    "forbidden": [
+      "breathe",
+      "pulse",
+      "stagger",
+      "hover lift",
+      "pressed scale",
+      "spring/bounce"
+    ]
+  },
+  "timing": {
+    "tooltip_delay_ms": 400,
+    "undo_toast_ms": 8000,
+    "loading_skeleton_threshold_ms": 300,
+    "widget_refresh_s": 60,
+    "hover_reveal_fade_ms": 100
+  },
+  "surfaces": [
+    "window",
+    "widget",
+    "pane",
+    "flyout",
+    "selected",
+    "attention"
+  ],
+  "semantic_states": {
+    "confirmed": "확정",
+    "needs_attention": "확인 필요",
+    "changed": "이 날짜만 변경 (셀 축약: 변경됨)",
+    "cancelled": "불참(참가) / 취소(일정·행사)",
+    "linked": "연결됨"
+  },
+  "date_format": {
+    "locale": "ko-KR",
+    "time_zone": "Asia/Seoul",
+    "widget": "M월 d일 (E)",
+    "month_cell": "d",
+    "week_header": "d(E)",
+    "matrix_header": "d(E)",
+    "inspector": "yyyy년 M월 d일 (E)",
+    "time": "HH:mm (24h, 선행 0)",
+    "range_same_year": "M/d–M/d",
+    "weekday_1char": [
+      "월",
+      "화",
+      "수",
+      "목",
+      "금",
+      "토",
+      "일"
+    ],
+    "week_start": "월 [Claude 제안]",
+    "relative": {
+      "today": "오늘 HH:mm",
+      "tomorrow": "내일",
+      "other": "M/d(E)"
+    },
+    "audit": "yyyy-MM-dd HH:mm"
+  },
+  "icon_policy": {
+    "source": "Microsoft Fluent System Icons (@fluentui/react-icons 2.0.339)",
+    "regular": "default/inactive",
+    "filled": "selected/active",
+    "sizes": "용도별 전용 컷(16/20/24) — CSS 스케일 금지",
+    "avoid": [
+      "mixed icon families",
+      "emoji as icon",
+      "decorative 3D icons",
+      "color as sole status signal"
+    ]
+  },
+  "layout_modes": {
+    "locked": "normal operating state; no accidental movement",
+    "edit": "show drag/resize affordances and explicit move/dock commands"
+  },
+  "summary_grammar": {
+    "weekday": "월·화",
+    "range_merge": "10/3–12/20",
+    "exception": "12/25 제외 · 9/26 추가",
+    "count": "오늘 7건 중 3건 확인 필요",
+    "empty": "오늘 일정 없음 · 다음 9/12(금) 고성청과"
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "version": "0.1",
+  "principles": {
+    "visual": [
+      "quiet-at-rest",
+      "fluent-behavior",
+      "swiss-information-hierarchy"
+    ],
+    "density": [
+      "compact",
+      "normal"
+    ],
+    "color_rule": "semantic colors communicate status; vendor identity must not rely on color alone"
+  },
+  "spacing": [
+    2,
+    4,
+    6,
+    8,
+    12,
+    16,
+    20,
+    24,
+    32
+  ],
+  "radius": {
+    "control": 4,
+    "compact_surface": 6,
+    "pane": 8,
+    "floating_widget": 12,
+    "flyout": 12
+  },
+  "motion_ms": {
+    "hover": [
+      100,
+      140
+    ],
+    "selection": [
+      120,
+      160
+    ],
+    "pane_expand": [
+      160,
+      220
+    ],
+    "layout_transition": [
+      180,
+      240
+    ]
+  },
+  "surfaces": [
+    "window",
+    "widget",
+    "pane",
+    "flyout",
+    "selected",
+    "attention"
+  ],
+  "semantic_states": {
+    "confirmed": "confirmed participation / completed certainty",
+    "needs_attention": "requires human confirmation or follow-up",
+    "changed": "schedule differs from base plan",
+    "cancelled": "not participating / cancelled",
+    "linked": "has event/vendor relationship"
+  },
+  "icon_policy": {
+    "source": "Microsoft Fluent System Icons",
+    "regular": "default/inactive",
+    "filled": "selected/active",
+    "avoid": [
+      "mixed icon families",
+      "decorative 3D icons",
+      "color as sole status signal"
+    ]
+  },
+  "layout_modes": {
+    "locked": "normal operating state; no accidental movement",
+    "edit": "show drag/resize affordances and explicit move/dock commands"
+  }
+}
