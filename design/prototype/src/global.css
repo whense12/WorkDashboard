@@ -1,0 +1,11 @@
+/* 한글 조판 규약(ADR-0003): 자간 0 · keep-all · tnum · line-height는 컴포넌트가 px로 지정 */
+html { font-variant-numeric: tabular-nums; word-break: keep-all; overflow-wrap: anywhere; letter-spacing: 0; }
+body { margin: 0; }
+*, *::before, *::after { box-sizing: border-box; }
+/* 장식 모션 금지(government). 컨트롤 피드백은 Fluent 토큰(duration*)이 담당 */
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }
+/* 행 명령ㆍ행 링크는 hover / 키보드 포커스 / 선택에서만 드러남. 슬롯은 예약되어 레이아웃이 흔들리지 않음 */
+.wd-row:hover .wd-cmds, .wd-row:focus-within .wd-cmds, .wd-row[aria-selected="true"] .wd-cmds { opacity: 1; }
+ul.wd-list { margin: 0; padding: 0; list-style: none; }
+/* 선택 탭의 굵기: Fluent 기본은 semibold(→700 매핑). 뷰당 Bold 2개 예산(문서 제목ㆍ인스펙터 제목)을 지키기 위해 400 */
+.fui-Tab[aria-selected="true"] .fui-Tab__content { font-weight: 400; }

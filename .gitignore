@@ -10,3 +10,5 @@ test-results/
 playwright-report/
 # stand-in Korean fonts for Linux rendering are never committed
 design/prototype/public/fonts-standin/
+
+design/prototype/tests/e2e/report/
