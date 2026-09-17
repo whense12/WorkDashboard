@@ -1,0 +1,233 @@
+/* Spike B — calendar density. Typography and spacing carry the hierarchy;
+   no card chrome, no truncation anywhere. */
+
+:root {
+  --ink: #1b1b1c;
+  --ink-2: #4a4a4f;
+  --ink-3: #7b7b83;
+  --line: #e2e2e6;
+  --line-2: #f0f0f3;
+  --bg: #fdfdfc;
+  --bg-cell: #ffffff;
+  --accent: #35507a;
+  --accent-soft: #eef2f8;
+  --sat: #a8563f;
+
+  /* density tokens (comfortable default) */
+  --fs-item: 13px;
+  --lh-item: 1.5;
+  --item-pad-y: 2px;
+  --cell-pad: 10px;
+  --row-gap: 2px;
+  --fs-date: 13px;
+  --cap-row: 260px;
+  --min-row: 108px;
+}
+
+html[data-theme="dark"], :root:not([data-theme="light"]) {
+  /* light only for this spike; measurements are taken in light */
+}
+
+* { box-sizing: border-box; }
+/* .month-grid sets display:flex, which would otherwise beat the UA [hidden] rule */
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 14px/1.5 "Pretendard", "Noto Sans KR", system-ui, -apple-system, "Segoe UI", sans-serif;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+body[data-density="compact"],
+body[data-density="columns"] {
+  --fs-item: 11.5px;
+  --lh-item: 1.32;
+  --item-pad-y: 0px;
+  --cell-pad: 6px;
+  --row-gap: 1px;
+  --fs-date: 12px;
+  --cap-row: 196px;
+  --min-row: 84px;
+}
+
+/* ---------- top bar ---------- */
+.bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 14px 20px 10px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  flex: 0 0 auto;
+}
+.month-title { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
+.month-sub { margin: 2px 0 0; font-size: 12px; color: var(--ink-3); }
+.bar-right { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.ctl { display: flex; align-items: center; gap: 4px; }
+.ctl-label { font-size: 11px; color: var(--ink-3); margin-right: 4px; }
+.ctl button {
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink-2);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 4px 9px;
+  cursor: pointer;
+}
+.ctl button.on { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+
+/* ---------- calendar frame ---------- */
+.cal { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+
+.weekday-head {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+.weekday-head span {
+  padding: 5px 10px;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.weekday-head span:first-child { color: var(--sat); }
+body[data-view="matrix"] .weekday-head { display: none; }
+
+/* OPTION 2: the calendar body is the scroller. Week rows never compress. */
+.cal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+/* ---------- month grid ---------- */
+.month-grid { display: flex; flex-direction: column; }
+
+/* OPTION 1: variable-height week rows — a row is as tall as its busiest day. */
+.week-row {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-bottom: 1px solid var(--line);
+  min-height: var(--min-row);
+  align-items: stretch;
+}
+
+/* OPTION 2b: capped rows — the dense cell scrolls in place instead of the body. */
+body[data-rowmode="cap"] .week-row { max-height: var(--cap-row); }
+/* the grid track is sized by its item, so the cell has to be capped too */
+body[data-rowmode="cap"] .day-cell { max-height: var(--cap-row); }
+body[data-rowmode="cap"] .day-scroll {
+  overflow-y: auto;
+  scrollbar-width: thin;                 /* the scrollbar is the "there is more" affordance */
+  scrollbar-color: #c3c3ca transparent;
+}
+
+.day-cell {
+  border-right: 1px solid var(--line-2);
+  padding: var(--cell-pad);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg-cell);
+}
+.day-cell:last-child { border-right: 0; }
+.day-cell[data-outside="true"] { background: #fafaf9; color: var(--ink-3); }
+.day-cell[data-focus="true"] { background: var(--accent-soft); }
+
+.day-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 4px;
+  flex: 0 0 auto;
+}
+.day-num { font-size: var(--fs-date); font-weight: 600; color: var(--ink-2); }
+.day-cell[data-dow="0"] .day-num { color: var(--sat); }
+/* extra context only — it never stands in for a name */
+.count-note { font-size: 10.5px; color: var(--ink-3); letter-spacing: 0.01em; }
+
+.day-scroll { flex: 1 1 auto; min-height: 0; }
+.day-items { display: block; }
+/* third density level: reflow into columns, never drop a name (measured option) */
+body[data-density="columns"] .day-items[data-band="high"],
+body[data-density="columns"] .day-items[data-band="extreme"] { column-count: 2; column-gap: 8px; }
+
+.item {
+  padding: var(--item-pad-y) 0;
+  font-size: var(--fs-item);
+  line-height: var(--lh-item);
+  break-inside: avoid;
+  /* full text, always: wrap instead of truncating */
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.item.general { color: var(--ink-2); }
+.item.general .g-time { color: var(--ink-3); font-size: 0.85em; margin-right: 4px; }
+/* vendors are marked with a hairline rule, never with a dot standing in for a name */
+.item.vendor {
+  color: var(--ink);
+  display: block;
+  border-left: 2px solid var(--accent-soft);
+  padding-left: 6px;
+}
+.vendor-name { min-width: 0; overflow-wrap: anywhere; }
+.sec-label {
+  font-size: 10px;
+  color: var(--ink-3);
+  margin: 4px 0 1px;
+  letter-spacing: 0.03em;
+}
+
+/* ---------- OPTION 4: vendor x date matrix ---------- */
+.matrix-wrap { padding: 0 0 24px; }
+.matrix { border-collapse: collapse; font-size: var(--fs-item); }
+.matrix th, .matrix td { border: 1px solid var(--line-2); }
+.matrix thead th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--bg);
+  font-weight: 600;
+  font-size: 11.5px;
+  color: var(--ink-2);
+  padding: 6px 7px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line);
+}
+.matrix tbody th {
+  position: sticky; left: 0; z-index: 1;
+  background: var(--bg-cell);
+  text-align: left;
+  font-weight: 400;
+  padding: 3px 10px 3px 14px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  min-width: 170px;
+  border-right: 1px solid var(--line);
+}
+.matrix thead th:first-child { left: 0; z-index: 3; text-align: left; padding-left: 14px; }
+.matrix td { text-align: center; padding: 3px 8px; color: var(--ink-3); }
+.matrix td[data-participating="true"] { color: var(--accent); background: #f6f8fc; }
+.matrix [data-focus-col="true"] { background: var(--accent-soft); }
+.matrix tbody tr:hover th, .matrix tbody tr:hover td { background: #f7f7f5; }
+.matrix-note { font-size: 12px; color: var(--ink-3); padding: 10px 14px 6px; }
+
+.foot {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--line);
+  padding: 6px 20px;
+  font-size: 11px;
+  color: var(--ink-3);
+  background: var(--bg);
+}
+
+@media (max-width: 680px) {
+  .bar { flex-direction: column; align-items: flex-start; gap: 10px; }
+}

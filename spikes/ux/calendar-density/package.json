@@ -1,0 +1,13 @@
+{
+  "name": "spike-calendar-density",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Spike B — month calendar density options (no hiding of vendor names)",
+  "scripts": {
+    "serve": "node server.js",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1"
+  }
+}

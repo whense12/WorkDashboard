@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Spike B — Calendar density</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body data-view="month" data-density="comfortable" data-rowmode="flow">
+  <header class="bar">
+    <div class="bar-left">
+      <h1 class="month-title" id="monthTitle">2026년 9월</h1>
+      <p class="month-sub" id="monthSub"></p>
+    </div>
+    <div class="bar-right">
+      <div class="ctl" role="group" aria-label="보기">
+        <span class="ctl-label">보기</span>
+        <button type="button" data-testid="view-month" data-view-btn="month" class="on">월</button>
+        <button type="button" data-testid="view-matrix" data-view-btn="matrix">업체 매트릭스</button>
+      </div>
+      <div class="ctl" role="group" aria-label="밀도">
+        <span class="ctl-label">밀도</span>
+        <button type="button" data-testid="density-comfortable" data-density-btn="comfortable" class="on">여유</button>
+        <button type="button" data-testid="density-compact" data-density-btn="compact">조밀</button>
+        <button type="button" data-testid="density-columns" data-density-btn="columns">조밀 2열</button>
+      </div>
+      <div class="ctl" role="group" aria-label="주 행 구조">
+        <span class="ctl-label">주 행</span>
+        <button type="button" data-testid="rowmode-flow" data-rowmode-btn="flow" class="on">행 확장</button>
+        <button type="button" data-testid="rowmode-cap" data-rowmode-btn="cap">행 고정 · 셀 스크롤</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="cal" data-testid="cal">
+    <div class="weekday-head" id="weekdayHead" aria-hidden="true"></div>
+    <div class="cal-body" id="calBody" data-testid="cal-body">
+      <div class="month-grid" id="monthGrid" data-testid="month-grid"></div>
+      <div class="matrix-wrap" id="matrixWrap" data-testid="matrix" hidden></div>
+    </div>
+  </main>
+
+  <footer class="foot">
+    <span id="measure" data-testid="measure"></span>
+  </footer>
+
+  <script src="fixtures.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
