@@ -1,0 +1,13 @@
+{
+  "name": "spike-object-lens",
+  "private": true,
+  "version": "0.0.0",
+  "description": "SPIKE C - Object Lens. Not a product decision.",
+  "scripts": {
+    "serve": "node server.js",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  }
+}

@@ -1,0 +1,161 @@
+/* SPIKE C — Object Lens. Quiet-at-rest sheet, typography/spacing hierarchy (EXPERIENCE 4). */
+
+:root{
+  --ink:#191714;
+  --ink-2:#55504a;
+  --ink-3:#8d867e;
+  --line:#ddd7cf;
+  --line-2:#ece7e0;
+  --paper:#faf8f5;
+  --paper-2:#fffdfa;
+  --origin:#9a5b12;
+  --origin-soft:#f3e2cb;
+  --ok:#3c6b4a;
+  --hold:#8a7318;
+  --off:#96412f;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font:15px/1.5 "Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ---- spike instrumentation bar (not product UI) ---- */
+#spike-bar{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:6px 18px;background:#241f1a;color:#e9e2d8;font-size:12px;
+}
+#spike-bar .spike-tag{letter-spacing:.06em;color:#c6b99f}
+#spike-bar label{display:flex;align-items:center;gap:6px}
+#spike-bar select,#spike-bar button{font:inherit;padding:2px 6px;background:#3a332b;color:#f0eae0;border:1px solid #574d41;border-radius:3px}
+
+#app-head{padding:22px 28px 10px}
+#app-head h1{margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em}
+#app-head h1 span{color:var(--ink-3);font-weight:400;margin-left:8px}
+.head-sub{margin:4px 0 0;font-size:12px;color:var(--ink-3);letter-spacing:.02em}
+.head-sub b{color:var(--ink-2);font-weight:600}
+
+main{padding:10px 28px 40px;max-width:1180px}
+
+/* ---- Calendar Sheet ---- */
+.dow-row{display:grid;grid-template-columns:repeat(7,1fr);padding:0 0 4px;font-size:11px;color:var(--ink-3)}
+.dow-row span{padding-left:6px}
+#cal-grid{display:grid;grid-template-columns:repeat(7,1fr);border-top:1px solid var(--line);border-left:1px solid var(--line)}
+.cell{
+  min-height:96px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);
+  padding:5px 6px 8px;background:var(--paper-2);position:relative;
+}
+.cell.is-out{background:#f4f1ec}
+.cell.is-out .daynum{color:#c2bbb2}
+.cell.is-today .daynum{color:var(--origin);font-weight:700}
+.daynum{font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.cell-entries{display:flex;flex-direction:column;gap:2px;margin-top:4px}
+
+/* entry = 업체명/행사명/일정명을 그대로 노출 (NEVER 3) */
+.entry{
+  display:block;width:100%;text-align:left;border:0;background:transparent;
+  font:inherit;font-size:12.5px;line-height:1.35;color:var(--ink);
+  padding:2px 4px;border-radius:3px;cursor:pointer;border-left:2px solid transparent;
+}
+.entry:hover{background:#f2ede6}
+.entry:focus-visible{outline:2px solid var(--origin);outline-offset:1px}
+.entry .nm{font-weight:500}
+.entry .st{font-size:11px;color:var(--ink-3);margin-left:4px}
+.entry[data-kind="event"]{border-left-color:#6b5b8a;font-weight:600}
+.entry[data-kind="schedule"]{border-left-color:#4a6b7a}
+.entry[data-kind="vendor"]{border-left-color:#8a7a5b}
+.entry[data-status="불참"] .nm{text-decoration:line-through;color:var(--ink-3)}
+.entry[data-status="보류"] .st{color:var(--hold)}
+.entry[data-status="확정"] .st{color:var(--ok)}
+.entry[data-status="불참"] .st{color:var(--off)}
+.entry .clip{font-size:10px;color:var(--ink-3);margin-left:4px;letter-spacing:.04em}
+
+/* origin marking: 열린 Lens 의 출처는 계속 표시된다 */
+[data-origin="true"]{background:var(--origin-soft) !important;box-shadow:inset 0 0 0 1px var(--origin);}
+[data-origin="true"]::after{
+  content:"origin";position:absolute;margin:-1px 0 0 6px;font-size:9px;color:var(--origin);letter-spacing:.08em;
+}
+.entry[data-origin="true"]{position:relative}
+.entry[data-origin="true"]::after{position:static;display:inline-block}
+
+/* ---- Work Track (Calendar-only 가 아님: EXPERIENCE 3, MUST 7) ---- */
+#work-track{margin-top:26px}
+.track-head{display:flex;align-items:baseline;gap:16px;border-bottom:1px solid var(--line);padding-bottom:6px}
+.track-head h2{margin:0;font-size:14px;font-weight:600}
+.track-filters{display:flex;gap:2px}
+.filter{font:inherit;font-size:12px;border:0;background:transparent;color:var(--ink-3);padding:2px 8px;cursor:pointer;border-radius:3px}
+.filter.is-on{color:var(--ink);background:#ece7e0;font-weight:600}
+#track-rows{display:flex;flex-direction:column}
+.track-row{
+  display:grid;grid-template-columns:76px 1fr 130px 92px 64px;gap:12px;align-items:baseline;
+  width:100%;text-align:left;border:0;border-bottom:1px solid var(--line-2);background:transparent;
+  font:inherit;font-size:13px;padding:7px 6px;cursor:pointer;
+}
+.track-row:hover{background:#f2ede6}
+.track-row:focus-visible{outline:2px solid var(--origin);outline-offset:-2px}
+.track-row .tr-state{font-size:11px;letter-spacing:.04em}
+.track-row[data-state="done"] .tr-state{color:var(--ok)}
+.track-row[data-state="active"] .tr-state{color:var(--hold)}
+.track-row[data-state="future"] .tr-state{color:var(--ink-3)}
+.track-row[data-state="done"] .tr-title{color:var(--ink-3)}
+.track-row .tr-owner{color:var(--ink-3);font-size:12px}
+.track-row .tr-due{color:var(--ink-3);font-size:12px;font-variant-numeric:tabular-nums}
+.track-row .tr-clip{color:var(--ink-3);font-size:11px}
+.track-row[hidden]{display:none}
+
+/* ---- scrim / tether ---- */
+#scrim{position:fixed;inset:0;background:rgba(30,26,22,.09);z-index:40;pointer-events:none}
+#tether{position:fixed;inset:0;width:100%;height:100%;z-index:41;pointer-events:none}
+#tether-line{stroke:var(--origin);stroke-width:1.5;stroke-dasharray:3 3}
+
+/* ---- Object Lens (transient overlay; NOT a permanent right inspector) ---- */
+#lens-stack{position:fixed;inset:0;z-index:42;pointer-events:none}
+.lens{
+  position:absolute;width:344px;pointer-events:auto;
+  background:var(--paper-2);border:1px solid var(--line);
+  box-shadow:0 10px 30px rgba(40,32,22,.18);border-radius:5px;
+  padding:13px 15px 12px;
+}
+.lens[data-depth="0"].has-above{opacity:.55}
+.lens-kind{font-size:10px;letter-spacing:.12em;color:var(--ink-3);text-transform:uppercase}
+.lens-title{margin:2px 0 1px;font-size:16px;font-weight:600;letter-spacing:-.01em}
+.lens-origin{font-size:11px;color:var(--origin)}
+.lens-facts{margin:9px 0 0;display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:12.5px}
+.lens-facts dt{color:var(--ink-3)}
+.lens-facts dd{margin:0;color:var(--ink)}
+.lens-actions{display:flex;gap:6px;align-items:center;margin-top:11px;flex-wrap:wrap}
+.lens-actions button{
+  font:inherit;font-size:12px;padding:3px 9px;border:1px solid var(--line);
+  background:#f6f2ec;border-radius:3px;cursor:pointer;color:var(--ink)
+}
+.lens-actions button:hover{background:#efe9e0}
+.lens-actions .scope-note{font-size:11px;color:var(--ink-3);margin-left:auto}
+.lens-close{position:absolute;top:8px;right:9px;border:0;background:transparent;font-size:12px;color:var(--ink-3);cursor:pointer;padding:2px 5px}
+.lens-close:hover{color:var(--ink)}
+.lens-depth{font-size:10px;color:var(--ink-3);letter-spacing:.06em;margin-top:8px}
+
+/* ---- Focus Surface ---- */
+#focus-surface{
+  position:fixed;inset:0;z-index:60;background:var(--paper);
+  padding:26px 34px;overflow:auto;
+}
+.focus-head{display:flex;align-items:baseline;gap:14px;border-bottom:1px solid var(--line);padding-bottom:10px}
+.focus-head h2{margin:0;font-size:21px;font-weight:600}
+.focus-kind{font-size:10px;letter-spacing:.12em;color:var(--ink-3);text-transform:uppercase}
+.focus-back{margin-left:auto;font:inherit;font-size:12px;padding:4px 10px;border:1px solid var(--line);background:#f6f2ec;border-radius:3px;cursor:pointer}
+.focus-cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:28px;margin-top:18px;max-width:1150px}
+.focus-cols h3{font-size:12px;letter-spacing:.06em;color:var(--ink-3);font-weight:600;margin:0 0 7px}
+.focus-cols ul{margin:0;padding-left:16px;font-size:13px}
+.focus-cols li{margin-bottom:4px}
+.focus-cols li .st{color:var(--ink-3);font-size:11px;margin-left:5px}
+.plan-scope{margin-top:14px;font-size:12px;color:var(--ink-2)}
+.plan-scope button{font:inherit;font-size:12px;padding:3px 9px;border:1px solid var(--line);background:#f6f2ec;border-radius:3px;cursor:pointer;margin-right:6px}
+
+#refuse-hint{
+  position:fixed;left:50%;transform:translateX(-50%);top:14px;z-index:70;
+  background:#241f1a;color:#f0e8dc;font-size:12px;padding:6px 12px;border-radius:3px;
+}

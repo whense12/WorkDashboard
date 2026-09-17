@@ -1,0 +1,277 @@
+{
+  "anchorOptions": [
+    {
+      "anchor": "anchored",
+      "kind": "vendor",
+      "originCoveredPx": 0,
+      "originCoveredPxReportedByPage": 0,
+      "originInViewport": true,
+      "originStillMarked": true,
+      "factsVisible": 8,
+      "clicksToFacts": 0,
+      "otherItemsMostlyHidden": 4,
+      "otherItemsCoveredPx": 14799,
+      "sheetItemCount": 35,
+      "originToLensPx": 216,
+      "openMs": 28
+    },
+    {
+      "anchor": "anchored",
+      "kind": "event",
+      "originCoveredPx": 0,
+      "originCoveredPxReportedByPage": 0,
+      "originInViewport": true,
+      "originStillMarked": true,
+      "factsVisible": 6,
+      "clicksToFacts": 0,
+      "otherItemsMostlyHidden": 3,
+      "otherItemsCoveredPx": 11369,
+      "sheetItemCount": 35,
+      "originToLensPx": 186,
+      "openMs": 26.8
+    },
+    {
+      "anchor": "anchored",
+      "kind": "schedule",
+      "originCoveredPx": 0,
+      "originCoveredPxReportedByPage": 0,
+      "originInViewport": true,
+      "originStillMarked": true,
+      "factsVisible": 6,
+      "clicksToFacts": 0,
+      "otherItemsMostlyHidden": 1,
+      "otherItemsCoveredPx": 7033,
+      "sheetItemCount": 35,
+      "originToLensPx": 208,
+      "openMs": 28.3
+    },
+    {
+      "anchor": "anchored",
+      "kind": "track-row",
+      "originCoveredPx": 0,
+      "originCoveredPxReportedByPage": 0,
+      "originInViewport": true,
+      "originStillMarked": true,
+      "factsVisible": 8,
+      "clicksToFacts": 0,
+      "otherItemsMostlyHidden": 0,
+      "otherItemsCoveredPx": 0,
+      "sheetItemCount": 35,
+      "originToLensPx": 763,
+      "openMs": 27.8
+    },
+    {
+      "anchor": "centered",
+      "kind": "vendor",
+      "originCoveredPx": 0,
+      "originCoveredPxReportedByPage": 0,
+      "originInViewport": true,
+      "originStillMarked": true,
+      "factsVisible": 8,
+      "clicksToFacts": 0,
+      "otherItemsMostlyHidden": 6,
+      "otherItemsCoveredPx": 22525,
+      "sheetItemCount": 35,
+      "originToLensPx": 437,
+      "openMs": 28.1
+    },
+    {
+      "anchor": "centered",
+      "kind": "event",
+      "originCoveredPx": 0,
+      "originCoveredPxReportedByPage": 0,
+      "originInViewport": true,
+      "originStillMarked": true,
+      "factsVisible": 6,
+      "clicksToFacts": 0,
+      "otherItemsMostlyHidden": 5,
+      "otherItemsCoveredPx": 17587,
+      "sheetItemCount": 35,
+      "originToLensPx": 432,
+      "openMs": 28
+    },
+    {
+      "anchor": "centered",
+      "kind": "schedule",
+      "originCoveredPx": 5107,
+      "originCoveredPxReportedByPage": 5107,
+      "originInViewport": true,
+      "originStillMarked": true,
+      "factsVisible": 6,
+      "clicksToFacts": 0,
+      "otherItemsMostlyHidden": 4,
+      "otherItemsCoveredPx": 12479,
+      "sheetItemCount": 35,
+      "originToLensPx": 114,
+      "openMs": 26.6
+    },
+    {
+      "anchor": "centered",
+      "kind": "track-row",
+      "originCoveredPx": 11868,
+      "originCoveredPxReportedByPage": 11868,
+      "originInViewport": true,
+      "originStillMarked": true,
+      "factsVisible": 8,
+      "clicksToFacts": 0,
+      "otherItemsMostlyHidden": 0,
+      "otherItemsCoveredPx": 114294,
+      "sheetItemCount": 35,
+      "originToLensPx": 50,
+      "openMs": 28.2
+    }
+  ],
+  "overlapRules": [
+    {
+      "rule": "stack2",
+      "lensesAfterSecond": 2,
+      "originsMarkedAfterSecond": 2,
+      "bothObjectsPresentAtOnce": true,
+      "lowerLensCoveredPct": 27,
+      "clicksToCompareTwo": 2,
+      "originCoveredPx": 0,
+      "otherItemsMostlyHidden": 4
+    },
+    {
+      "rule": "replace",
+      "lensesAfterSecond": 1,
+      "originsMarkedAfterSecond": 1,
+      "bothObjectsPresentAtOnce": false,
+      "lowerLensCoveredPct": 0,
+      "clicksToCompareTwo": 2,
+      "originCoveredPx": 0,
+      "otherItemsMostlyHidden": 3
+    },
+    {
+      "rule": "refuse",
+      "lensesAfterSecond": 1,
+      "originsMarkedAfterSecond": 1,
+      "bothObjectsPresentAtOnce": false,
+      "lowerLensCoveredPct": 0,
+      "clicksToCompareTwo": 3,
+      "originCoveredPx": 0,
+      "otherItemsMostlyHidden": 1
+    }
+  ],
+  "sheetOcclusion": [
+    {
+      "origin": "v-baram@2026-09-02",
+      "originCoveredPx": 0,
+      "otherItemsCoveredPx": 639,
+      "otherItemsMostlyHidden": 0,
+      "itemCount": 35
+    },
+    {
+      "origin": "v-hansol@2026-09-05",
+      "originCoveredPx": 0,
+      "otherItemsCoveredPx": 18509,
+      "otherItemsMostlyHidden": 3,
+      "itemCount": 35
+    },
+    {
+      "origin": "v-dolsan@2026-09-05",
+      "originCoveredPx": 0,
+      "otherItemsCoveredPx": 18183,
+      "otherItemsMostlyHidden": 3,
+      "itemCount": 35
+    },
+    {
+      "origin": "v-baram@2026-09-09",
+      "originCoveredPx": 0,
+      "otherItemsCoveredPx": 5048,
+      "otherItemsMostlyHidden": 1,
+      "itemCount": 35
+    },
+    {
+      "origin": "s-budget@2026-09-11",
+      "originCoveredPx": 0,
+      "otherItemsCoveredPx": 14799,
+      "otherItemsMostlyHidden": 4,
+      "itemCount": 35
+    },
+    {
+      "origin": "v-hansol@2026-09-12",
+      "originCoveredPx": 0,
+      "otherItemsCoveredPx": 14799,
+      "otherItemsMostlyHidden": 4,
+      "itemCount": 35
+    },
+    {
+      "origin": "v-baram@2026-09-16",
+      "originCoveredPx": 0,
+      "otherItemsCoveredPx": 6584,
+      "otherItemsMostlyHidden": 1,
+      "itemCount": 35
+    },
+    {
+      "origin": "s-visit@2026-09-17",
+      "originCoveredPx": 0,
+      "otherItemsCoveredPx": 7033,
+      "otherItemsMostlyHidden": 1,
+      "itemCount": 35
+    },
+    {
+      "origin": "e-autumn@2026-09-19",
+      "originCoveredPx": 0,
+      "otherItemsCoveredPx": 11369,
+      "otherItemsMostlyHidden": 3,
+      "itemCount": 35
+    },
+    {
+      "origin": "v-hansol@2026-09-19",
+      "originCoveredPx": 0,
+      "otherItemsCoveredPx": 12491,
+      "otherItemsMostlyHidden": 2,
+      "itemCount": 35
+    },
+    {
+      "origin": "v-dolsan@2026-09-19",
+      "originCoveredPx": 0,
+      "otherItemsCoveredPx": 13695,
+      "otherItemsMostlyHidden": 2,
+      "itemCount": 35
+    },
+    {
+      "origin": "e-autumn@2026-09-20",
+      "originCoveredPx": 0,
+      "otherItemsCoveredPx": 0,
+      "otherItemsMostlyHidden": 0,
+      "itemCount": 35
+    },
+    {
+      "origin": "v-baram@2026-09-23",
+      "originCoveredPx": 0,
+      "otherItemsCoveredPx": 7616,
+      "otherItemsMostlyHidden": 1,
+      "itemCount": 35
+    },
+    {
+      "origin": "e-training@2026-09-24",
+      "originCoveredPx": 0,
+      "otherItemsCoveredPx": 8011,
+      "otherItemsMostlyHidden": 2,
+      "itemCount": 35
+    },
+    {
+      "origin": "v-hansol@2026-09-26",
+      "originCoveredPx": 0,
+      "otherItemsCoveredPx": 13609,
+      "otherItemsMostlyHidden": 2,
+      "itemCount": 35
+    },
+    {
+      "origin": "s-report@2026-09-28",
+      "originCoveredPx": 0,
+      "otherItemsCoveredPx": 1423,
+      "otherItemsMostlyHidden": 0,
+      "itemCount": 35
+    },
+    {
+      "origin": "v-baram@2026-09-30",
+      "originCoveredPx": 0,
+      "otherItemsCoveredPx": 7616,
+      "otherItemsMostlyHidden": 1,
+      "itemCount": 35
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPIKE C — Object Lens</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="spike-bar" role="region" aria-label="spike 계측 전환">
+  <span class="spike-tag">SPIKE 계측 전환 (제품 UI 아님)</span>
+  <label>앵커 옵션
+    <select id="anchor-mode" data-testid="anchor-mode">
+      <option value="anchored" selected>A1 · origin 앵커</option>
+      <option value="centered">A2 · 화면중앙 + tether</option>
+    </select>
+  </label>
+  <label>중첩 규칙
+    <select id="overlap-rule" data-testid="overlap-rule">
+      <option value="stack2" selected>O2 · 스택(깊이 상한 2)</option>
+      <option value="replace">O1 · 교체</option>
+      <option value="refuse">O3 · 거부</option>
+    </select>
+  </label>
+  <button type="button" id="reset-state" data-testid="reset-state">상태 초기화</button>
+</div>
+
+<header id="app-head">
+  <h1>업무 시트 <span id="month-label"></span></h1>
+  <p class="head-sub">Ambient → Quick → <b>Calendar Sheet</b> → <b>Object Lens</b> → <b>Focus Surface</b></p>
+</header>
+
+<main>
+  <section id="calendar-sheet" aria-label="Calendar Sheet">
+    <div class="dow-row" aria-hidden="true">
+      <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+    </div>
+    <div id="cal-grid"></div>
+  </section>
+
+  <section id="work-track" aria-label="Work Track">
+    <div class="track-head">
+      <h2>업무 트랙</h2>
+      <div class="track-filters" role="group" aria-label="업무 상태 필터">
+        <button type="button" class="filter is-on" data-filter="all" data-testid="filter-all">전체</button>
+        <button type="button" class="filter" data-filter="future" data-testid="filter-future">예정</button>
+        <button type="button" class="filter" data-filter="active" data-testid="filter-active">진행</button>
+        <button type="button" class="filter" data-filter="done" data-testid="filter-done">완료</button>
+      </div>
+    </div>
+    <div id="track-rows"></div>
+  </section>
+</main>
+
+<div id="scrim" hidden></div>
+<svg id="tether" hidden aria-hidden="true"><line id="tether-line" x1="0" y1="0" x2="0" y2="0"></line></svg>
+<div id="lens-stack" data-testid="lens-stack"></div>
+<div id="refuse-hint" data-testid="refuse-hint" role="status" hidden>이미 열린 Lens 가 있습니다 (규칙 O3 · 거부)</div>
+
+<section id="focus-surface" data-testid="focus-surface" hidden aria-label="Focus Surface"></section>
+
+<script src="fixtures.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
