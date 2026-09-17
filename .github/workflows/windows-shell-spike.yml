@@ -1,0 +1,232 @@
+name: Windows Shell Spike
+
+# Spike A 를 실제 Windows 에서 build / probe 한다.
+#
+# 이 러너에서 할 수 있는 것: 빌드, .exe 산출 확인, 프로세스 기동 smoke test, 환경 수집.
+# 이 러너에서 할 수 없는 것: GUI 상호작용 전부 — Z-order, focus, click-through, 전역 단축키,
+#   drag, 다중 모니터, DPI 변경. GitHub 러너에는 사람이 쓰는 대화형 데스크톱 세션이 없다.
+#   그런 항목은 FAIL 이 아니라 NOT TESTED 로 남긴다. 미검증을 PASS 로 올리지 않는다.
+
+on:
+  push:
+    branches: [reboot/workdashboard-v1]
+    paths:
+      - 'spikes/shell/**'
+      - '.github/workflows/windows-shell-spike.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  tauri-windows:
+    name: Tauri (windows-latest)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Rust stable (MSVC)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: spikes/shell/tauri/src-tauri -> target
+
+      - name: 환경 정보 수집
+        continue-on-error: true
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          & .\spikes\shell\scripts\collect-windows-env.ps1 -OutFile artifacts\WINDOWS_ENVIRONMENT.md
+          Get-Content artifacts\WINDOWS_ENVIRONMENT.md
+
+      - name: 의존성 설치
+        working-directory: spikes/shell/tauri
+        run: npm install --no-audit --no-fund
+
+      - name: cargo test --lib
+        working-directory: spikes/shell/tauri/src-tauri
+        run: cargo test --lib
+
+      - name: Release build (bundle 없음)
+        working-directory: spikes/shell/tauri/src-tauri
+        run: cargo build --release
+
+      - name: .exe 존재 확인 (GATE)
+        id: exe
+        working-directory: spikes/shell/tauri/src-tauri
+        run: |
+          $exe = Get-ChildItem target\release -Filter '*.exe' -File -ErrorAction SilentlyContinue |
+                 Where-Object { $_.Name -notlike '*build-script*' } |
+                 Select-Object -First 1
+          if (-not $exe) {
+            Write-Host '::error::release 빌드에서 .exe 가 나오지 않았다.'
+            Get-ChildItem target\release -File | Select-Object Name, Length | Format-Table
+            exit 1
+          }
+          Write-Host "exe: $($exe.FullName)  ($($exe.Length) bytes)"
+          "path=$($exe.FullName)" >> $env:GITHUB_OUTPUT
+
+      - name: 기동 smoke test — 5초 내 즉시 종료하지 않는가
+        id: smoke
+        continue-on-error: true
+        run: |
+          $exe = '${{ steps.exe.outputs.path }}'
+          $log = 'artifacts\tauri-smoke.txt'
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          $p = Start-Process -FilePath $exe -PassThru -ErrorAction Stop
+          Start-Sleep -Seconds 5
+          $alive = -not $p.HasExited
+          if ($alive) {
+            $line = "SMOKE: PASS - 5초 후에도 살아 있다 (pid $($p.Id))"
+            try { $p.Kill(); $p.WaitForExit(5000) } catch { }
+          } else {
+            $line = "SMOKE: FAIL - 5초 안에 종료했다 (exit code $($p.ExitCode))"
+          }
+          Write-Host $line
+          $line | Set-Content $log
+          if (-not $alive) { exit 1 }
+
+      - name: repeat-stability.ps1 (GUI 필요 — 실패해도 NOT TESTED)
+        continue-on-error: true
+        run: |
+          $out = 'artifacts\tauri-stability.md'
+          $exe = '${{ steps.exe.outputs.path }}'
+          $p = $null
+          try {
+            $p = Start-Process -FilePath $exe -PassThru -ErrorAction Stop
+            Start-Sleep -Seconds 5
+            & .\spikes\shell\scripts\repeat-stability.ps1 -WindowTitle 'SpikeA Shell (Tauri)' -Iterations 100 -OutFile $out
+          } catch {
+            $lines = @(
+              '# 반복 안정성 — NOT TESTED',
+              '',
+              'GitHub windows-latest 러너에는 대화형 데스크톱 세션이 없어 창을 찾거나',
+              'SendKeys 를 보낼 수 없다. 이것은 구현 실패가 아니라 **측정 불가** 다.',
+              'FAIL 로 적지 않는다.',
+              '',
+              '시도 중 나온 메시지:',
+              '',
+              ('    ' + $_.Exception.Message)
+            )
+            $lines | Set-Content $out
+          } finally {
+            if ($p -and -not $p.HasExited) { try { $p.Kill() } catch { } }
+          }
+          Get-Content $out
+
+      - name: artifact 업로드
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-windows
+          path: |
+            artifacts/**
+            spikes/shell/tauri/src-tauri/target/release/*.exe
+          if-no-files-found: warn
+          retention-days: 7
+
+  wpf-windows:
+    name: WPF (windows-latest)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: 환경 정보 수집
+        continue-on-error: true
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          & .\spikes\shell\scripts\collect-windows-env.ps1 -OutFile artifacts\WINDOWS_ENVIRONMENT.md
+          Get-Content artifacts\WINDOWS_ENVIRONMENT.md
+
+      - name: Release / win-x64 build
+        working-directory: spikes/shell/wpf
+        run: dotnet build -c Release -r win-x64 --self-contained false
+
+      - name: ShellSpike.exe 확인 (GATE)
+        id: exe
+        working-directory: spikes/shell/wpf
+        run: |
+          $exe = Get-ChildItem bin\Release -Recurse -Filter 'ShellSpike.exe' -File -ErrorAction SilentlyContinue |
+                 Select-Object -First 1
+          if (-not $exe) {
+            Write-Host '::error::ShellSpike.exe 가 나오지 않았다.'
+            Get-ChildItem bin\Release -Recurse -File | Select-Object FullName, Length | Format-Table
+            exit 1
+          }
+          Write-Host "exe: $($exe.FullName)  ($($exe.Length) bytes)"
+          "path=$($exe.FullName)" >> $env:GITHUB_OUTPUT
+
+      - name: 기동 smoke test — 5초 내 즉시 종료하지 않는가
+        id: smoke
+        continue-on-error: true
+        run: |
+          $exe = '${{ steps.exe.outputs.path }}'
+          $log = 'artifacts\wpf-smoke.txt'
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          $p = Start-Process -FilePath $exe -PassThru -ErrorAction Stop
+          Start-Sleep -Seconds 5
+          $alive = -not $p.HasExited
+          if ($alive) {
+            $line = "SMOKE: PASS - 5초 후에도 살아 있다 (pid $($p.Id))"
+            try { $p.Kill(); $p.WaitForExit(5000) } catch { }
+          } else {
+            $line = "SMOKE: FAIL - 5초 안에 종료했다 (exit code $($p.ExitCode))"
+          }
+          Write-Host $line
+          $line | Set-Content $log
+          if (-not $alive) { exit 1 }
+
+      - name: repeat-stability.ps1 (GUI 필요 — 실패해도 NOT TESTED)
+        continue-on-error: true
+        run: |
+          $out = 'artifacts\wpf-stability.md'
+          $exe = '${{ steps.exe.outputs.path }}'
+          $p = $null
+          try {
+            $p = Start-Process -FilePath $exe -PassThru -ErrorAction Stop
+            Start-Sleep -Seconds 5
+            & .\spikes\shell\scripts\repeat-stability.ps1 -WindowTitle 'WorkDashboard Shell Spike (WPF)' -Iterations 100 -OutFile $out
+          } catch {
+            $lines = @(
+              '# 반복 안정성 — NOT TESTED',
+              '',
+              'GitHub windows-latest 러너에는 대화형 데스크톱 세션이 없어 창을 찾거나',
+              'SendKeys 를 보낼 수 없다. 이것은 구현 실패가 아니라 **측정 불가** 다.',
+              'FAIL 로 적지 않는다.',
+              '',
+              '시도 중 나온 메시지:',
+              '',
+              ('    ' + $_.Exception.Message)
+            )
+            $lines | Set-Content $out
+          } finally {
+            if ($p -and -not $p.HasExited) { try { $p.Kill() } catch { } }
+          }
+          Get-Content $out
+
+      - name: artifact 업로드
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wpf-windows
+          path: |
+            artifacts/**
+            spikes/shell/wpf/bin/Release/**/ShellSpike.exe
+          if-no-files-found: warn
+          retention-days: 7
