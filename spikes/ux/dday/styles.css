@@ -1,0 +1,189 @@
+/* SPIKE D — Desktop D-day pin surface. 탐색용 스타일. */
+
+:root {
+  --ink:        #eef1f4;
+  --ink-soft:   #a8b0ba;
+  --ink-faint:  #6d7682;
+  --surface-bg: rgba(18, 21, 26, 0.86);
+  --rule:       rgba(255, 255, 255, 0.10);
+  --overdue:    #e8735a;
+  --today:      #e8c05a;
+  --near:       #7fb2e8;
+  --far:        #7d8894;
+  --pin-w: 220px;
+  --pin-h: 94px;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: "Noto Sans KR", "Malgun Gothic", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--ink);
+  background: radial-gradient(120% 120% at 20% 0%, #2b3340 0%, #171b21 55%, #0f1216 100%);
+  overflow: hidden;
+}
+
+/* ---- 배경: 사용자가 실제로 하고 있는 '다른 업무' ---- */
+.desktop { position: fixed; inset: 0; padding: 48px 56px; }
+.desktop-doc {
+  max-width: 620px;
+  color: #c9d1da;
+  font-size: 13.5px;
+  line-height: 2;
+  opacity: 0.5;
+}
+.desktop-doc p { margin: 0 0 18px; }
+.desktop-doc p:first-child { font-size: 17px; letter-spacing: -0.01em; color: #e7edf4; }
+
+/* ---- HUD (SPIKE 계측 조작판, 제품 UI 아님) ---- */
+.hud {
+  position: fixed; left: 16px; bottom: 16px; z-index: 40;
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  font-size: 11px; letter-spacing: 0.02em;
+}
+.hud-tag { color: var(--ink-faint); letter-spacing: 0.14em; }
+.hud-group { display: flex; gap: 2px; }
+.hud button {
+  font: inherit; color: var(--ink-soft);
+  background: rgba(255,255,255,0.05); border: 0; border-radius: 3px;
+  padding: 5px 9px; cursor: pointer;
+}
+.hud button[aria-pressed="true"] { background: rgba(255,255,255,0.20); color: #fff; }
+.hud-edit { margin-left: 6px; }
+.hud-edit[aria-pressed="true"] { background: #3d6ea8 !important; color: #fff !important; }
+
+/* ---- pin surface ---- */
+.surface {
+  position: fixed; top: 40px; right: 40px; z-index: 30;
+  width: 760px;
+  background: var(--surface-bg);
+  border-radius: 10px;
+  padding: 20px 0 14px;
+  transition: opacity 140ms linear;
+}
+/* EXPERIENCE 1/2 — quiet at rest. 평상시에는 뒤로 물러나 있고 의도가 있을 때 올라온다. */
+body[data-ambient="on"] .surface { opacity: 0.62; }
+body[data-ambient="on"] .surface:hover { opacity: 1; }
+body[data-ambient="off"] .surface { opacity: 1; }
+
+.surface-head { padding: 0 24px 12px; }
+.surface-head h1 {
+  margin: 0; font-size: 12px; font-weight: 600;
+  letter-spacing: 0.22em; color: var(--ink-faint); text-transform: uppercase;
+}
+.surface-ledger { margin: 6px 0 0; font-size: 12px; color: var(--ink-soft); }
+/* Layout Edit 안내는 항상 자리를 차지한다.
+   상태가 바뀔 때 header 높이가 변하면 아래의 pin 들이 커서 밑에서 움직인다. */
+.surface-edit-note {
+  margin: 8px 0 0; font-size: 11.5px; color: #9ec2ee;
+  display: block; visibility: hidden;
+}
+body[data-edit="on"] .surface-edit-note { visibility: visible; }
+body[data-edit="on"] .surface { box-shadow: inset 0 0 0 1px rgba(110,160,220,0.55); }
+
+/* ---- rail (스크롤 표면) ---- */
+.rail {
+  height: 560px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.22) transparent;
+}
+.rail--free { position: relative; }
+.canvas { position: relative; }
+
+/* ---- pin ---- */
+/* 장식 카드가 아니라 위치·간격·typography 로 위계를 만든다. */
+.pin {
+  display: block;
+  color: inherit;
+  cursor: default;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* independent 배치 */
+.rail--free .pin {
+  position: absolute;
+  width: var(--pin-w);
+  height: var(--pin-h);
+  padding: 12px 14px 12px 16px;
+  border-left: 2px solid var(--far);
+  background: rgba(255,255,255,0.035);
+  border-radius: 0 4px 4px 0;
+}
+.rail--free .pin-d { display: block; font-size: 19px; }
+.rail--free .pin-title { display: block; margin-top: 4px; }
+.rail--free .pin-event { display: block; margin-top: 3px; }
+
+/* stack / group 안의 한 줄짜리 pin */
+.pin--row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 74px 1fr auto;
+  align-items: baseline;
+  gap: 12px;
+  padding: 9px 24px 9px 22px;
+  border-left: 2px solid var(--far);
+  margin-left: 22px;
+}
+.rail--stack .pin--row { margin-left: 24px; margin-right: 24px; }
+
+.pin-d {
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--far);
+}
+.pin-title { font-size: 13.5px; color: var(--ink); line-height: 1.45; }
+.pin-event { font-size: 11.5px; color: var(--ink-faint); white-space: nowrap; }
+
+.pin[data-bucket="overdue"] { border-left-color: var(--overdue); }
+.pin[data-bucket="overdue"] .pin-d { color: var(--overdue); }
+.pin[data-bucket="today"] { border-left-color: var(--today); }
+.pin[data-bucket="today"] .pin-d { color: var(--today); }
+.pin[data-bucket="week"] { border-left-color: var(--near); }
+.pin[data-bucket="week"] .pin-d { color: var(--near); }
+
+/* ---- group ---- */
+.group { padding: 6px 0 10px; border-top: 1px solid var(--rule); }
+.group:first-child { border-top: 0; }
+.group-head {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 8px 24px 6px;
+}
+.group-toggle {
+  font: inherit; font-size: 12px; letter-spacing: 0.06em;
+  color: var(--ink-soft); background: none; border: 0; padding: 0; cursor: pointer;
+}
+.group-toggle::before { content: '▾ '; font-size: 10px; color: var(--ink-faint); }
+.group[data-collapsed="true"] .group-toggle::before { content: '▸ '; }
+.group-lead { font-size: 11px; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.group-count { margin-left: auto; font-size: 11px; color: var(--ink-faint); }
+
+/* 접힘: pin 은 DOM 에 그대로 남고, 어떤 건이 들어있는지 이름으로 남는다. */
+.group-summary {
+  display: none;
+  margin: 0; padding: 0 24px 4px 46px;
+  font-size: 11.5px; color: var(--ink-faint);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.group[data-collapsed="true"] .group-summary { display: block; }
+.group[data-collapsed="true"] .group-body { display: none; }
+
+/* ---- Layout Edit ---- */
+/* 평상시(data-edit="off") 에는 grab 표시도 handler 도 없다. */
+body[data-edit="on"] .rail--free .pin[data-draggable="true"] {
+  cursor: grab;
+  background: rgba(120,165,220,0.12);
+  outline: 1px dashed rgba(140,180,225,0.55);
+}
+body[data-edit="on"] .rail--grouped .group[data-draggable="true"] .group-head {
+  cursor: grab;
+  background: rgba(120,165,220,0.10);
+}
+.is-dragging { cursor: grabbing !important; z-index: 5; opacity: 0.95; }

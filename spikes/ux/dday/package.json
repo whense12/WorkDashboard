@@ -1,0 +1,12 @@
+{
+  "name": "spike-ux-dday",
+  "private": true,
+  "version": "0.0.0",
+  "description": "SPIKE D - Desktop D-day pin surface (exploration only, not a final design)",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  }
+}

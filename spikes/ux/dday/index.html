@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPIKE D — Desktop D-day</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body data-arrangement="free" data-axis="urgency" data-edit="off" data-ambient="on">
+
+  <!-- 데스크톱 배경 시뮬레이션: pin surface 가 '다른 업무' 위에 얹혀 있는 상황을 만든다 -->
+  <div class="desktop" aria-hidden="true">
+    <div class="desktop-doc">
+      <p>2026년도 지역농산물 유통 활성화 추진계획(안)</p>
+      <p>1. 추진배경<br>지역 농산물의 판로 다변화와 유통비용 절감을 위하여 ……</p>
+      <p>2. 추진방향<br>가. 직거래장터 상설화<br>나. 온라인 기획전 연 4회 운영<br>다. 공동물류 시범사업 확대</p>
+      <p>3. 세부추진계획<br>가. 대상: 관내 농업법인 및 개별농가<br>나. 기간: 2026. 1. ~ 2026. 12.<br>다. 예산: 금 이억삼천만원정</p>
+      <p>4. 행정사항<br>가. 사업별 추진상황을 분기마다 보고한다.<br>나. 세부 집행계획은 별도 통보한다.</p>
+    </div>
+  </div>
+
+  <!-- SPIKE 계측용 조작판. 제품 UI 가 아니라 비교 조건을 바꾸기 위한 장치다. -->
+  <div class="hud" id="hud">
+    <span class="hud-tag">SPIKE D</span>
+    <span class="hud-group" role="group" aria-label="fixture">
+      <button type="button" data-set="fixture" data-value="3" id="fx-3">3</button>
+      <button type="button" data-set="fixture" data-value="8" id="fx-8">8</button>
+      <button type="button" data-set="fixture" data-value="20" id="fx-20">20</button>
+    </span>
+    <span class="hud-group" role="group" aria-label="arrangement">
+      <button type="button" data-set="arrangement" data-value="free" id="arr-free">independent</button>
+      <button type="button" data-set="arrangement" data-value="stack" id="arr-stack">stack</button>
+      <button type="button" data-set="arrangement" data-value="grouped" id="arr-grouped">group</button>
+    </span>
+    <span class="hud-group" role="group" aria-label="axis">
+      <button type="button" data-set="axis" data-value="urgency" id="ax-urgency">by urgency</button>
+      <button type="button" data-set="axis" data-value="event" id="ax-event">by event</button>
+    </span>
+    <span class="hud-group" role="group" aria-label="collapse">
+      <button type="button" id="collapse-all">collapse all</button>
+      <button type="button" id="expand-all">expand all</button>
+    </span>
+    <button type="button" id="layout-edit-toggle" class="hud-edit" aria-pressed="false">Layout Edit</button>
+  </div>
+
+  <!-- D-day pin surface -->
+  <section class="surface" id="surface" aria-label="D-day pin surface">
+    <header class="surface-head">
+      <h1>D-day</h1>
+      <p class="surface-ledger" id="ledger" data-total="0" data-shown="0">
+        <span id="ledger-text"></span>
+      </p>
+      <p class="surface-edit-note" id="edit-note">Layout Edit — 배치를 직접 옮길 수 있는 상태</p>
+    </header>
+    <div class="rail" id="rail"></div>
+  </section>
+
+  <script src="fixtures.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
