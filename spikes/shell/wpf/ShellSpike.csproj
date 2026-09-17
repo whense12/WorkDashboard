@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <!-- Required to build a net8.0-windows / WPF project on a non-Windows host. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>12.0</LangVersion>
+    <AssemblyName>ShellSpike</AssemblyName>
+    <RootNamespace>ShellSpike</RootNamespace>
+    <Platforms>AnyCPU</Platforms>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Per-monitor DPI awareness is declared in app.manifest, not here. -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <!--
+    No NuGet PackageReference at all. Everything used (WPF, System.Text.Json,
+    Microsoft.Win32.Registry) ships inside the net8.0-windows target framework.
+    Keeping the dependency set empty is deliberate: the spike measures shell
+    behaviour, not package plumbing.
+  -->
+
+</Project>

@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+<title>SpikeA Shell (Tauri)</title>
+<style>
+  /* Neutral verification surface. Not a product design. */
+  :root {
+    --bg: 30, 30, 30;          /* #1E1E1E */
+    --border: #3C3C3C;
+    --fg: #E6E6E6;
+    --fg-dim: #9A9A9A;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 320px;
+    height: 240px;
+    overflow: hidden;
+    background: transparent;   /* the window itself is transparent */
+  }
+
+  body {
+    /* System default only. No web fonts, no bundled fonts. */
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: 13px;
+    color: var(--fg);
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: default;
+  }
+
+  #surface {
+    box-sizing: border-box;
+    width: 320px;
+    height: 240px;
+    background: rgba(var(--bg), 0.85);   /* ~85% opacity */
+    border: 1px solid var(--border);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;             /* single column, left aligned */
+    /* Vertical budget inside the fixed 240px height: 240 - 2px border - 24px padding
+       leaves 214px of content box. Six 19.5px text rows (117) + three 6px spacers (18)
+       + two 29.5px buttons (59) = 194px, i.e. ~20px of slack, comparable to the WPF
+       StackPanel. Without that slack the second button can be silently clipped by
+       overflow:hidden on a wider metric or a fallback font. */
+    line-height: 1.5;
+    position: relative;
+  }
+
+  .spacer { height: 6px; }
+  .dim { color: var(--fg-dim); }
+
+  button {
+    font: inherit;
+    color: var(--fg);
+    background: transparent;
+    border: 1px solid var(--border);
+    padding: 2px 8px;
+    margin: 2px 0;
+    text-align: left;
+    cursor: pointer;
+  }
+  button:disabled { color: var(--fg-dim); cursor: default; }
+  /* State is shown by the control's own appearance, never by changing its text. */
+  button[aria-pressed="true"] { border-color: var(--fg); }
+  button[aria-pressed="false"] { color: var(--fg-dim); }
+
+  /* Armed ONLY in LAYOUT EDIT: the attribute is added to the surface and its
+     text rows, and removed again on leaving the state. */
+  [data-tauri-drag-region] { cursor: move; }
+</style>
+</head>
+<body>
+  <div id="surface">
+    <div id="line-date">9/24 Thu</div>
+    <div class="spacer"></div>
+    <div class="dim">다음 일정</div>
+    <div>14:00 업체 확인</div>
+    <div class="spacer"></div>
+    <div>D-7 진주</div>
+    <div>D-23 공룡엑스포</div>
+    <div>D-40 경남박람회</div>
+    <div class="spacer"></div>
+    <button id="btn-active" type="button">[ACTIVE / PASSIVE]</button>
+    <button id="btn-layout" type="button">[LAYOUT EDIT]</button>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  var T = window.__TAURI__;
+  var invoke = T && T.core ? T.core.invoke : null;
+  var listen = T && T.event ? T.event.listen : null;
+
+  var surface = document.getElementById("surface");
+  var btnActive = document.getElementById("btn-active");
+  var btnLayout = document.getElementById("btn-layout");
+
+  function render(state) {
+    if (!state) return;
+
+    // The two toggle labels are the shared spec's strings verbatim and never
+    // change. Current state is shown without altering text, so both prototypes
+    // render the identical line content.
+    // The [ACTIVE / PASSIVE] control reads as pressed whenever the surface is not
+    // PASSIVE -- LAYOUT EDIT is an active surface too. Matches the WPF ToggleButton,
+    // whose IsChecked is `_state != Passive`.
+    btnActive.setAttribute("aria-pressed", String(state.mode !== "PASSIVE"));
+    btnLayout.setAttribute("aria-pressed", String(state.mode === "LAYOUT_EDIT"));
+    document.body.setAttribute("data-mode", state.mode);
+    document.body.setAttribute("data-click-through", String(state.click_through));
+
+    // Drag is possible in LAYOUT EDIT and nowhere else. The attribute is put on
+    // the surface and its text rows only -- never on the two buttons, so the
+    // [LAYOUT EDIT] toggle stays clickable and the state is always escapable
+    // from the surface itself.
+    var targets = [surface].concat(
+      Array.prototype.slice.call(surface.querySelectorAll("div"))
+    );
+    targets.forEach(function (el) {
+      if (state.draggable) {
+        el.setAttribute("data-tauri-drag-region", "");
+      } else {
+        el.removeAttribute("data-tauri-drag-region");
+      }
+    });
+  }
+
+  function call(name) {
+    if (!invoke) return;
+    invoke(name).then(render).catch(function (e) {
+      console.error(name + " failed", e);
+    });
+  }
+
+  btnActive.addEventListener("click", function () { call("toggle_active"); });
+  btnLayout.addEventListener("click", function () { call("toggle_layout_edit"); });
+
+  // Rust is the single source of truth: global shortcuts change state there and
+  // push it back out over this event.
+  if (listen) {
+    listen("shell://state", function (e) { render(e.payload); });
+  }
+
+  if (invoke) {
+    invoke("get_state").then(render).catch(function (e) {
+      console.error("get_state failed", e);
+    });
+  }
+})();
+</script>
+</body>
+</html>

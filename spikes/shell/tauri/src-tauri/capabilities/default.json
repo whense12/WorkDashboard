@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Spike A shell surface: core window + event access only.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

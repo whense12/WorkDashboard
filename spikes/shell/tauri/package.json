@@ -1,0 +1,13 @@
+{
+  "name": "spike-shell-tauri",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Spike A - Windows desktop shell behaviour probe (Tauri 2). UI is plain HTML/CSS/JS; there is no bundler and no build step.",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.11.1"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "SpikeAShellTauri",
+  "version": "0.1.0",
+  "identifier": "dev.workdashboard.spike.shell.tauri",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'"
+    },
+    "windows": [
+      {
+        "label": "main",
+        "title": "SpikeA Shell (Tauri)",
+        "width": 320,
+        "height": 240,
+        "minWidth": 320,
+        "minHeight": 240,
+        "maxWidth": 320,
+        "maxHeight": 240,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "skipTaskbar": true,
+        "alwaysOnTop": false,
+        "shadow": false,
+        "focus": false,
+        "visible": false,
+        "center": false,
+        "maximizable": false,
+        "minimizable": false
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["icons/icon.png", "icons/icon.ico"]
+  }
+}

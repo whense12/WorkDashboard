@@ -1,0 +1,63 @@
+<Window x:Class="ShellSpike.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="WorkDashboard Shell Spike (WPF)"
+        Width="320"
+        Height="240"
+        MinWidth="320"
+        MinHeight="240"
+        MaxWidth="320"
+        MaxHeight="240"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        Topmost="False"
+        SizeToContent="Manual"
+        WindowStartupLocation="Manual"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        Background="Transparent"
+        TextOptions.TextFormattingMode="Display">
+
+    <!-- 1px border + 85% opaque #1E1E1E fill. The Window itself is transparent so the
+         border edge is the only thing drawn outside the fill. -->
+    <Border x:Name="RootSurface"
+            Background="{StaticResource SurfaceBrush}"
+            BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="1"
+            MouseLeftButtonDown="RootSurface_MouseLeftButtonDown">
+
+        <StackPanel Margin="12,10,12,10" Orientation="Vertical" HorizontalAlignment="Left">
+
+            <TextBlock Style="{StaticResource LineText}" Text="9/24 Thu" />
+
+            <Rectangle Height="6" Fill="Transparent" />
+
+            <TextBlock Style="{StaticResource LineTextSecondary}" Text="다음 일정" />
+            <TextBlock Style="{StaticResource LineText}" Text="14:00 업체 확인" />
+
+            <Rectangle Height="6" Fill="Transparent" />
+
+            <TextBlock Style="{StaticResource LineText}" Text="D-7 진주" />
+            <TextBlock Style="{StaticResource LineText}" Text="D-23 공룡엑스포" />
+            <TextBlock Style="{StaticResource LineText}" Text="D-40 경남박람회" />
+
+            <Rectangle Height="6" Fill="Transparent" />
+
+            <ToggleButton x:Name="StateToggle"
+                          Style="{StaticResource SpikeToggle}"
+                          Content="[ACTIVE / PASSIVE]"
+                          Checked="StateToggle_Changed"
+                          Unchecked="StateToggle_Changed" />
+
+            <ToggleButton x:Name="LayoutEditToggle"
+                          Style="{StaticResource SpikeToggle}"
+                          Content="[LAYOUT EDIT]"
+                          Checked="LayoutEditToggle_Changed"
+                          Unchecked="LayoutEditToggle_Changed" />
+
+        </StackPanel>
+    </Border>
+</Window>
