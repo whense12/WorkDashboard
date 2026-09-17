@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
+using ShellSpike.Experimental;
 using ShellSpike.Interop;
 using ShellSpike.Services;
 
@@ -313,16 +314,27 @@ public partial class MainWindow : Window
 
     private void RestorePlacement()
     {
-        WindowPlacement? saved = WindowPlacementStore.Load();
+        // EXPERIMENTAL, OPT-IN, OFF BY DEFAULT. The monitor-normalized restore only runs when
+        // SHELLSPIKE_EXPERIMENT_MONITOR_NORMALIZED=1; with the variable unset this whole
+        // condition short-circuits and the default path below is exactly what it always was.
+        bool restoredByExperiment =
+            MonitorNormalizedPlacementExperiment.IsRestoreEnabled &&
+            MonitorNormalizedPlacementExperiment.TryRestore(this);
 
-        if (saved is not null && IsPlacementVisible(saved.Left, saved.Top))
+        if (!restoredByExperiment)
         {
-            Left = saved.Left;
-            Top = saved.Top;
-        }
-        else
-        {
-            MoveToDefaultPosition();
+            // DEFAULT PATH - window.json, unchanged.
+            WindowPlacement? saved = WindowPlacementStore.Load();
+
+            if (saved is not null && IsPlacementVisible(saved.Left, saved.Top))
+            {
+                Left = saved.Left;
+                Top = saved.Top;
+            }
+            else
+            {
+                MoveToDefaultPosition();
+            }
         }
 
         // Click-through always starts off; it is never restored from disk.
@@ -372,11 +384,17 @@ public partial class MainWindow : Window
 
     private void SavePlacement()
     {
+        // DEFAULT PATH - window.json, DIPs, unchanged.
         WindowPlacementStore.Save(new WindowPlacement
         {
             Left = Left,
             Top = Top,
         });
+
+        // EXPERIMENTAL, ADDITIVE: writes a SECOND file (window-normalized.experimental.json).
+        // Its return value is ignored on purpose - the experiment must never be able to affect
+        // the default save above. It is never read back unless the opt-in variable is set.
+        MonitorNormalizedPlacementExperiment.TrySave(this);
     }
 
     // ---------------------------------------------------------------------

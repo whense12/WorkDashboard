@@ -7,6 +7,9 @@
 //! No product data, no database, no date math. The only thing the surface persists is the
 //! window's own position.
 
+pub mod monitor_placement;
+pub mod win_shell;
+
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -38,6 +41,17 @@ pub enum Mode {
 }
 
 impl Mode {
+    /// The plain `u8` the Windows message-hook layer reads. Keeping the mapping here, rather
+    /// than letting `win_shell` know about `Mode`, is what keeps the shell layer free of any
+    /// dependency on the UI/product side.
+    fn shell_code(self) -> u8 {
+        match self {
+            Mode::Passive => win_shell::MODE_PASSIVE,
+            Mode::Active => win_shell::MODE_ACTIVE,
+            Mode::LayoutEdit => win_shell::MODE_LAYOUT_EDIT,
+        }
+    }
+
     fn from_str(s: &str) -> Option<Self> {
         match s.to_ascii_uppercase().replace(['-', ' '], "_").as_str() {
             "PASSIVE" => Some(Mode::Passive),
@@ -330,6 +344,11 @@ fn apply_mode<R: Runtime>(app: &AppHandle<R>) -> Result<ShellState, String> {
 
     let passive = state.mode == Mode::Passive;
 
+    // Publish the mode for the Windows message-hook layer BEFORE any Win32 call below, so a
+    // WM_WINDOWPOSCHANGING raised by those calls already sees the new mode. Lock-free store;
+    // a no-op off Windows.
+    win_shell::publish_mode(state.mode.shell_code());
+
     // Portable layer: Tauri's own APIs.
     window
         .set_ignore_cursor_events(state.click_through)
@@ -395,6 +414,90 @@ fn persist_current_position<R: Runtime>(app: &AppHandle<R>) -> Result<(), String
         .outer_position()
         .map_err(|e| format!("outer_position: {e}"))?;
     store_position(app, SavedPosition { x: p.x, y: p.y })
+}
+
+// ---------------------------------------------------------------------------
+// EXPERIMENT — monitor-normalized placement (additive; does NOT replace the above)
+//
+// `window-position.json` stays the default path and is untouched. This writes a second,
+// separate file and only runs when one of the two `experiment_*` commands is invoked.
+// Nothing on the startup path reads it.
+// ---------------------------------------------------------------------------
+
+use monitor_placement::NormalizedPlacement;
+
+// Only the `#[cfg(windows)]` arms of the two experiment commands call this; off Windows the
+// commands return an error before reaching it.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn normalized_placement_file<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+    let dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|e| format!("app_config_dir unavailable: {e}"))?;
+    fs::create_dir_all(&dir).map_err(|e| format!("cannot create {}: {e}", dir.display()))?;
+    Ok(dir.join(monitor_placement::FILE_NAME))
+}
+
+#[cfg(windows)]
+fn main_hwnd_raw<R: Runtime>(window: &WebviewWindow<R>) -> Result<isize, String> {
+    Ok(window.hwnd().map_err(|e| format!("hwnd: {e}"))?.0 as isize)
+}
+
+/// EXPERIMENTAL. Normalize the current origin against the current monitor's work area and
+/// write the shared record. **NOT TESTED.**
+#[tauri::command]
+fn experiment_save_normalized_placement(app: AppHandle) -> Result<NormalizedPlacement, String> {
+    #[cfg(windows)]
+    {
+        let window = app
+            .get_webview_window(MAIN_WINDOW)
+            .ok_or_else(|| format!("window `{MAIN_WINDOW}` not found"))?;
+        let raw = main_hwnd_raw(&window)?;
+        let rec = monitor_placement::capture(raw, WIN_W as u32, WIN_H as u32)?;
+        let path = normalized_placement_file(&app)?;
+        fs::write(&path, rec.to_canonical_json())
+            .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
+        Ok(rec)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = &app;
+        Err("monitor-normalized placement experiment is Windows-only".to_string())
+    }
+}
+
+/// EXPERIMENTAL. Re-resolve the stored record against the CURRENT monitor layout and DPI and
+/// move the window there. Falls back to the primary monitor's work area when the recorded
+/// monitor is gone. **NOT TESTED.**
+#[tauri::command]
+fn experiment_restore_normalized_placement(app: AppHandle) -> Result<NormalizedPlacement, String> {
+    #[cfg(windows)]
+    {
+        let window = app
+            .get_webview_window(MAIN_WINDOW)
+            .ok_or_else(|| format!("window `{MAIN_WINDOW}` not found"))?;
+        let raw = main_hwnd_raw(&window)?;
+        let path = normalized_placement_file(&app)?;
+        let text = fs::read_to_string(&path)
+            .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+        let rec = NormalizedPlacement::from_json(&text)?;
+        let (x, y, exact) = monitor_placement::resolve(raw, &rec)?;
+        if !exact {
+            eprintln!(
+                "[spike] experiment: monitor `{}` is gone; fell back to the primary monitor work area",
+                rec.monitor_id
+            );
+        }
+        window
+            .set_position(PhysicalPosition::new(x, y))
+            .map_err(|e| format!("set_position: {e}"))?;
+        Ok(rec)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = &app;
+        Err("monitor-normalized placement experiment is Windows-only".to_string())
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -558,6 +661,9 @@ pub fn run() {
             save_position,
             autostart_enabled,
             set_autostart,
+            // EXPERIMENT — reachable over IPC only, never on the default path.
+            experiment_save_normalized_placement,
+            experiment_restore_normalized_placement,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
@@ -597,6 +703,35 @@ pub fn run() {
             if let Err(e) = apply_mode(&handle) {
                 eprintln!("[spike] initial mode apply failed: {e}");
             }
+
+            // Windows message-hook layer. Attached AFTER the first `apply_mode` (so the
+            // published mode is already PASSIVE) and BEFORE `show()`.
+            //
+            // The attach is SYNCHRONOUS on purpose. `SetWindowSubclass` must run on the
+            // thread that owns the window, and this setup hook already runs on the main
+            // thread before the event loop starts pumping — so calling it directly is both
+            // valid and the only way to be attached before `show()` below. Dispatching it
+            // through `run_on_main_thread` would NOT do that: that posts a task to the event
+            // loop, which cannot run until the loop is pumping, i.e. after `show()` has
+            // already returned and its first WM_WINDOWPOSCHANGING has been and gone.
+            //
+            // NOT TESTED: nothing here has been executed. The ordering argument is read off
+            // the API contract, not observed.
+            // Detach is handled by the subclass itself on WM_NCDESTROY.
+            #[cfg(windows)]
+            {
+                match window.hwnd() {
+                    Ok(h) => {
+                        if let Err(e) = win_shell::attach(h.0 as isize) {
+                            eprintln!("[spike] win_shell attach failed: {e}");
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("[spike] hwnd unavailable; message-hook layer not attached: {e}");
+                    }
+                }
+            }
+
             let _ = window.show();
             if let Err(e) = apply_mode(&handle) {
                 eprintln!("[spike] post-show mode apply failed: {e}");

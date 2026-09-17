@@ -6,9 +6,13 @@ using System.Text.Json.Serialization;
 namespace ShellSpike.Services;
 
 /// <summary>
-/// Persisted window position. This is the only FILE this spike writes:
+/// Persisted window position — the DEFAULT path, unchanged:
 /// two coordinates and nothing else. No preferences, no product data, no database.
 /// Click-through lives in memory only, exactly as it does on the Tauri side.
+///
+/// One more file exists beside it, written by the monitor-normalized placement EXPERIMENT
+/// (Experimental/MonitorNormalizedPlacementStore.cs). That file is additive, is never read
+/// unless the experiment is opted into, and holds a position too — nothing else.
 /// </summary>
 internal sealed class WindowPlacement
 {

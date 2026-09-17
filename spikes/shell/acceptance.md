@@ -41,8 +41,8 @@
 | B2 | transparent / background | `NOT TESTED` | `transparent:true`, surface `rgba(30,30,30,.85)` | `AllowsTransparency=True`, alpha 배경 |
 | B3 | taskbar 정책 | `NOT TESTED` | `skipTaskbar:true` + `WS_EX_TOOLWINDOW`, `WS_EX_APPWINDOW` 제거 | `ShowInTaskbar=False` + `WS_EX_TOOLWINDOW` |
 | B4 | Alt+Tab / switcher 정책 | `NOT TESTED` | `WS_EX_TOOLWINDOW` 무조건 적용 — 세 상태 모두 switcher 비노출 | 동일 |
-| B5 | bottom-Z behavior | `NOT TESTED` | `set_always_on_bottom(true)` + `SetWindowPos(HWND_BOTTOM,…)` **1회성** | 동일 호출 + `WM_WINDOWPOSCHANGING` 훅으로 **매 재배치마다 재강제** + `WM_ACTIVATE` 복구 |
-| B6 | ACTIVE / PASSIVE 전환 | `NOT TESTED` | `WS_EX_NOACTIVATE` 토글, 진입 시 `HWND_TOP` | 동일 + `WM_MOUSEACTIVATE` → `MA_NOACTIVATE` |
+| B5 | bottom-Z behavior | `NOT TESTED` | `set_always_on_bottom(true)` + `SetWindowPos(HWND_BOTTOM,…)` + **`WM_WINDOWPOSCHANGING` 서브클래스로 매 재배치마다 재강제** + `WM_ACTIVATE` 복구 (win_shell.rs) | 동일 호출 + `WM_WINDOWPOSCHANGING` 훅으로 매 재배치마다 재강제 + `WM_ACTIVATE` 복구 |
+| B6 | ACTIVE / PASSIVE 전환 | `NOT TESTED` | `WS_EX_NOACTIVATE` 토글, 진입 시 `HWND_TOP`, **`WM_MOUSEACTIVATE` → `MA_NOACTIVATE`** (win_shell.rs) | 동일 + `WM_MOUSEACTIVATE` → `MA_NOACTIVATE` |
 | B7 | click-through on/off | `NOT TESTED` | `set_ignore_cursor_events` + `WS_EX_TRANSPARENT`, PASSIVE 에서만 | `WS_EX_TRANSPARENT`, PASSIVE 에서만 |
 | B8 | global shortcut activation | `NOT TESTED` | `tauri-plugin-global-shortcut` | `RegisterHotKey` + `WM_HOTKEY` 훅 |
 | B9 | Layout Edit drag | `NOT TESTED` | `data-tauri-drag-region`, LAYOUT EDIT 에서만 | `DragMove()`, LAYOUT EDIT 에서만 |
@@ -174,3 +174,20 @@ E8: LAYOUT EDIT 로 보조 모니터에 배치 → 종료 → 모니터 분리 �
 | F. Reliability | F3~F6 반자동 | F1·F2·F7·F8 | — |
 
 **억지로 unit test 로 바꿔 PASS 를 만들지 않았다.** B~F 는 전부 `NOT TESTED` 로 남긴다.
+
+
+---
+
+## 부록 — 매트릭스에 아직 행이 없는 코드
+
+아래는 이후 추가된 코드이고, **기존 조건을 바꾸지 않기 위해** 새 행을 만들지 않았다.
+Windows 실측 때 어느 행으로 편입할지는 orchestrator 가 정한다.
+
+| 코드 | 무엇 | 현재 상태 |
+|---|---|---|
+| `tauri/src-tauri/src/win_shell.rs` | Win32 서브클래스 — `WM_WINDOWPOSCHANGING` · `WM_MOUSEACTIVATE` · `WM_ACTIVATE` · `WM_DISPLAYCHANGE` | `NOT TESTED` (B5·B6 서술에 반영, 별도 행 없음) |
+| `tauri/src-tauri/src/monitor_placement.rs` | 모니터 정규화 배치 **실험** | `NOT TESTED` · 실험이며 production contract 아님 |
+| `wpf/Experimental/**` | 같은 실험의 WPF 측 | `NOT TESTED` · 동일 |
+| `scripts/*.ps1` | 환경 수집 · 자원 측정 · 반복 안정성 · 스크린샷 | Windows 에서 실행된 적 없음 |
+
+B~F 의 판정은 하나도 바뀌지 않았다. 전부 `NOT TESTED` 그대로다.

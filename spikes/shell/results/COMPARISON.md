@@ -29,12 +29,12 @@
 - **Linux 에서 Windows 실행파일을 만들지 못한다.** 모든 crate 컴파일에 성공한 뒤
   `error: linker 'link.exe' not found` 로 링크 실패. `.exe` 산출 0개.
   전체 기록: `results/TAURI_WINDOWS_BUILD.md`
-- **PASSIVE 의 bottom-Z 가 1회성 배치에 그친다.** `WM_WINDOWPOSCHANGING` 을 가로챌 수 없어
-  다른 창이 Z-order 를 바꾸면 되돌릴 방법이 없다.
-  원인: Tauri 2 의 `WindowEvent` 에 raw 메시지 변형이 없다(`Resized`/`Moved`/`CloseRequested`/
-  `Destroyed`/`Focused`/`ScaleFactorChanged`/`ThemeChanged`/`DragDrop` 뿐).
-- **PASSIVE 의 focus 미탈취가 top-level HWND 에만 적용된다.** WebView2 는 자체 자식 HWND 계층을
-  가지며 부모의 `WS_EX_NOACTIVATE` 가 이를 덮지 않는다. `WM_MOUSEACTIVATE` 를 답할 수단이 없다.
+- **(해소됨 — 아래 '2차 개정' 참조)** 이전 개정에서는 PASSIVE 의 bottom-Z 가 1회성 배치에
+  그쳤다. 사용자 승인으로 Win32 서브클래스를 추가해 `WM_WINDOWPOSCHANGING` 을 가로채게 했다.
+- **WebView2 자식 HWND 의 focus 는 여전히 미해결.** `WS_EX_NOACTIVATE` 는 top-level HWND 에만
+  적용되고, WebView2 는 자체 자식 HWND 계층을 갖는다. 서브클래스가 `WM_MOUSEACTIVATE` 를
+  `MA_NOACTIVATE` 로 답하지만, 자식 HWND 가 별도로 포커스를 요구하는 경로는 덮지 못한다.
+  **NOT TESTED** — 실기에서만 확인 가능하다.
 
 ### Unknown
 
@@ -81,9 +81,9 @@
 |---|---|---|
 | build | `PASS` (타입검사만, Windows 타깃) | `PASS` (clean Release, 0 error) |
 | **Windows .exe 산출 (Linux 에서)** | **`FAIL` — `link.exe` 없음** | **`PASS` — PE32+ GUI 확인** |
-| bottom-Z | `NOT TESTED` · 코드는 **1회성 배치** | `NOT TESTED` · 코드는 **메시지 훅으로 상시 재강제** |
+| bottom-Z | `NOT TESTED` · 코드는 **서브클래스로 상시 재강제** (2차 개정) | `NOT TESTED` · 코드는 **메시지 훅으로 상시 재강제** |
 | click-through | `NOT TESTED` · `set_ignore_cursor_events` + `WS_EX_TRANSPARENT` | `NOT TESTED` · `WS_EX_TRANSPARENT` |
-| focus behavior | `NOT TESTED` · `WS_EX_NOACTIVATE` **만** (WebView2 자식 HWND 미포함) | `NOT TESTED` · `WS_EX_NOACTIVATE` + `MA_NOACTIVATE` + `WM_ACTIVATE` 복구 |
+| focus behavior | `NOT TESTED` · `WS_EX_NOACTIVATE` + `MA_NOACTIVATE` + `WM_ACTIVATE` 복구 (2차 개정). **WebView2 자식 HWND 는 여전히 미포함** | `NOT TESTED` · `WS_EX_NOACTIVATE` + `MA_NOACTIVATE` + `WM_ACTIVATE` 복구 |
 | taskbar / Alt+Tab | `NOT TESTED` · `skipTaskbar` + `WS_EX_TOOLWINDOW` | `NOT TESTED` · `ShowInTaskbar=False` + `WS_EX_TOOLWINDOW` |
 | restart persistence | `NOT TESTED` · 물리 픽셀, 48×48 검증 | `NOT TESTED` · DIP, 48×48 검증 + `WM_DISPLAYCHANGE` 재검증 |
 | multi-monitor | `NOT TESTED` · 기본 배치는 주 모니터 작업영역 | `NOT TESTED` · 동일 |
@@ -98,10 +98,10 @@
 **읽어도 되는 것 (측정됨)**
 1. Linux CI 에서 Windows 산출물을 만들 수 있는 쪽은 **WPF 뿐**이다.
 2. Windows 메시지 루프에 접근해야 하는 shell 동작(상시 bottom-Z, 클릭 시 활성화 거부,
-   활성화 복구, 디스플레이 변경 대응)은 **WPF 에서는 지원되는 API 로 구현되고, Tauri 에서는 안 된다.**
-   단, 이것은 Windows 의 한계가 아니라 **Tauri 2 의 지원 API 표면의 한계**다.
-   Tauri crate 는 이미 `windows` 를 링크하고 raw HWND 도 쥐고 있어, 비지원 `SetWindowSubclass` 를
-   쓰면 넷 다 닫힌다. 그 선택의 비용은 이 Spike 에서 평가하지 않았다.
+   활성화 복구, 디스플레이 변경 대응)은 **WPF 에서는 프레임워크가 그대로 제공**하고
+   (`HwndSource.AddHook`), **Tauri 에서는 Win32 서브클래스를 직접 붙여야 한다.**
+   2차 개정에서 실제로 붙였고(`win_shell.rs`), 기능 격차는 코드 수준에서 닫혔다.
+   남는 것은 **비용의 차이**다 — 아래 interop 부담 항목.
 3. WPF 는 외부 패키지 의존이 0이고, Tauri 는 상당한 crate 그래프를 끌어온다.
 
 **읽으면 안 되는 것 (미측정)**
@@ -112,3 +112,43 @@
 
 **최종 플랫폼은 이 문서로 확정하지 않는다.**
 확정하려면 Windows 기계에서 `acceptance.md` 의 B~F 를 실제로 수행해야 한다.
+
+
+---
+
+## 2차 개정 — Win32 interop 허용 이후 (2026-09-17)
+
+사용자 승인으로 Tauri 측에 Windows 전용 Win32 서브클래스 계층을 추가했다.
+목적은 "Tauri 순정 vs WPF 순정" 이 아니라 **각 플랫폼에서 현실적으로 쓸 아키텍처** 를 맞대는 것이다.
+
+추가된 것 — `tauri/src-tauri/src/win_shell.rs`, `monitor_placement.rs`
+`SetWindowSubclass` 로 `WM_WINDOWPOSCHANGING` · `WM_MOUSEACTIVATE` · `WM_ACTIVATE` ·
+`WM_DISPLAYCHANGE` 를 처리한다. 공개 `WebviewWindow::hwnd()` 만 쓰고 Tauri 내부 API 에
+의존하지 않는다(독립 검증됨). UI 코드와 분리된 `#[cfg(windows)]` 모듈이다.
+
+### Native interop burden (독립 계수)
+
+| | Tauri | WPF |
+|---|---|---|
+| 서로 다른 raw Win32 진입점 | **15** (이번에 10 신규) | **13** |
+| unsafe block / DllImport 선언 | **27 unsafe block** (신규 모듈 20) | **13 DllImport**, `unsafe` 0 |
+| Windows 전용 interop LOC (raw/code) | **478 / 355** | **332 / 213** (+ WndProc 훅 약 67/51) |
+| 메시지 훅 획득 방법 | `SetWindowSubclass` 직접 부착 | `HwndSource.AddHook` (프레임워크 제공) |
+
+**이 수치는 그대로 비교하면 안 된다.** WPF 의 13에는 32/64비트 분기로 중복 선언된
+`GetWindowLongW/Ptr`·`SetWindowLongW/Ptr` 4건이 포함돼 부풀려져 있고, 반대로 Tauri 의 15에는
+`tauri-plugin-global-shortcut` 이 의존성 안에서 호출하는 `RegisterHotKey` 가 빠져 있어
+같은 기능인데도 과소 계상돼 있다.
+
+### 2차 개정이 바꾸지 못한 것
+
+- **여전히 아무것도 실행되지 않았다.** B~F 는 전부 `NOT TESTED` 그대로다.
+- **링크는 한 번도 되지 않았다.** `cargo check` 는 링크를 하지 않으므로
+  comctl32(`SetWindowSubclass`)·shcore(`GetDpiForMonitor`) 의 심볼 해석이 미검증이다.
+- **서브클래스가 런타임에 무효화될 수 있다.** `SetWindowSubclass` 는 comctl32 v6 API 이고
+  activation context 에 좌우된다. Tauri 측에는 `app.manifest` 가 없어 v5 가 로드되면
+  `attach()` 가 실패하고 이전 동작으로 되돌아간다. **이 개정의 핵심 결과가 여기에 걸려 있다.**
+  (WPF 측은 매니페스트를 갖고 있다.)
+- **좌표 저장 실험은 양쪽이 같은 실험이 아니다.** WPF 는 기본 저장 때마다 자동으로 기록하고,
+  Tauri 는 UI 에서 호출되지 않는 IPC 명령 뒤에만 있다. 두 파일은 서로 다른 config 디렉터리에
+  쓰이므로 실기에서도 직접 맞대볼 수 없다.
