@@ -103,6 +103,7 @@ jobs:
           $out = 'artifacts\tauri-stability.md'
           $exe = '${{ steps.exe.outputs.path }}'
           $p = $null
+          $ErrorActionPreference = 'Stop'
           try {
             $p = Start-Process -FilePath $exe -PassThru -ErrorAction Stop
             Start-Sleep -Seconds 5
@@ -122,6 +123,15 @@ jobs:
             $lines | Set-Content $out
           } finally {
             if ($p -and -not $p.HasExited) { try { $p.Kill() } catch { } }
+          }
+          # 안전망: 어떤 경로로 실패했든 NOT TESTED 기록은 반드시 남긴다.
+          if (-not (Test-Path $out)) {
+            @(
+              '# 반복 안정성 — NOT TESTED',
+              '',
+              '러너에 대화형 데스크톱 세션이 없어 창을 찾지 못했다.',
+              '측정 불가이며 FAIL 이 아니다.'
+            ) | Set-Content $out
           }
           Get-Content $out
 
@@ -198,6 +208,7 @@ jobs:
           $out = 'artifacts\wpf-stability.md'
           $exe = '${{ steps.exe.outputs.path }}'
           $p = $null
+          $ErrorActionPreference = 'Stop'
           try {
             $p = Start-Process -FilePath $exe -PassThru -ErrorAction Stop
             Start-Sleep -Seconds 5
@@ -217,6 +228,15 @@ jobs:
             $lines | Set-Content $out
           } finally {
             if ($p -and -not $p.HasExited) { try { $p.Kill() } catch { } }
+          }
+          # 안전망: 어떤 경로로 실패했든 NOT TESTED 기록은 반드시 남긴다.
+          if (-not (Test-Path $out)) {
+            @(
+              '# 반복 안정성 — NOT TESTED',
+              '',
+              '러너에 대화형 데스크톱 세션이 없어 창을 찾지 못했다.',
+              '측정 불가이며 FAIL 이 아니다.'
+            ) | Set-Content $out
           }
           Get-Content $out
 
