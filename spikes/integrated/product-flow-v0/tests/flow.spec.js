@@ -2,6 +2,8 @@
 const { test, expect } = require('@playwright/test');
 const H = require('./helpers');
 const { DENSE_DATE, TODAY } = H;
+/* lens 는 origin 에 붙는다 — placeLens 의 GAP(10px) + 반올림 여유. 제품 수치가 아니라 회귀 감지선이다. */
+const LENS_MAX_GAP = 16;
 
 /* ---------------- 1. 흐름이 실제로 이어지는가 ---------------- */
 test('Idle -> Ambient -> Quick -> Calendar 가 한 화면에서 이어진다', async ({ page }) => {
@@ -184,7 +186,27 @@ test('lens 를 열어도 origin 이 화면에 남고 한 픽셀도 가려지지 
     expect(r.covered, `${k} covered`).toBe(0);
     expect(r.inViewport, `${k} in viewport`).toBeTruthy();
     await expect(page.locator(`[data-lens-origin="${k}"]`)).toHaveClass(/is-origin/);
+    // lens 자신도 화면 안에, 캘린더 본문 안에, origin 바로 옆에 있어야 한다
+    const p = await H.lensPlacement(page);
+    expect(p.ok, `${k} lens placement`).toBeTruthy();
+    expect(p.outViewport, `${k} lens 가 viewport 밖으로 ${p.outViewport}px`).toBeLessThanOrEqual(1);
+    expect(p.outRegion, `${k} lens 가 캘린더 본문 밖으로 ${p.outRegion}px`).toBeLessThanOrEqual(1);
+    expect(p.gap, `${k} lens 가 origin 에서 ${p.gap}px 떨어짐`).toBeLessThanOrEqual(LENS_MAX_GAP);
   }
+});
+
+/* placeLens 의 clamp 회귀 방지: 어떤 origin 에서도 lens 가 화면/캘린더 본문 밖으로 나가지 않는다.
+   (clamp 가 없거나 viewport 기준으로만 걸리면 아래 목록이 비지 않는다) */
+test('lens 자신이 모든 origin 에서 화면과 캘린더 본문 안에 머문다', async ({ page }) => {
+  await H.walkIn(page);
+  const n = await page.locator('#sheet [data-lens-origin]').count();
+  expect(n).toBeGreaterThan(50);
+  expect(await H.lensPlacementViolations(page, LENS_MAX_GAP), '월 뷰').toEqual([]);
+
+  await page.keyboard.press('Escape');
+  await page.click('[data-act="view-matrix"]');
+  await expect(page.locator('body')).toHaveAttribute('data-cal-view', 'matrix');
+  expect(await H.lensPlacementViolations(page, LENS_MAX_GAP), '매트릭스 뷰').toEqual([]);
 });
 
 test('lens 를 닫으면 focus 가 origin 으로 돌아온다', async ({ page }) => {
@@ -333,6 +355,36 @@ test('D-day 20건: group 을 접어도 항목이 하나도 사라지지 않는�
   for (let i = 0; i < groups; i++) await page.locator('#dday .dd-gh').nth(i).click();
   expect((await page.locator('#dday .dd-item').allTextContents()).length).toBe(before.length);
 });
+
+/* "누락 0 · 전부 도달 가능" 을 DOM 개수가 아니라 실제 기하로 확인한다.
+   개수는 그대로 두고 조상 overflow 로 항목을 잘라내는 구현은 여기서 걸린다. */
+for (const n of [3, 20]) {
+  test(`D-day ${n}건 — pin 과 그룹 항목 전부가 화면에서 실제로 도달 가능하다 (잘림 0)`, async ({ page }) => {
+    await page.goto(`/index.html?stage=ambient&dday=${n}`);
+    await expect(page.locator('#dday')).toBeVisible();
+    await expect(page.locator('#ddLedger')).toHaveAttribute('data-total', String(n));
+
+    const pins = page.locator('#dday .pin'), items = page.locator('#dday .dd-item');
+    const pc = await pins.count(), ic = await items.count();
+    expect(pc + ic, '화면에 있는 항목 수가 총 건수와 같다').toBe(n);
+
+    const pinTexts = [], itemTexts = [];
+    for (let i = 0; i < pc; i++) pinTexts.push((await H.expectReachable(pins.nth(i), `pin ${i}`)).text);
+    for (let i = 0; i < ic; i++) itemTexts.push((await H.expectReachable(items.nth(i), `dd-item ${i}`)).text);
+    expect(new Set([...pinTexts, ...itemTexts]).size, '같은 항목이 중복으로 세어지지 않았다').toBe(n);
+
+    // 접었다 다시 펴도 모든 항목이 같은 방식으로 다시 도달 가능하다
+    const groups = await page.locator('#dday .dd-group').count();
+    for (let i = 0; i < groups; i++) await page.locator('#dday .dd-gh').nth(i).click();
+    for (let i = 0; i < groups; i++)
+      await expect(page.locator('#dday .dd-group').nth(i)).toHaveAttribute('data-collapsed', '1');
+    for (let i = 0; i < groups; i++) await page.locator('#dday .dd-gh').nth(i).click();
+
+    const again = [];
+    for (let i = 0; i < ic; i++) again.push((await H.expectReachable(items.nth(i), `펼친 뒤 dd-item ${i}`)).text);
+    expect(new Set(again)).toEqual(new Set(itemTexts));
+  });
+}
 
 /* ---------------- 14. Layout Edit ---------------- */
 test('평상시에는 drag 가 불가능하고, Layout Edit 안에서만 pin 이 움직인다', async ({ page }) => {

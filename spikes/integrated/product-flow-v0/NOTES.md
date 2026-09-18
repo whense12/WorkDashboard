@@ -33,9 +33,9 @@ URL 로 상태 고정 (테스트·스크린샷용):
 | 보조: Vendor Matrix | `업체 × 날짜` 표. 같은 날짜 열의 업체 집합이 월 뷰와 동일함을 단언 | `Calendar <-> Vendor Matrix 는 같은 데이터의 두 표면이다` |
 | `+N` · 숫자만 · 셀 독립 스크롤바 · 자동 2열 금지 | `+N`/`외 N건`/`N건 더`/`…` 패턴 0건, `text-overflow:ellipsis`·`line-clamp` 0건, 밀도 전환은 **사용자 조작만** | `ZERO +N 업체 overflow …` (3개 밀도 × 월/매트릭스) |
 | 2열은 비기본 옵션으로만 | `조밀 2열` 은 세그먼트의 세 번째 선택지. 기본은 `조밀` | `body[data-density]` 기본값 단언 |
-| Object Lens: origin 앵커 · **동시에 정확히 1개** · 새 객체 선택은 교체 · origin 화면 유지 · 닫으면 origin 으로 focus 복귀 · 위치 점수로 다른 항목 가림 회피 | `S.lens` 는 단일 슬롯. `placeLens()` 가 right/left/below/above 4후보를 점수로 고름 | `lens 는 정확히 하나다 …`, `lens 를 열어도 origin 이 …`, `lens 를 닫으면 focus 가 origin 으로 …` |
+| Object Lens: origin 앵커 · **동시에 정확히 1개** · 새 객체 선택은 교체 · origin 화면 유지 · 닫으면 origin 으로 focus 복귀 · 위치 점수로 다른 항목 가림 회피 | `S.lens` 는 단일 슬롯. `placeLens()` 가 right/left/below/above 4후보를 점수로 고름 | `lens 는 정확히 하나다 …`, `lens 를 열어도 origin 이 …` (lens 자신의 위치까지 단언), `lens 자신이 모든 origin 에서 화면과 캘린더 본문 안에 머문다` (101개 origin 전수 + 매트릭스 뷰), `lens 를 닫으면 focus 가 origin 으로 …` |
 | 상시 우측 inspector 없음 — 영원히 | 쉴 때 lens 0개. 어떤 상태에서도 "화면 오른쪽에 붙어 화면 높이의 60% 이상을 차지하는 폭 200~560px 고정 패널" 이 0개 | `상시 우측 inspector 는 어떤 상태에도 없다` (idle/ambient/quick/calendar/lens/focus/dday 7상태) |
-| D-day: HYBRID — 사용자 표시 중요 항목은 독립 pin, 나머지는 긴급도 그룹(접힘 가능), 전부 도달 가능, 기능적 상한 없음, pin 이동은 Layout Edit 에서만 | pin 영역(절대좌표) + 긴급도 5버킷. ledger 가 `총 N = 고정 P + 그룹 G (접힘 C · 스크롤 밖 S)` 를 항상 표시 | `D-day 3건/20건 — HYBRID …`, `D-day 20건: group 을 접어도 항목이 하나도 사라지지 않는다` |
+| D-day: HYBRID — 사용자 표시 중요 항목은 독립 pin, 나머지는 긴급도 그룹(접힘 가능), 전부 도달 가능, 기능적 상한 없음, pin 이동은 Layout Edit 에서만 | pin 영역(절대좌표) + 긴급도 5버킷. ledger 가 `총 N = 고정 P + 그룹 G (접힘 C · 스크롤 밖 S)` 를 항상 표시 | `D-day 3건/20건 — HYBRID …` (개수), `D-day 3건/20건 — pin 과 그룹 항목 전부가 화면에서 실제로 도달 가능하다 (잘림 0)` (항목마다 스크롤 후 조상 overflow·viewport 로 잘리지 않았음을 기하로 확인), `D-day 20건: group 을 접어도 항목이 하나도 사라지지 않는다` |
 | Layout Edit 에서만 자유 배치 | 모든 drag 진입점이 `S.layoutEdit` 를 먼저 보고 즉시 빠져나간다. 평상시 `data-draggable="false"` / `draggable="false"` / `cursor:grab` 0개 | `평상시에는 drag 가 불가능하고 …`, `평상시 어떤 요소에도 drag 가 걸려 있지 않다` |
 
 ---
@@ -139,7 +139,7 @@ URL 로 상태 고정 (테스트·스크린샷용):
 
 ## 5. PASS / FAIL / NOT TESTED / NOT APPLICABLE
 
-실제 실행: `npx playwright test` → **26 passed, 0 failed** (Chromium headless, Playwright 1.56.1, 1 worker).
+실제 실행: `npx playwright test` → **29 passed, 0 failed** (Chromium headless, Playwright 1.56.1, 1 worker).
 viewport 는 config 에서 1280×800 으로 고정(devices 기본 1280×720 을 덮어쓴다), 스크린샷 spec 은 1280×800 과 1600×1000 두 번 돈다.
 
 | 요구 | 결과 | 근거 |
@@ -151,8 +151,10 @@ viewport 는 config 에서 1280×800 으로 고정(devices 기본 1280×720 을 
 | Vendor / Event / General Schedule lens | **PASS** | `Vendor / Event / General Schedule 세 가지 lens …` |
 | lens 교체 후 활성 lens == 1 | **PASS** | `lens 는 정확히 하나다 …` (4객체 연속 클릭) |
 | origin 이 화면에 남는다 | **PASS** | `lens 를 열어도 origin 이 …` (5케이스, 가림 0 px² + viewport 안) |
+| lens 자신이 화면·캘린더 본문 밖으로 나가지 않는다 | **PASS** | `lens 자신이 모든 origin 에서 …` (월 뷰 origin 101개 + 매트릭스 뷰 전수, viewport 밖 0px · 본문 밖 0px · origin 과 간격 ≤ 16px) |
 | Focus 진입 / 복귀 | **PASS** | `Focus Surface 진입과 복귀 …` |
 | D-day 3 / 20 | **PASS** | `D-day 3건/20건 — HYBRID …` (고정 + 그룹 = 총건수) |
+| D-day 항목 전부가 실제로 화면에서 도달 가능 | **PASS** | `D-day 3건/20건 — pin 과 그룹 항목 전부가 …` (pin·항목 하나하나를 스크롤해 끌어온 뒤 조상 overflow·viewport clip 을 적용한 실제 보이는 박스가 자기 크기와 같음을 확인. 접었다 편 뒤 재확인) |
 | 접힘으로 항목 0개 유실 | **PASS** | `D-day 20건: group 을 접어도 …` (제목 집합 동일 + 왕복 복귀) |
 | 평상시 drag 불가 / Layout Edit 에서 가능 | **PASS** | `평상시에는 drag 가 불가능하고 …` (이동량 0 vs 정확히 +120/+90) |
 | `Esc` / 뒤로 | **PASS** | `Esc 로 Focus -> Lens -> Calendar -> Quick -> Ambient -> Idle …`, `Esc 가 Quick Add 와 Layout Edit 도 …` |
@@ -161,6 +163,7 @@ viewport 는 config 에서 1280×800 으로 고정(devices 기본 1280×720 을 
 | MUST 4 — 이 날짜만 vs 전체 참가계획 | **PASS** | `이 날짜만 수정과 전체 참가계획 수정이 구별된다` |
 | 스크린샷 14장 (1280×800, 1600×1000) | **PASS** | `tests/screens.spec.js` — 한 세션에서 연속 조작하며 촬영 |
 | 실측치 기록 | **PASS** | `tests/measure.spec.js` → `measurements.json` (손으로 쓴 값 없음) |
+| lens 위치 점수의 가중치 값 자체(거리 ÷10, 타 항목 가림 ÷200) | **NOT TESTED** | 현재 구현에서는 ÷40 으로 되돌려도 101개 origin 의 배치가 관측상 동일하다 (위 검증 보강 3). 관측 가능한 성질(화면·본문 안, origin 과 ≤16px)만 잠갔다 |
 | 다른 해상도 / DPI / 창 크기 변경 | **NOT TESTED** | 1280×800 · 1600×1000 두 조합만. `resize` 는 재렌더하지만 검증하지 않았다 |
 | 키보드 전용 경로 · tab 순서 · 스크린리더 | **NOT TESTED** | `Esc` 와 lens 닫힘 focus 복귀만 검증. `aria`/tab 순서는 검사하지 않았다 |
 | 실제 Windows 데스크톱 상주(투명 창·always-on-top·다른 창 간섭) | **NOT TESTED** | 브라우저 안에서 데스크톱을 흉내낸 것이다 |
@@ -183,13 +186,46 @@ viewport 는 config 에서 1280×800 으로 고정(devices 기본 1280×720 을 
    Quick 의 닫기 버튼이 viewport 밖으로 나가고 Layout Edit 의 ambient drag 가 D-day 패널에 먹혔다
    (두 테스트가 각각 잡았다) → D-day/Quick 을 ambient 열 **왼쪽** 슬롯으로 옮기고 둘이 동시에 열리지 않게 했다.
 4. lens 가 viewport 기준으로만 clamp 되어 Calendar Sheet 바깥(작업표시줄 위)까지 삐져나왔다
-   → 캘린더 본문 영역으로 clamp 하도록 고쳤다.
+   → 캘린더 본문 영역으로 clamp 하도록 고쳤다. **처음에는 이 수정에 회귀 테스트가 없었다.**
+   지금은 `lens 자신이 모든 origin 에서 화면과 캘린더 본문 안에 머문다` 가 막는다 (아래 검증 보강 참조).
 5. lens 위치 점수의 거리 가중치가 너무 약해(÷40) 항상 화면 왼쪽 빈 곳으로 날아갔다(중심간 269→577px).
    `measurements.json` 이 그걸 보여줘서 가중치를 다시 잡았다.
+   **다만 이 값은 지금 구현에서 회귀 테스트로 잠기지 않는다** — 아래 검증 보강 3 참조.
 6. D-day pin 제목을 `nowrap + ellipsis` 로 두었더니 `제28회 가을 농특산물 대축제 개막` 이 잘렸다.
    pin 은 group 에 중복으로 들어가지 않으므로 그 잘림은 **정보 유실**이다 → 두 줄 허용 + pin 높이 74px 로 고쳤다.
 7. 밀집 주 행 스크린샷이 `row.offsetTop` 을 `#calBody` 기준으로 착각해 날짜 머리줄을 지나쳐 찍혔다
    → `getBoundingClientRect` 차이로 계산하도록 고쳤다.
+
+### 검증 지적에 따른 보강 (테스트를 낮추지 않고 단언을 늘렸다)
+
+독립 검증에서 "개수만 세고 실제로 보이는지는 아무도 확인하지 않는다" 는 지적을 받아, **구현은 그대로 두고
+빠져 있던 단언을 추가했다.** acceptance 를 낮추거나 단언을 지우지 않았다 (테스트 수 26 → 29, 모두 추가).
+
+1. **D-day `누락 0 · 전부 도달 가능`** — 기존 테스트는 `.pin` / `.dd-item` 의 **개수와 텍스트 집합**만 봤다.
+   `D-day 3건/20건 — pin 과 그룹 항목 전부가 화면에서 실제로 도달 가능하다 (잘림 0)` 를 추가했다.
+   항목마다 `scrollIntoViewIfNeeded` 로 끌어온 뒤, **조상의 `overflow` clip 과 viewport 를 모두 적용한
+   실제 보이는 박스**(`helpers.visibleBoxOf`)가 자기 박스 크기와 같은지, 높이가 글자 크기 이상인지 본다.
+   접었다 편 왕복 뒤에도 같은 집합을 다시 확인한다.
+   - 변이 검증: 펼쳐진 `.dd-items` 에 `max-height:0;overflow:hidden` 을 넣으면
+     **보강 전 26개 전부 통과 → 보강 후 2개 실패**(`dd-item 0 세로 잘림: 보이는 6 / 실제 23`).
+   - 변이 검증: D-day 패널을 viewport 아래로 260px 밀면 역시 실패한다(`보이는 0 / 실제 23`).
+
+2. **lens 자신의 위치** — 기존 테스트는 **origin** 만 검사했고 lens 자신은 아무도 보지 않았다.
+   기존 `lens 를 열어도 origin 이 …` 에 lens 위치 단언을 더하고,
+   `lens 자신이 모든 origin 에서 화면과 캘린더 본문 안에 머문다` 를 새로 추가했다
+   (월 뷰 origin 101개 전수 + 매트릭스 뷰 전수: viewport 밖 0px · 캘린더 본문 밖 0px · origin 과 간격 ≤ 16px ·
+   lens 가 찌그러지지 않음). 실측 최댓값은 viewport 밖 0 / 본문 밖 0 / 간격 10px(= `placeLens` 의 `GAP`).
+   - 변이 검증: `placeLens` 의 clamp 를 항등함수로 바꾸면 **보강 전 전부 통과 → 보강 후 2개 실패**
+     (월 뷰에서 위반 198건).
+   - 변이 검증: clamp 를 viewport 기준으로만 되돌리면(결함 #4 를 그대로 재현) 역시 2개 실패한다.
+
+3. **결함 #5 의 거리 가중치(÷40 → ÷10)는 회귀 테스트로 잠그지 않았다 — `NOT TESTED` 로 남긴다.**
+   지금 구현에서 가중치를 ÷40 으로 되돌리고 origin 101개를 전수 측정하면
+   중심간 거리 최대 **296px → 296px**, 평균 **261px → 264px**, origin 과의 간격 최대 **10px → 10px**,
+   앵커 분포 `left 66→69 · above 17→15 · below 8→7 · right 10→10` 으로 **관측상 차이가 없다**.
+   결함 #5 의 577px 은 결함 #3·#4 를 고치기 전 배치에서 나온 값이고, 본문 영역 clamp 가 들어온 뒤로는
+   가중치가 배치를 좌우하지 않는다. 관측되지 않는 것을 통과시키려고 소스의 `/ 10` 이라는 숫자 자체를
+   테스트로 굳히지는 않았다 — 그것은 프로토타입 내부 수치를 제품 규칙으로 승격하는 일이다.
 
 ---
 
