@@ -1,0 +1,13 @@
+{
+  "name": "product-flow-v0",
+  "private": true,
+  "version": "0.0.0",
+  "description": "WorkDashboard — Integrated UX Prototype v0 (Ambient -> Quick -> Calendar Sheet -> Object Lens -> Focus Surface)",
+  "scripts": {
+    "serve": "node server.js",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  }
+}

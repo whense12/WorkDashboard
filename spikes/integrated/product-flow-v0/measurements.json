@@ -1,0 +1,268 @@
+{
+  "generatedBy": "tests/measure.spec.js",
+  "viewport": "1280x800",
+  "rows": {
+    "calendar": {
+      "compact": {
+        "vendorNames": 20,
+        "fontSizePx": 11.5,
+        "rowPitchPx": 15.2,
+        "vendorListHeightPx": 304,
+        "denseWeekRowPx": 463,
+        "weekRowHeightsPx": [
+          87,
+          184,
+          258,
+          463,
+          275
+        ],
+        "calBodyClientPx": 599,
+        "calBodyScrollPx": 668,
+        "columnCount": 1,
+        "namesFullyInBodyViewport": 20,
+        "cellsWithOwnScrollbar": 0
+      },
+      "comfortable": {
+        "vendorNames": 20,
+        "fontSizePx": 13,
+        "rowPitchPx": 23.5,
+        "vendorListHeightPx": 470,
+        "denseWeekRowPx": 629,
+        "weekRowHeightsPx": [
+          87,
+          217,
+          291,
+          629,
+          350
+        ],
+        "calBodyClientPx": 599,
+        "calBodyScrollPx": 975,
+        "columnCount": 1,
+        "namesFullyInBodyViewport": 20,
+        "cellsWithOwnScrollbar": 0
+      },
+      "dense2": {
+        "vendorNames": 20,
+        "fontSizePx": 11.5,
+        "rowPitchPx": 30.41,
+        "vendorListHeightPx": 274,
+        "denseWeekRowPx": 433,
+        "weekRowHeightsPx": [
+          87,
+          169,
+          243,
+          433,
+          290
+        ],
+        "calBodyClientPx": 599,
+        "calBodyScrollPx": 622,
+        "columnCount": 2,
+        "namesFullyInBodyViewport": 20,
+        "cellsWithOwnScrollbar": 0
+      }
+    },
+    "matrix": {
+      "vendorRows": 22,
+      "dateColumns": 10,
+      "tablePx": [
+        1238,
+        515
+      ],
+      "verticalScrollPx": 0,
+      "horizontalScrollPx": 0
+    },
+    "lens": [
+      {
+        "origin": "v:v01@2026-09-23",
+        "anchor": "left",
+        "activeLenses": 1,
+        "originCoveredPx": 0,
+        "originInViewport": true,
+        "factsVisible": 8,
+        "clicksToFacts": 0,
+        "otherItemsMostlyHidden": 2,
+        "sheetItems": 101,
+        "originToLensCenterPx": 295,
+        "lensPx": [
+          312,
+          316
+        ]
+      },
+      {
+        "origin": "v:v20@2026-09-23",
+        "anchor": "left",
+        "activeLenses": 1,
+        "originCoveredPx": 0,
+        "originInViewport": true,
+        "factsVisible": 8,
+        "clicksToFacts": 0,
+        "otherItemsMostlyHidden": 0,
+        "sheetItems": 101,
+        "originToLensCenterPx": 295,
+        "lensPx": [
+          312,
+          316
+        ]
+      },
+      {
+        "origin": "e:e1@2026-09-23",
+        "anchor": "left",
+        "activeLenses": 1,
+        "originCoveredPx": 0,
+        "originInViewport": true,
+        "factsVisible": 7,
+        "clicksToFacts": 0,
+        "otherItemsMostlyHidden": 2,
+        "sheetItems": 101,
+        "originToLensCenterPx": 278,
+        "lensPx": [
+          312,
+          296
+        ]
+      },
+      {
+        "origin": "e:e2@2026-09-11",
+        "anchor": "left",
+        "activeLenses": 1,
+        "originCoveredPx": 0,
+        "originInViewport": true,
+        "factsVisible": 7,
+        "clicksToFacts": 0,
+        "otherItemsMostlyHidden": 7,
+        "sheetItems": 101,
+        "originToLensCenterPx": 276,
+        "lensPx": [
+          312,
+          296
+        ]
+      },
+      {
+        "origin": "s:s08@2026-09-18",
+        "anchor": "left",
+        "activeLenses": 1,
+        "originCoveredPx": 0,
+        "originInViewport": true,
+        "factsVisible": 5,
+        "clicksToFacts": 0,
+        "otherItemsMostlyHidden": 8,
+        "sheetItems": 101,
+        "originToLensCenterPx": 269,
+        "lensPx": [
+          312,
+          255
+        ]
+      },
+      {
+        "origin": "s:s01@2026-09-01",
+        "anchor": "right",
+        "activeLenses": 1,
+        "originCoveredPx": 0,
+        "originInViewport": true,
+        "factsVisible": 5,
+        "clicksToFacts": 0,
+        "otherItemsMostlyHidden": 1,
+        "sheetItems": 101,
+        "originToLensCenterPx": 271,
+        "lensPx": [
+          312,
+          255
+        ]
+      },
+      {
+        "origin": "s:s14@2026-09-29",
+        "anchor": "left",
+        "activeLenses": 1,
+        "originCoveredPx": 0,
+        "originInViewport": true,
+        "factsVisible": 5,
+        "clicksToFacts": 0,
+        "otherItemsMostlyHidden": 0,
+        "sheetItems": 101,
+        "originToLensCenterPx": 280,
+        "lensPx": [
+          312,
+          255
+        ]
+      }
+    ],
+    "dday": [
+      {
+        "fixture": 3,
+        "collapsed": false,
+        "domItems": 3,
+        "pinned": 1,
+        "grouped": 2,
+        "collapsedItems": 0,
+        "offscreenItems": 0,
+        "groups": 1,
+        "groupsScrollHeight": 90,
+        "groupsClientHeight": 90,
+        "overflowPx": 0,
+        "visibleItems": 2
+      },
+      {
+        "fixture": 3,
+        "collapsed": true,
+        "domItems": 3,
+        "pinned": 1,
+        "grouped": 2,
+        "collapsedItems": 2,
+        "offscreenItems": 0,
+        "groups": 1,
+        "groupsScrollHeight": 37,
+        "groupsClientHeight": 37,
+        "overflowPx": 0,
+        "visibleItems": 0
+      },
+      {
+        "fixture": 20,
+        "collapsed": false,
+        "domItems": 20,
+        "pinned": 3,
+        "grouped": 17,
+        "collapsedItems": 0,
+        "offscreenItems": 9,
+        "groups": 5,
+        "groupsScrollHeight": 587,
+        "groupsClientHeight": 305,
+        "overflowPx": 282,
+        "visibleItems": 8
+      },
+      {
+        "fixture": 20,
+        "collapsed": true,
+        "domItems": 20,
+        "pinned": 3,
+        "grouped": 17,
+        "collapsedItems": 17,
+        "offscreenItems": 0,
+        "groups": 5,
+        "groupsScrollHeight": 159,
+        "groupsClientHeight": 159,
+        "overflowPx": 0,
+        "visibleItems": 0
+      }
+    ],
+    "panels": {
+      "viewport": [
+        1280,
+        800
+      ],
+      "ambient": {
+        "w": 352,
+        "h": 441,
+        "right": 1260,
+        "heightPctOfViewport": 0.552,
+        "distanceFromRightEdgePx": 20
+      },
+      "dday": {
+        "w": 396,
+        "h": 560,
+        "right": 896,
+        "heightPctOfViewport": 0.7,
+        "distanceFromRightEdgePx": 384
+      }
+    },
+    "rightInspectorsFound": []
+  }
+}
