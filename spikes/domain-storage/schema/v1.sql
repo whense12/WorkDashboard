@@ -134,6 +134,12 @@ CREATE TABLE reminder (
 -- Append-only change log. entity_id is deliberately NOT a foreign key:
 -- history must survive deletion of the entity it describes, and undo must
 -- never be able to cascade a row out of here (C4).
+--
+-- before_json/after_json describe the NAMED entity row only. A delete also
+-- destroys rows the database removes on its own via ON DELETE CASCADE, and
+-- detaches rows via ON DELETE SET NULL. Those rows are recorded in
+-- cascade_json, because otherwise neither the history nor undo would ever
+-- know they existed (kernel MUST 11).
 CREATE TABLE audit_event (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     occurred_at      TEXT NOT NULL,
@@ -144,6 +150,9 @@ CREATE TABLE audit_event (
                        CHECK (action IN ('create','update','delete','undo')),
     before_json      TEXT,
     after_json       TEXT,
+    -- {"deleted":[{"table":..,"row":{..}}], "nulled":[{..}]}; NULL when the
+    -- action had no referential fallout at all.
+    cascade_json     TEXT,
     undo_of_audit_id INTEGER REFERENCES audit_event(id)
 );
 

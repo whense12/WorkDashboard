@@ -62,8 +62,12 @@ def _statements(sql: str):
         raise ValueError("trailing incomplete SQL: %r" % buf[:80])
 
 
-def _run_script(conn: sqlite3.Connection, name: str) -> int:
-    sql = (SCHEMA_DIR / name).read_text(encoding="utf-8")
+def _run_script(conn: sqlite3.Connection, name) -> int:
+    """Run a .sql script. `name` is a file in schema/, or an absolute path
+    (used by the C6 tests to drive a deliberately careless rebuild through
+    exactly the same migration machinery the product path uses)."""
+    p = pathlib.Path(name)
+    sql = (p if p.is_absolute() else SCHEMA_DIR / p).read_text(encoding="utf-8")
     count = 0
     for stmt in _statements(sql):
         conn.execute(stmt)
@@ -83,11 +87,18 @@ def schema_version(conn: sqlite3.Connection) -> int:
     ).fetchone()[0]
 
 
-def migrate_to_v2(conn: sqlite3.Connection, *, now: str = "1970-01-01T00:00:01Z"):
+def migrate_to_v2(conn: sqlite3.Connection, *, now: str = "1970-01-01T00:00:01Z",
+                  script="v2.sql"):
     """The documented SQLite table-rebuild procedure.
 
-    Returns the rows reported by PRAGMA foreign_key_check inside the
-    migration transaction - callers assert it is empty.
+    A rebuild runs with foreign_keys OFF, so the database will NOT stop a
+    script that detaches or orphans a child row - it will happily commit the
+    damage. PRAGMA foreign_key_check inside the transaction is the only thing
+    standing between a careless rebuild and silent data loss, so a non-empty
+    result aborts and rolls the whole migration back.
+
+    Returns the (empty) foreign_key_check result on success; raises
+    RuntimeError if the rebuild would orphan anything.
     """
     if schema_version(conn) != 1:
         raise RuntimeError("migrate_to_v2 expects schema v1")
@@ -96,7 +107,7 @@ def migrate_to_v2(conn: sqlite3.Connection, *, now: str = "1970-01-01T00:00:01Z"
     try:
         conn.execute("BEGIN")
         try:
-            _run_script(conn, "v2.sql")
+            _run_script(conn, script)
             violations = conn.execute("PRAGMA foreign_key_check").fetchall()
             if violations:
                 raise RuntimeError("migration would orphan rows: %r" % (violations,))

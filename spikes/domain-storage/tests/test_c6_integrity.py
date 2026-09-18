@@ -1,11 +1,17 @@
 """C6 - SQLite integrity: foreign keys, migration, rollback, orphans, backup."""
 
 import os
+import pathlib
 import sqlite3
 import unittest
 
 from _support import DbCase
 from harness import db, snapshot
+
+# A deliberately careless rebuild, used to prove the migration's
+# foreign_key_check gate actually fires. See the file's own header.
+CARELESS_REBUILD = str(
+    pathlib.Path(__file__).resolve().parent / "careless_rebuild.sql")
 
 
 # --------------------------------------------------------------- foreign keys
@@ -117,6 +123,97 @@ class MigrationV1toV2(unittest.TestCase):
         db.migrate_to_v2(self.conn)
         with self.assertRaises(RuntimeError):
             db.migrate_to_v2(self.conn)
+
+
+# ------------------------------------------- the foreign_key_check gate itself
+class RebuildOrphanGate(unittest.TestCase):
+    """The rebuild step runs with foreign_keys OFF. That is the whole reason
+    the 12-step procedure ends with PRAGMA foreign_key_check: nothing else
+    will notice a rebuild that detaches child rows. These tests EXECUTE that
+    gate rather than asserting that an empty result is empty."""
+
+    def setUp(self):
+        import tempfile
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.path = os.path.join(self.tmp.name, "gate.db")
+        self.conn = db.init_v1(self.path)
+        self.addCleanup(self.conn.close)
+        self.ev = self.conn.execute(
+            "INSERT INTO event (name) VALUES ('축제')").lastrowid
+        # notes IS NULL, so the careless script's filter drops this row
+        self.si = self.conn.execute(
+            "INSERT INTO schedule_item (title, on_date, event_id)"
+            " VALUES ('설치','2026-10-17',?)", (self.ev,)).lastrowid
+        for i in range(3):
+            self.conn.execute(
+                "INSERT INTO attachment (kind, display_name, target,"
+                " schedule_item_id) VALUES ('file',?,?,?)",
+                ("첨부%d" % i, "D:/a%d" % i, self.si))
+        self.conn.execute(
+            "INSERT INTO work_item (title, status, schedule_item_id)"
+            " VALUES ('부스 배치','active',?)", (self.si,))
+
+    def count(self, table):
+        return self.conn.execute(
+            "SELECT COUNT(*) FROM %s" % table).fetchone()[0]
+
+    def test_the_careless_rebuild_really_does_orphan_rows_when_unguarded(self):
+        """Premise check: without the gate this damage commits silently.
+
+        Run the same script by hand, with foreign_keys OFF and no gate, and
+        confirm SQLite raises nothing while leaving 4 dangling children.
+        """
+        self.conn.execute("PRAGMA foreign_keys = OFF")
+        self.conn.execute("BEGIN")
+        db._run_script(self.conn, CARELESS_REBUILD)   # raises nothing at all
+        # measured INSIDE the transaction - the rollback below undoes it
+        surviving_parents = self.count("schedule_item")
+        violations = self.conn.execute("PRAGMA foreign_key_check").fetchall()
+        self.conn.execute("ROLLBACK")
+        self.conn.execute("PRAGMA foreign_keys = ON")
+
+        self.assertEqual(0, surviving_parents, "the parent row was dropped")
+        self.assertEqual(1, self.count("schedule_item"), "rollback undid it")
+        self.assertEqual(
+            4, len(violations),
+            "expected 3 attachment + 1 work_item rows left dangling")
+        self.assertEqual(
+            {"attachment", "work_item"}, {r[0] for r in violations})
+
+    def test_the_gate_aborts_a_rebuild_that_would_orphan_children(self):
+        with self.assertRaises(RuntimeError) as ctx:
+            db.migrate_to_v2(self.conn, script=CARELESS_REBUILD)
+        self.assertIn("orphan", str(ctx.exception))
+
+    def test_an_aborted_rebuild_leaves_a_whole_usable_v1_database(self):
+        with self.assertRaises(RuntimeError):
+            db.migrate_to_v2(self.conn, script=CARELESS_REBUILD)
+
+        self.assertEqual(1, db.schema_version(self.conn))
+        self.assertEqual(1, self.count("schedule_item"))
+        self.assertEqual(3, self.count("attachment"))
+        self.assertEqual(1, self.count("work_item"))
+        self.assertNotIn("schedule_item_v2", db.table_names(self.conn))
+        self.assertEqual(
+            [], self.conn.execute("PRAGMA foreign_key_check").fetchall())
+        self.assertEqual(
+            1, self.conn.execute("PRAGMA foreign_keys").fetchone()[0])
+
+    def test_the_gate_also_catches_an_orphan_that_was_already_in_v1(self):
+        """A v1 file whose FK pragma was off at some point carries bad rows.
+        The migration must refuse to promote them into v2, not launder them."""
+        loose = db.connect(self.path, foreign_keys=False)
+        self.addCleanup(loose.close)
+        loose.execute(
+            "INSERT INTO attachment (kind, display_name, target,"
+            " schedule_item_id) VALUES ('file','고아','D:/o',9999)")
+
+        with self.assertRaises(RuntimeError) as ctx:
+            db.migrate_to_v2(self.conn)
+        self.assertIn("orphan", str(ctx.exception))
+        self.assertEqual(1, db.schema_version(self.conn))
+        self.assertNotIn("attachment_v2", db.table_names(self.conn))
 
 
 # ------------------------------------------------------- rollback / orphans

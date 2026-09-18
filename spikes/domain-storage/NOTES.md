@@ -19,7 +19,7 @@ python3 demo_backup.py    # C6 backup 주장을 숫자로 출력
 **실제 실행 결과 (측정값, 추정 아님):**
 
 ```
-Ran 66 tests in 0.675s
+Ran 78 tests in 0.875s
 OK
 ```
 
@@ -28,13 +28,23 @@ OK
 | C1 minimum domain | 4 | **PASS** |
 | C2 participation semantics | 15 | **PASS** |
 | C3 relations | 11 | **PASS** |
-| C4 undo vs audit | 8 | **PASS** |
+| C4 undo vs audit | 16 | **PASS** |
 | C5 attachment metadata | 6 | **PASS** |
-| C6 SQLite integrity | 22 | **PASS** |
-| 합계 | **66** | **66 passed / 0 failed** |
+| C6 SQLite integrity | 26 | **PASS** |
+| 합계 | **78** | **78 passed / 0 failed** |
 
 실행 중 발견되어 고친 실패는 1건이며, 테스트 코드 자체의 버그였다
 (`sqlite3.Row` 를 tuple 과 비교). acceptance 조건은 바꾸지 않았다.
+
+### 독립 검증에서 지적되어 고친 것 (2건, 둘 다 구현을 고쳤다)
+
+| # | 지적 | 조치 |
+|---|---|---|
+| V-1 | `delete` 의 undo 가 **ON DELETE CASCADE 로 함께 지워진 자식 row 를 전부 잃었다.** 그런데 delete-undo 테스트가 자식 없는 `vendor` 뿐이어서 suite 는 초록이었다. MUST 11 위반이고, 아래 §5 의 "delete 의 undo 도 검증했다" 는 서술이 실제보다 강했다. | `audit_event.cascade_json` 을 추가하고, `delete()` 가 지워질 자식·끊길 링크를 **먼저** 기록한 뒤 지우며, `undo()` 가 그것을 되살린다. 2단계 깊이 + 형제 4개 테이블 + `ON DELETE SET NULL` 까지 테스트했다. |
+| V-2 | migration 의 `foreign_key_check` 게이트가 **한 번도 실행되지 않는 죽은 코드**였다. `violations = []` 로 바꿔도 66개가 전부 통과했고, `raise RuntimeError("migration would orphan rows")` 는 line coverage 상 도달 0회였다. 즉 "orphan 방지 PASS" 는 **주장이지 시연이 아니었다.** | 실제로 자식을 고아로 만드는 재구축 스크립트(`tests/careless_rebuild.sql`)를 같은 migration 절차에 태워 게이트가 **실제로 발동**하게 했다. 그 줄은 이제 실행 3회다. |
+
+두 지적 모두 **테스트를 약화시키지 않고** 구현 쪽을 고쳐서 해결했다.
+확인 방법은 mutation: 고친 코드를 다시 무력화하면 suite 가 **실패한다** (§10).
 
 ### 런타임 선택: python3 sqlite3 (node:sqlite 아님)
 
@@ -64,7 +74,8 @@ npm 의존성이 0 이고, 어떤 UI framework 와도 묶이지 않는다 (요�
 | `harness/participation.py` | 참가계획 해석 (순수 read, 쓰기 없음) |
 | `harness/audit.py` | 감사 기록이 붙은 write path + undo |
 | `harness/snapshot.py` | Online Backup / restore / naive copy 반례 |
-| `tests/test_c1..c6*.py` | 66개 테스트 |
+| `tests/test_c1..c6*.py` | 78개 테스트 |
+| `tests/careless_rebuild.sql` | **테스트 픽스처.** 일부러 자식을 고아로 만드는 재구축 — migration 의 `foreign_key_check` 게이트를 실제로 발동시키는 데만 쓴다. 제품 경로가 아니다 |
 | `demo_backup.py` | C6 주장을 숫자로 재현 |
 
 ---
@@ -164,6 +175,32 @@ BEGIN SELECT RAISE(ABORT, 'audit_event is append-only: DELETE rejected'); END;
   이력이 cascade 로 따라 지워지지 않는다 (`test_history_survives_deleting_the_entity`).
 - create 의 undo, delete 의 undo 도 각각 검증했다.
 
+### delete 는 "지목한 row" 가 전부가 아니다 (V-1)
+
+DB 는 `ON DELETE CASCADE` 로 자손을, `ON DELETE SET NULL` 로 참조를 **조용히**
+같이 처리한다. `before_json` 에 지목한 row 만 담으면 그 자식들은 이력에
+남지도 않고 undo 로 돌아오지도 않는다. undo 라고 적힌 버튼 뒤의 **단방향 데이터
+손실**이다. 그래서:
+
+- `delete()` 는 지우기 **전에** `PRAGMA foreign_key_list` 로 사라질 것들을 걸어서
+  `audit_event.cascade_json` 에 적는다. 스키마 파일을 파싱하지 않고 **살아있는
+  DB** 를 읽으므로 schema 와 어긋날 수 없다.
+- `undo()` 는 부모를 넣은 뒤 그것들을 되살린다. FK 가 ON 인 상태라 부모가 먼저
+  들어가야 하고, 발견 순서가 이미 그 순서다 (retry loop 가 보강한다).
+- `RESTRICT` / `NO ACTION` 자식은 기록하지 않는다. DB 가 delete 자체를 거부하므로
+  잃는 것이 없다.
+
+검증된 것:
+
+- plan 삭제 → 예외 2건이 사라지고, undo 후 **필드 단위로 동일하게** 돌아온다.
+- event 삭제 → `plan → exception` 2단계 + `attachment` · `dday_pin` · `reminder`
+  까지 6개 테이블이 통째로 사라지고, undo 후 전부 동일하게 복구되며
+  `foreign_key_check` 가 빈 결과다.
+- `work_item.schedule_item_id` 가 `SET NULL` 로 끊긴 링크도 undo 가 되돌린다.
+- undo 전이라도 **delete audit row 자체가** 잃어버린 자식들을 담고 있다
+  (`cascade_json`). 자식이 없으면 `NULL` 이라 잡음이 되지 않는다.
+- undo-of-create 의 delete 역시 같은 방식으로 기록된다.
+
 ## 6. C5 — 첨부는 메타데이터만 · PASS
 
 `kind IN ('file','folder','archive','link')` — v2 에서 CHECK 로 닫힌 집합이 된다.
@@ -184,14 +221,20 @@ BEGIN SELECT RAISE(ABORT, 'audit_event is append-only: DELETE rejected'); END;
 | foreign_keys ON + 위반이 실제로 거부됨 | PASS | 위반 INSERT 가 `IntegrityError`. 추가로 pragma OFF 인 연결에서는 **같은 INSERT 가 통과**하고 `foreign_key_check` 가 1건을 보고함 → 거부가 pragma 때문임을 증명 |
 | v1 → v2 migration 시뮬레이션 | PASS | 아래 |
 | transaction rollback | PASS | 명시적 ROLLBACK, 그리고 트랜잭션 중간 FK 실패 후 ROLLBACK — 둘 다 아무것도 남기지 않음 |
-| orphan 방지 | PASS | plan 삭제 → 예외 cascade 삭제; 연결된 event 삭제는 RESTRICT 로 거부; 모든 조작 후 `PRAGMA foreign_key_check` 가 빈 결과 |
+| orphan 방지 | PASS | plan 삭제 → 예외 cascade 삭제; 연결된 event 삭제는 RESTRICT 로 거부; 모든 조작 후 `PRAGMA foreign_key_check` 가 빈 결과. 추가로 **고아를 실제로 만드는 재구축**을 migration 에 태워 `foreign_key_check` 게이트가 발동하고 ROLLBACK 되는 것까지 확인 (아래) |
 | backup / restore 일관성 | PASS | 아래 |
 
 ### migration v1 → v2
 
 v2 는 **기술적 조임만** 한다: `attachment.kind` 에 CHECK 를 추가하고 인덱스 3개를
-만든다. SQLite 는 ALTER TABLE 로 CHECK 를 못 붙이므로 테이블 재구축이 필요하고,
-재구축은 바로 자식 row 가 조용히 고아가 되는 지점이다. 그래서 이걸 골랐다.
+만든다. SQLite 는 ALTER TABLE 로 CHECK 를 못 붙이므로 테이블 재구축이 필요하다.
+
+**정확히 해 둔다 (V-1/V-2 교정):** 재구축이 자식을 고아로 만드는 것은 재구축
+일반의 위험이지, `v2.sql` 자체의 위험이 아니다. `v2.sql` 이 재구축하는
+`attachment` 를 참조하는 테이블은 **하나도 없으므로** `v2.sql` 은 고아를 만들
+수 없다. 이전 판의 NOTES 는 이 구분 없이 "재구축은 고아가 되는 지점이라서 이걸
+골랐다" 고만 적었고, 그래서 `foreign_key_check` 게이트가 한 번도 실행되지 않는
+죽은 코드라는 사실이 가려져 있었다.
 
 절차는 문서화된 순서 그대로다:
 `PRAGMA foreign_keys=OFF` → `BEGIN` → rebuild → `PRAGMA foreign_key_check` →
@@ -204,7 +247,32 @@ v2 는 **기술적 조임만** 한다: `attachment.kind` 에 CHECK 를 추가하
 - **v2 가 거부할 데이터가 v1 에 있으면 migration 이 시끄럽게 중단된다.**
   row 를 버리지 않는다. ROLLBACK 후 DB 는 멀쩡한 v1 로 남고
   `attachment_v2` 잔해도 남지 않으며 `foreign_keys` 는 ON 으로 복구된다.
+  (이 경로는 INSERT 중의 CHECK 위반으로 발동한다. FK 게이트가 아니다.)
 - 두 번 실행하면 거부된다.
+
+### foreign_key_check 게이트를 실제로 발동시킨다 (V-2)
+
+재구축은 `PRAGMA foreign_keys = OFF` 로 돌아간다. 그래서 **DB 는 자식을 끊어놓는
+재구축을 막아주지 않는다.** 아무 에러 없이 커밋된다. 트랜잭션 안의
+`PRAGMA foreign_key_check` 가 유일한 방어선이다.
+
+그 방어선이 진짜로 동작하는지 보려면 **진짜로 고아를 만드는 재구축**이 필요하다.
+`tests/careless_rebuild.sql` 이 그것이다 — 제품 경로가 아니라 **테스트 픽스처**이며,
+`attachment` · `work_item` · `reminder` 가 참조하는 `schedule_item` 을 재구축하면서
+복사 단계의 필터를 잘못 써서 부모 row 를 하나 흘린다 (이 버그의 전형적인 모양).
+같은 `migrate_to_v2()` 절차에 그대로 태운다.
+
+- `test_the_careless_rebuild_really_does_orphan_rows_when_unguarded` — 전제 확인.
+  게이트 없이 돌리면 **SQLite 는 아무것도 raise 하지 않고**, 자식 4건
+  (`attachment` 3 + `work_item` 1) 이 그대로 매달린 채 남는다.
+- `test_the_gate_aborts_a_rebuild_that_would_orphan_children` — 게이트가 잡는다.
+- `test_an_aborted_rebuild_leaves_a_whole_usable_v1_database` — ROLLBACK 후 v1 이
+  온전하고 `schedule_item_v2` 잔해도 없다.
+- `test_the_gate_also_catches_an_orphan_that_was_already_in_v1` — pragma 가 꺼진
+  연결이 남긴 기존 고아도 v2 로 세탁되지 않고 거부된다.
+
+`harness/db.py` 의 `raise RuntimeError("migration would orphan rows")` 는
+trace 기반 line coverage 상 **실행 0회 → 3회** 가 되었다.
 
 `harness/db.py` 는 `executescript()` 를 쓰지 않는다. `executescript()` 는 실행 전에
 pending transaction 을 **COMMIT** 해버려서 migration 의 명시적 트랜잭션을 조용히
@@ -272,3 +340,31 @@ digest 가 live 와 일치한다. 추가로:
 - **시간대 / DST — NOT APPLICABLE (이번 범위에서).** 날짜는 지역 날짜 TEXT 로만 다뤘고
   시각 연산을 하지 않았다. 알림(`reminder.remind_at`) 이 실제 시각 연산을 하게 되면
   그때 다뤄야 한다.
+- **`harness/audit.py` 의 방어 분기 — NOT TESTED.** 아래 줄들은 현재 스키마에
+  해당 조건 자체가 없어서 한 번도 실행되지 않는다. PASS 가 아니라 미실행이다.
+  - 복합(composite) FK 를 만나면 `NotImplementedError` — 현재 복합 FK 가 없다.
+    부분만 기록하고 조용히 넘어가는 대신 시끄럽게 멈추도록 해 두었다.
+  - `ON DELETE SET DEFAULT` 를 만나면 `NotImplementedError` — 현재 없다.
+  - 단일 컬럼 PK 가 없는 테이블에서의 `RuntimeError` — 현재 12개 테이블 전부
+    `INTEGER PRIMARY KEY` 다.
+  - `_restore_fallout()` 의 "진전 없음" `RuntimeError` (자식 복구 순서를 끝내
+    못 푸는 경우) — 현재 스키마의 FK 그래프는 트리라서 도달하지 않는다.
+  - `update`/`delete`/`undo` 의 "그런 row 없음" `LookupError` 세 개.
+- **undo 의 자식 복구가 다중 부모(diamond) FK 그래프에서도 성립하는가 — NOT TESTED.**
+  retry loop 는 그 경우를 염두에 두고 썼지만, 현재 스키마에 그런 구조가 없어
+  실제로 측정하지는 못했다.
+
+---
+
+## 10. mutation 확인 — 이 suite 가 실제로 무는지
+
+"통과했다" 와 "무는다" 는 다르다. 고친 두 지점을 다시 무력화해서 확인했다.
+아래는 실제 실행 결과다.
+
+| 무력화한 것 | 결과 |
+|---|---|
+| `undo()` 의 `_restore_fallout(conn, a["cascade_json"])` 제거 | **FAILED (failures=3)** |
+| `migrate_to_v2()` 의 `violations = conn.execute("PRAGMA foreign_key_check").fetchall()` → `violations = []` | **FAILED (failures=3)** |
+| (교정 전 기준선) 같은 게이트 무력화 | 66 tests **OK** — 게이트가 죽은 코드였다는 증거 |
+
+두 무력화 모두 원복한 뒤 78 tests **OK** 로 돌아온다.
