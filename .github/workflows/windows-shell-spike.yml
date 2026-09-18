@@ -2,14 +2,19 @@ name: Windows Shell Spike
 
 # Spike A 를 실제 Windows 에서 build / probe 한다.
 #
-# 이 러너에서 할 수 있는 것: 빌드, .exe 산출 확인, 프로세스 기동 smoke test, 환경 수집.
-# 이 러너에서 할 수 없는 것: GUI 상호작용 전부 — Z-order, focus, click-through, 전역 단축키,
-#   drag, 다중 모니터, DPI 변경. GitHub 러너에는 사람이 쓰는 대화형 데스크톱 세션이 없다.
-#   그런 항목은 FAIL 이 아니라 NOT TESTED 로 남긴다. 미검증을 PASS 로 올리지 않는다.
+# 이 러너에서 할 수 있는 것: 빌드, .exe 산출 확인, **exe 안의 RT_MANIFEST 리소스 검사**,
+#   **대화형 데스크톱 없이 확인 가능한 Win32 primitive probe** (양쪽 프로토타입), 프로세스 기동
+#   smoke test, 환경 수집.
+# 이 러너에서 할 수 없는 것: 사람이 봐야 하는 GUI 상호작용 전부 — 실제 click-through, focus 탈취,
+#   Win+D, 잠금/절전, 모니터 물리적 분리/재연결, DPI 배율 변경, 전역 단축키의 실제 발화, drag.
+#   GitHub 러너에는 사람이 쓰는 대화형 데스크톱 세션이 없다.
+#   그런 항목은 FAIL 이 아니라 NOT TESTED 로 남긴다. **미검증을 PASS 로 올리지 않는다.**
 
 on:
   push:
-    branches: [reboot/workdashboard-v1]
+    branches:
+      - reboot/workdashboard-v1
+      - 'spike/**'
     paths:
       - 'spikes/shell/**'
       - '.github/workflows/windows-shell-spike.yml'
@@ -66,22 +71,61 @@ jobs:
         id: exe
         working-directory: spikes/shell/tauri/src-tauri
         run: |
-          $exe = Get-ChildItem target\release -Filter '*.exe' -File -ErrorAction SilentlyContinue |
-                 Where-Object { $_.Name -notlike '*build-script*' } |
-                 Select-Object -First 1
-          if (-not $exe) {
-            Write-Host '::error::release 빌드에서 .exe 가 나오지 않았다.'
+          # 이름으로 명시 선택한다. 이 패키지는 bin 이 둘이다 —
+          #   spike-shell-tauri.exe : 프로토타입 (GUI subsystem)
+          #   win32-probe.exe       : 헤드리스 Win32 probe (console subsystem)
+          $app = Join-Path (Get-Location) 'target\release\spike-shell-tauri.exe'
+          $probe = Join-Path (Get-Location) 'target\release\win32-probe.exe'
+          $missing = @()
+          foreach ($p in @($app, $probe)) {
+            if (Test-Path -LiteralPath $p) {
+              Write-Host ("exe: {0}  ({1} bytes)" -f $p, (Get-Item -LiteralPath $p).Length)
+            } else {
+              $missing += $p
+            }
+          }
+          if ($missing.Count -gt 0) {
+            Write-Host ('::error::release 빌드에서 다음 .exe 가 나오지 않았다: ' + ($missing -join ', '))
             Get-ChildItem target\release -File | Select-Object Name, Length | Format-Table
             exit 1
           }
-          Write-Host "exe: $($exe.FullName)  ($($exe.Length) bytes)"
-          "path=$($exe.FullName)" >> $env:GITHUB_OUTPUT
+          "app=$app"     >> $env:GITHUB_OUTPUT
+          "probe=$probe" >> $env:GITHUB_OUTPUT
+
+      - name: RT_MANIFEST 리소스 검사 — 앱 exe (GATE)
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          # 파일 존재 확인이 아니다. exe 안의 RT_MANIFEST 리소스를 실제로 읽어서 검사한다.
+          & .\spikes\shell\scripts\inspect-exe-manifest.ps1 `
+              -ExePath '${{ steps.exe.outputs.app }}' `
+              -Label 'Tauri app (spike-shell-tauri.exe)' `
+              -Require 'Microsoft.Windows.Common-Controls','6.0.0.0','PerMonitorV2','true/pm','asInvoker' `
+              -OutFile artifacts\tauri-manifest.md
+
+      - name: RT_MANIFEST 리소스 검사 — probe exe (GATE)
+        run: |
+          # probe 도 같은 매니페스트를 가져야 한다. 그래야 probe 가 측정하는 comctl32 v6
+          # activation context 가 앱의 activation context 와 같다고 말할 수 있다.
+          & .\spikes\shell\scripts\inspect-exe-manifest.ps1 `
+              -ExePath '${{ steps.exe.outputs.probe }}' `
+              -Label 'Tauri probe (win32-probe.exe)' `
+              -Require 'Microsoft.Windows.Common-Controls','6.0.0.0','PerMonitorV2','true/pm' `
+              -OutFile artifacts\tauri-probe-manifest.md
+
+      - name: Win32 probe (GATE) — 대화형 데스크톱 없이 확인 가능한 primitive
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          & '${{ steps.exe.outputs.probe }}' --out artifacts\tauri-win32-probe.md
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error::Tauri/Win32 probe 에서 실제 실패가 나왔다.'
+            exit $LASTEXITCODE
+          }
 
       - name: 기동 smoke test — 5초 내 즉시 종료하지 않는가
         id: smoke
         continue-on-error: true
         run: |
-          $exe = '${{ steps.exe.outputs.path }}'
+          $exe = '${{ steps.exe.outputs.app }}'
           $log = 'artifacts\tauri-smoke.txt'
           New-Item -ItemType Directory -Force -Path artifacts | Out-Null
           $p = Start-Process -FilePath $exe -PassThru -ErrorAction Stop
@@ -101,7 +145,7 @@ jobs:
         continue-on-error: true
         run: |
           $out = 'artifacts\tauri-stability.md'
-          $exe = '${{ steps.exe.outputs.path }}'
+          $exe = '${{ steps.exe.outputs.app }}'
           $p = $null
           $ErrorActionPreference = 'Stop'
           try {
@@ -142,7 +186,8 @@ jobs:
           name: tauri-windows
           path: |
             artifacts/**
-            spikes/shell/tauri/src-tauri/target/release/*.exe
+            spikes/shell/tauri/src-tauri/target/release/spike-shell-tauri.exe
+            spikes/shell/tauri/src-tauri/target/release/win32-probe.exe
           if-no-files-found: warn
           retention-days: 7
 
@@ -181,6 +226,55 @@ jobs:
           }
           Write-Host "exe: $($exe.FullName)  ($($exe.Length) bytes)"
           "path=$($exe.FullName)" >> $env:GITHUB_OUTPUT
+
+      - name: RT_MANIFEST 리소스 검사 — ShellSpike.exe (GATE)
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          # WPF 프로토타입의 app.manifest 는 DPI 만 선언한다 (comctl32 v6 미선언 —
+          # WPF 는 SetWindowSubclass 대신 HwndSource.AddHook 을 쓴다). 기존 조건을 바꾸지 않기
+          # 위해 요구 항목도 DPI 두 줄로 둔다.
+          & .\spikes\shell\scripts\inspect-exe-manifest.ps1 `
+              -ExePath '${{ steps.exe.outputs.path }}' `
+              -Label 'WPF app (ShellSpike.exe)' `
+              -Require 'PerMonitorV2','true/pm' `
+              -OutFile artifacts\wpf-manifest.md
+
+      - name: Win32 probe build (GATE)
+        working-directory: spikes/shell/wpf-probe
+        run: dotnet build -c Release -r win-x64 --self-contained false
+
+      - name: Win32Probe.exe 확인 (GATE)
+        id: probe
+        working-directory: spikes/shell/wpf-probe
+        run: |
+          $exe = Get-ChildItem bin\Release -Recurse -Filter 'Win32Probe.exe' -File -ErrorAction SilentlyContinue |
+                 Select-Object -First 1
+          if (-not $exe) {
+            Write-Host '::error::Win32Probe.exe 가 나오지 않았다.'
+            Get-ChildItem bin\Release -Recurse -File | Select-Object FullName, Length | Format-Table
+            exit 1
+          }
+          Write-Host "exe: $($exe.FullName)  ($($exe.Length) bytes)"
+          "path=$($exe.FullName)" >> $env:GITHUB_OUTPUT
+
+      - name: RT_MANIFEST 리소스 검사 — Win32Probe.exe (GATE)
+        run: |
+          # probe 쪽은 comctl32 v6 를 직접 선언한다. SetWindowSubclass 를 그 activation
+          # context 안에서 측정하기 위한 것이고, 프로토타입의 app.manifest 는 건드리지 않았다.
+          & .\spikes\shell\scripts\inspect-exe-manifest.ps1 `
+              -ExePath '${{ steps.probe.outputs.path }}' `
+              -Label 'WPF probe (Win32Probe.exe)' `
+              -Require 'Microsoft.Windows.Common-Controls','6.0.0.0','PerMonitorV2','true/pm','asInvoker' `
+              -OutFile artifacts\wpf-probe-manifest.md
+
+      - name: Win32 probe (GATE) — 대화형 데스크톱 없이 확인 가능한 primitive
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          & '${{ steps.probe.outputs.path }}' --out artifacts\wpf-win32-probe.md
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error::WPF/Win32 probe 에서 실제 실패가 나왔다.'
+            exit $LASTEXITCODE
+          }
 
       - name: 기동 smoke test — 5초 내 즉시 종료하지 않는가
         id: smoke
@@ -248,5 +342,6 @@ jobs:
           path: |
             artifacts/**
             spikes/shell/wpf/bin/Release/**/ShellSpike.exe
+            spikes/shell/wpf-probe/bin/Release/**/Win32Probe.exe
           if-no-files-found: warn
           retention-days: 7

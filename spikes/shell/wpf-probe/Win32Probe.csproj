@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Spike A - WPF/.NET side of the headless Win32 primitive probe.
+
+    It deliberately lives OUTSIDE spikes/shell/wpf/: ShellSpike.csproj globs **/*.cs under its
+    own directory, so a probe nested in there would be compiled into the prototype and collide
+    with its entry point.
+
+    It is a CONSOLE exe (no WinExe, no windows subsystem) because CI reads its stdout, but
+    UseWPF is on: the prototype hooks its window through HwndSource.AddHook
+    (wpf/MainWindow.xaml.cs), so the probe has to be able to do the same thing.
+
+    The prototype's real interop files are compiled IN, not copied. That is the point of the
+    exercise: it is the shipped P/Invoke declarations whose binding gets proved, not a
+    second set written for the test.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <!-- Required to build a net8.0-windows project on a non-Windows host. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>12.0</LangVersion>
+    <AssemblyName>Win32Probe</AssemblyName>
+    <RootNamespace>ShellSpike.Probe</RootNamespace>
+    <Platforms>AnyCPU</Platforms>
+    <!-- Same declarations the prototypes make. comctl32 v6 is what SetWindowSubclass is
+         documented against, so the probe must run inside that activation context. -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- A console app inside an STA Main; the analyzer warning about Main's attribute is not
+         applicable here. -->
+    <NoWarn>$(NoWarn)</NoWarn>
+  </PropertyGroup>
+
+  <!-- The prototype's shipped interop + the experiment's byte-contract writer. -->
+  <ItemGroup>
+    <Compile Include="..\wpf\Interop\NativeMethods.cs" Link="Shared\NativeMethods.cs" />
+    <Compile Include="..\wpf\Interop\MonitorNativeMethods.cs" Link="Shared\MonitorNativeMethods.cs" />
+    <Compile Include="..\wpf\Experimental\MonitorNormalizedPlacementStore.cs" Link="Shared\MonitorNormalizedPlacementStore.cs" />
+  </ItemGroup>
+
+  <!-- No PackageReference, matching ShellSpike.csproj. -->
+
+</Project>

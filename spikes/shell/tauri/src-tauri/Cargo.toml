@@ -32,6 +32,10 @@ windows = { version = "=0.61.3", features = [
   "Win32_Graphics_Gdi",
   #   GetDpiForMonitor / GetDpiForWindow
   "Win32_UI_HiDpi",
+  # added for the headless Win32 probe (src/win32_probe.rs):
+  #   GetModuleHandleW / GetModuleFileNameW, used to create the hidden probe window and to
+  #   report which comctl32 the activation context actually resolved to
+  "Win32_System_LibraryLoader",
 ] }
 
 [profile.release]

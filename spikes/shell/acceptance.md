@@ -191,3 +191,183 @@ Windows 실측 때 어느 행으로 편입할지는 orchestrator 가 정한다.
 | `scripts/*.ps1` | 환경 수집 · 자원 측정 · 반복 안정성 · 스크린샷 | Windows 에서 실행된 적 없음 |
 
 B~F 의 판정은 하나도 바뀌지 않았다. 전부 `NOT TESTED` 그대로다.
+
+---
+
+## G. CI 자동화된 Win32 primitive probe (추가 절)
+
+이 절은 **새로 추가된 행만** 담는다. A~F 의 기존 조건·판정은 하나도 바꾸지 않았다.
+B~F 는 전부 `NOT TESTED` 그대로다.
+
+> **지금 이 시점의 판정.**
+> 아래 probe 는 `windows-latest` 에서 자동 실행되도록 CI 에 배선했지만,
+> **이 컨테이너(headless Ubuntu)에서는 실행되지 않았다.** 따라서 G 절의 Windows 측 판정은
+> 현재 전부 `NOT TESTED` 다. CI 가 1회 돌아간 뒤 artifact 의 실측값으로 채운다.
+> **배선했다는 사실을 `PASS` 로 올리지 않는다.**
+
+검증 위치:
+
+| 무엇 | 어디 | CI step |
+|---|---|---|
+| Tauri probe | `tauri/src-tauri/src/win32_probe.rs` + `src/bin/win32-probe.rs` | `Win32 probe (GATE)` — tauri-windows |
+| WPF probe | `wpf-probe/` (`Win32Probe.exe`) | `Win32 probe (GATE)` — wpf-windows |
+| 매니페스트 리소스 검사 | `scripts/inspect-exe-manifest.ps1` | `RT_MANIFEST 리소스 검사 (GATE)` ×4 |
+
+probe 는 실패 시 exit 1 이고 step 에 `continue-on-error` 가 없으므로 **job 을 실패시킨다.**
+
+---
+
+### G1. Application manifest (embedding)
+
+| # | 항목 | Tauri | WPF | 방식 | 근거 |
+|---|---|---|---|---|---|
+| G1-1 | 명시적 manifest 파일 존재 | `PASS` | `PASS` | Automated | Tauri: `tauri/src-tauri/windows-app-manifest.xml` 신규, `build.rs` 가 `tauri_build::WindowsAttributes::app_manifest` 로 배선. WPF: 기존 `wpf/app.manifest`. 양쪽 XML well-formed 를 이 컨테이너에서 파싱 확인 |
+| G1-2 | `.rc` 에 `1 24 { … }` (RT_MANIFEST) 로 들어간다 | `PASS` | `NOT APPLICABLE` | Automated | Tauri: 생성된 `target/.../out/resource.rc` 에 `1 24` 블록과 manifest 본문이 실제로 들어간 것을 확인. WPF 는 .rc 를 쓰지 않는다(SDK 가 apphost 에 직접 기록) |
+| G1-3 | **exe 안의 RT_MANIFEST 리소스를 읽어** 선언을 검사 | `NOT TESTED` | `NOT TESTED` | Automated (CI) | `inspect-exe-manifest.ps1` 이 `FindResource`/`LoadResource`/`LockResource` 로 리소스를 꺼내 검사한다. **이 컨테이너에는 rc.exe 도 Windows 로더도 없어 실행 못 했다** |
+| G1-4 | `Microsoft.Windows.Common-Controls` 6.0.0.0 선언 | `NOT TESTED` | `NOT APPLICABLE` | Automated (CI) | Tauri 는 요구 항목에 포함. WPF 프로토타입은 `SetWindowSubclass` 대신 `HwndSource.AddHook` 을 쓰므로 comctl32 v6 를 요구하지 않는다 — **기존 조건을 바꾸지 않기 위해 `wpf/app.manifest` 는 손대지 않았다** (아래 OPEN 참조) |
+| G1-5 | `dpiAwareness = PerMonitorV2` + `dpiAware = true/pm` | `NOT TESTED` | `NOT TESTED` | Automated (CI) | 양쪽 exe 모두 CI 에서 리소스 검사 대상 |
+| G1-6 | 내장된 manifest 가 well-formed XML | `NOT TESTED` | `NOT TESTED` | Automated (CI) | 파싱 불가 manifest 는 프로세스가 `0xC0000020` 으로 안 뜨게 만든다. smoke test 만으로는 원인을 알 수 없어 별도로 검사한다 |
+| G1-7 | probe exe 도 같은 manifest 를 갖는다 | `NOT TESTED` | `NOT TESTED` | Automated (CI) | probe 가 측정하는 activation context 가 앱의 것과 같다는 근거. Tauri 는 `rustc-link-arg-bins` 로 패키지의 모든 bin 에 같은 리소스가 들어간다, WPF probe 는 자기 `app.manifest` 를 갖는다 |
+
+**G1-note.** E 절 "정적으로 확인된 차이" 의 *"Tauri 프로젝트에는 `app.manifest` 가 없다.
+`tauri-build` 기본값에 의존한다"* 는 이 작업으로 **더 이상 사실이 아니다.**
+원문은 당시 측정 기록이므로 고치지 않고 이 note 로 대체한다.
+`tauri-build` 기본 manifest 는 comctl32 v6 만 선언하고 DPI 는 전혀 선언하지 않는다는 점은
+이 컨테이너에서 `tauri-build 2.6.3` 소스로 확인했다.
+
+---
+
+### G2. Headless Win32 primitive probe — Tauri / Rust
+
+`tauri/src-tauri/src/win32_probe.rs`. 각 항목은 probe 의 check 이름 그대로다.
+
+| # | check | 결과 | 무엇을 증명하나 |
+|---|---|---|---|
+| G2-1 | `process.module_handle` | `NOT TESTED` | `GetModuleHandleW` |
+| G2-2 | `hwnd.register_class` | `NOT TESTED` | `RegisterClassExW` |
+| G2-3 | `hwnd.create_hidden_toplevel` | `NOT TESTED` | 보이지 않는 top-level HWND 생성 (`WS_POPUP`, `WS_VISIBLE` 없음) |
+| G2-4 | `subclass.attach` | `NOT TESTED` | `SetWindowSubclass` 성공 |
+| G2-5 | `subclass.callback_invoked` | `NOT TESTED` | **콜백이 실제로 불린다** — 전용 `WM_APP+0x51` 을 보내고 카운터가 1 이 되는지 본다 |
+| G2-6 | `subclass.callback_repeats` | `NOT TESTED` | 3회 → 카운터 3. 1회성 훅이 아니다 |
+| G2-7 | `subclass.remove` | `NOT TESTED` | `RemoveWindowSubclass` 성공 |
+| G2-8 | `subclass.remove_stops_callback` | `NOT TESTED` | 제거 후 카운터가 **증가하지 않는다** (훅 누수 검출) |
+| G2-9 | `win_shell.attach` | `NOT TESTED` | 프로토타입이 실제로 싣는 `win_shell::attach` 가 같은 HWND 에서 성공 |
+| G2-10 | `win_shell.detach` | `NOT TESTED` | 같은 코드의 detach + `is_attached()` 복귀 |
+| G2-11 | `exstyle.set_and_read_back` | `NOT TESTED` | `SetWindowLongPtrW(GWL_EXSTYLE)` — 비트가 **없었다는 것까지** 확인한 뒤 set, read back |
+| G2-12 | `exstyle.restore` | `NOT TESTED` | 원래 값으로 복원 |
+| G2-13 | `zorder.setwindowpos_hwnd_bottom` | `NOT TESTED` | `SetWindowPos(HWND_BOTTOM, SWP_NOACTIVATE)` 호출 성공 |
+| G2-14 | `hwnd.get_window_rect` | `NOT TESTED` | `GetWindowRect` |
+| G2-15 | `monitor.enumerate` | `NOT TESTED` | `EnumDisplayMonitors` + 모니터 개수 |
+| G2-16 | `monitor.get_monitor_info` | `NOT TESTED` | `GetMonitorInfoW` 의 `rcWork` 가 유효 |
+| G2-17 | `dpi.get_dpi_for_window` | `NOT TESTED` | `GetDpiForWindow` 가 0 이 아니다 |
+| G2-18 | `placement.capture` | `NOT TESTED` | `monitor_placement::capture` 가 실제 geometry 에서 0..1 정규값을 낸다 |
+| G2-19 | `placement.resolve_on_monitor` | `NOT TESTED` | `resolve` 가 monitorId 로 같은 모니터를 다시 찾고, 결과가 `rcWork` 안에 완전히 들어간다 |
+| G2-20 | `placement.unknown_monitor_falls_back` | `NOT TESTED` | 없는 monitorId → 주 모니터 fallback, 그래도 화면 안 |
+| G2-21 | `hwnd.destroy` / `hwnd.unregister_class` | `NOT TESTED` | teardown 누수 없음 |
+| G2-22 | `zorder.observed_behind_other_app` | `NOT TESTED` | probe 가 **시도하지 않는다.** 대화형 데스크톱 필요 (B5 · C1~C4) |
+| G2-23 | `placement.physical_monitor_hotplug` | `NOT TESTED` | probe 가 **시도하지 않는다.** 물리적 분리 필요 (E8) |
+
+Linux 에서 검증한 것 (실측):
+
+- `cargo check --target x86_64-pc-windows-msvc --all-targets` → exit 0. `#[cfg(windows)]` 본문이
+  실제로 타입검사된다는 것을 일부러 깨뜨려 확인했다(고의 오류 → error 2건 → 복구).
+- `cargo test --lib` → **13 passed / 0 failed** (기존 6 + probe 산술 7).
+- `cargo run --bin win32-probe` (Linux) → `0 PASS, 0 FAIL, 0 NOT TESTED, 24 NOT APPLICABLE`, exit 0.
+  Linux 빌드를 깨지 않는다.
+
+---
+
+### G3. Headless Win32 primitive probe — WPF / .NET
+
+`wpf-probe/` (`Win32Probe.exe`). 프로토타입의 **실제** interop 파일
+(`wpf/Interop/NativeMethods.cs`, `wpf/Interop/MonitorNativeMethods.cs`,
+`wpf/Experimental/MonitorNormalizedPlacementStore.cs`) 을 그대로 컴파일해 넣는다 —
+검증 대상이 실제로 싣는 P/Invoke 선언이어야 하므로 복제하지 않았다.
+`wpf/` 안의 파일은 **하나도 수정하지 않았다.**
+
+| # | check | 결과 | 무엇을 증명하나 |
+|---|---|---|---|
+| G3-1 | `process.module_handle` · `hwnd.register_class` · `hwnd.create_hidden_toplevel` | `NOT TESTED` | G2-1~3 과 동일 |
+| G3-2 | `subclass.attach` · `callback_invoked` · `callback_repeats` · `remove` · `remove_stops_callback` | `NOT TESTED` | comctl32 subclass 를 WPF 측에서도 도달 가능한지 (G2-4~8 과 동일 기준) |
+| G3-3 | `hwndsource.create` | `NOT TESTED` | `HwndSource` 생성 — **프로토타입이 실제로 쓰는 메커니즘** (`MainWindow.xaml.cs`) |
+| G3-4 | `hwndsource.hook_invoked` | `NOT TESTED` | `HwndSource.AddHook` 콜백이 **실제로 불린다** (카운터) |
+| G3-5 | `hwndsource.hook_removed` | `NOT TESTED` | `RemoveHook` 후 카운터 정지 |
+| G3-6 | `exstyle.set_and_read_back` · `exstyle.restore` | `NOT TESTED` | 프로토타입의 `NativeMethods.AddExStyle`/`HasExStyle`/`RemoveExStyle` 경유 |
+| G3-7 | `exstyle.setwindowlongptr_roundtrip` | `NOT TESTED` | `SetWindowLongPtrW`/`GetWindowLongPtrW` 직접 호출 roundtrip |
+| G3-8 | `zorder.setwindowpos_hwnd_bottom` | `NOT TESTED` | 프로토타입의 `NativeMethods.SetWindowPos(HWND_BOTTOM)` |
+| G3-9 | `hotkey.register` / `hotkey.unregister` | `NOT TESTED` | `RegisterHotKey`/`UnregisterHotKey` 도달 가능성. **제품 조합(`Ctrl+Alt+D`)이 아니라** 충돌 가능성이 가장 낮은 `Ctrl+Alt+Shift+Win+F24` 로 API 자체만 본다 |
+| G3-10 | `hwnd.get_window_rect` | `NOT TESTED` | 프로토타입의 `MonitorNativeMethods.GetWindowRect` |
+| G3-11 | `placement.canonical_json_matches_rust_golden` | `NOT TESTED` | **C# 쪽 byte 계약이 처음으로 실행된다.** `MonitorNormalizedPlacementStore.Serialize` 출력이 `monitor_placement.rs::canonical_json_is_byte_stable` 의 golden bytes 와 byte 단위로 같은지 |
+| G3-12 | `placement.float_rendering_matches_rust` | `NOT TESTED` | `0.0 / 1.0 / 0.5 / 0.7333 / 9e-6 / 0.00001` 이 serde_json(ryu) 과 같게 찍히는지 |
+| G3-13 | `monitor.enumerate` · `monitor.get_monitor_info` | `NOT TESTED` | G2-15~16 과 동일 |
+| G3-14 | `monitor.find_by_device_name` | `NOT TESTED` | `FindMonitorByDeviceName(szDevice)` 가 `MonitorFromWindow` 와 같은 HMONITOR 를 돌려준다. 깨져 있으면 모든 restore 가 조용히 주 모니터로 떨어진다 |
+| G3-15 | `dpi.get_dpi_for_window` · `dpi.get_dpi_for_monitor` | `NOT TESTED` | `GetDpiForWindow`, shcore `GetDpiForMonitor` |
+| G3-16 | `placement.capture` · `placement.resolve_on_monitor` · `placement.unknown_monitor_falls_back` | `NOT TESTED` | G2-18~20 과 동일 산술 (물리 픽셀 구간만. DIP 변환은 WPF `Window` 가 필요해 probe 밖) |
+| G3-17 | `hwnd.destroy` / `hwnd.unregister_class` | `NOT TESTED` | teardown |
+| G3-18 | `zorder.observed_behind_other_app` · `hotkey.actually_fires` · `placement.physical_monitor_hotplug` | `NOT TESTED` | probe 가 **시도하지 않는다.** 대화형 데스크톱 · 실제 키 입력 · 물리적 분리 필요 |
+
+Linux 에서 검증한 것 (실측):
+
+- `dotnet build -c Release` → `Build succeeded. 0 Warning(s) 0 Error(s)`.
+- `dotnet build -c Release -r win-x64 --self-contained false` →
+  `Win32Probe.exe` = `PE32+ executable (console) x86-64, for MS Windows, 6 sections`,
+  바이트 스캔으로 `Microsoft.Windows.Common-Controls` · `6.0.0.0` · `PerMonitorV2` ·
+  `true/pm` · `asInvoker` 확인.
+- **실행은 못 했다.** net8.0-windows / WPF 런타임이 Linux 에 없다 → `NOT TESTED`.
+- `wpf/` 프로토타입 재빌드 (`rm -rf bin obj` 후) → `Build succeeded`, `ShellSpike.exe` 정상 산출.
+  probe 를 별도 디렉터리에 둔 덕에 프로토타입 빌드가 영향받지 않는다는 것을 확인.
+
+---
+
+### G4. CI 배선
+
+| # | 항목 | 결과 | 근거 |
+|---|---|---|---|
+| G4-1 | windows-latest 에서 Tauri build · WPF build | `PASS` (배선) / `NOT TESTED` (실행) | 기존 두 job 유지 |
+| G4-2 | Tauri tests (`cargo test --lib`) | `PASS` (배선) / `NOT TESTED` (Windows 실행) | 기존 step. Linux 에서는 13 passed |
+| G4-3 | Tauri/Win32 probe step (GATE) | `PASS` (배선) / `NOT TESTED` (실행) | `continue-on-error` 없음 → 실패 시 job 실패 |
+| G4-4 | WPF/Win32 probe build + step (GATE) | `PASS` (배선) / `NOT TESTED` (실행) | 동일 |
+| G4-5 | RT_MANIFEST 리소스 검사 step ×4 (GATE) | `PASS` (배선) / `NOT TESTED` (실행) | 앱 exe 2개 + probe exe 2개 |
+| G4-6 | artifact 업로드 | `PASS` (배선) / `NOT TESTED` (실행) | probe report · manifest report · 양쪽 exe 추가 |
+| G4-7 | 대화형 데스크톱 항목이 PASS 로 올라가지 않는다 | `PASS` (배선) | smoke / `repeat-stability.ps1` 은 `continue-on-error` 유지, probe 는 해당 항목을 `NOT TESTED` 로만 출력한다 |
+
+`PASS (배선)` 은 **YAML/스크립트가 검증됐다**는 뜻이고 job 이 초록이었다는 뜻이 아니다.
+이 컨테이너에서 검증한 것:
+
+- `windows-shell-spike.yml` → PyYAML `safe_load` 파싱 성공, job/step 구조 출력 확인.
+- workflow 의 `run:` 블록 **20개 전부** 를 추출해 PowerShell 7.4 파서로 파싱 → 0 failures.
+- `scripts/*.ps1` 5개 전부 파싱 → 0 failures.
+- `inspect-exe-manifest.ps1` 의 C# `Add-Type` 블록이 컴파일되고, 보고서 스캐폴딩 ·
+  요구 항목 매칭 표 · 실패 시 exit 1 경로가 Linux 에서 실제로 동작하는 것을 확인
+  (Win32 호출 자체는 Linux 에서 당연히 실패 → 그 경로가 FAIL 로 보고되는 것까지 확인).
+- YAML block scalar 안에 PowerShell here-string 을 넣지 않았다. C# 인터롭은 `.ps1` 파일로
+  분리했고, 여러 줄 텍스트는 전부 배열 + `Set-Content` 다.
+
+---
+
+### G5. OPEN (구현하지 않음 — 사람이 결정할 것)
+
+1. `wpf/app.manifest` 에 `Microsoft.Windows.Common-Controls` 6.0.0.0 을 넣을지.
+   WPF 프로토타입은 `HwndSource.AddHook` 을 쓰므로 **지금은 필요하지 않다.** 다만 A~F 표가
+   두 플랫폼을 나란히 비교하므로 manifest 선언을 맞출지는 판단이 필요하다.
+   Task A1 이 Tauri 만 지정했고 기존 조건을 바꾸지 않기 위해 **건드리지 않았다.**
+2. G 절의 probe 행을 A~F 의 어느 행으로 편입할지(예: G2-4~8 을 B5 의 근거로 승격할지).
+   probe 는 **primitive 도달 가능성**만 보고, B5 가 요구하는 *동작*은 보지 않는다.
+   승격은 제품/측정 판단이므로 orchestrator 가 정한다.
+3. `hotkey.register` 가 러너에서 실패할 경우 이를 FAIL 로 둘지 `NOT TESTED` 로 내릴지.
+   현재는 GATE 다 — API 도달 불가는 실제 위험이라고 보았다.
+
+---
+
+## 부록 추가 — 이번에 들어온 코드
+
+| 코드 | 무엇 | 현재 상태 |
+|---|---|---|
+| `tauri/src-tauri/windows-app-manifest.xml` | 명시적 Windows application manifest (comctl32 v6 · PerMonitorV2 · `true/pm` · supportedOS · asInvoker) | 파일·`.rc` 배선은 확인, **exe embedding 은 `NOT TESTED`** (CI 가 확인) |
+| `tauri/src-tauri/build.rs` | `WindowsAttributes::app_manifest` 로 위 파일을 리소스에 배선 | 동일 |
+| `tauri/src-tauri/src/win32_probe.rs` | headless Win32 primitive probe (lib 모듈 + 순수 산술 unit test) | Linux: 타입검사 · 13 tests PASS. Windows 실행: `NOT TESTED` |
+| `tauri/src-tauri/src/bin/win32-probe.rs` | 위 probe 의 CI 진입점 (console bin, 앱과 같은 RT_MANIFEST) | 동일 |
+| `wpf-probe/**` | WPF 측 probe (`Win32Probe.exe`) + 자기 `app.manifest` | Linux: build PASS · exe 산출 확인. 실행: `NOT TESTED` |
+| `scripts/inspect-exe-manifest.ps1` | exe 의 RT_MANIFEST 리소스를 읽어 선언 검사 | 파서 · `Add-Type` · 실패 경로 확인. Windows 실행: `NOT TESTED` |
+
+**B~F 의 판정은 이번에도 하나도 바뀌지 않았다. 전부 `NOT TESTED` 그대로다.**

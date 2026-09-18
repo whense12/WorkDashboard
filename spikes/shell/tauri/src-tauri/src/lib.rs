@@ -8,6 +8,7 @@
 //! window's own position.
 
 pub mod monitor_placement;
+pub mod win32_probe;
 pub mod win_shell;
 
 use std::fs;

@@ -28,6 +28,9 @@ tauri/
     src/lib.rs              all shell logic
     src/win_shell.rs        Windows message-hook layer (subclass on the public HWND) + no-op stub
     src/monitor_placement.rs  EXPERIMENT: monitor-normalized placement record + Win32 monitor geometry
+    src/win32_probe.rs      headless Win32 primitive probe (see spikes/shell/acceptance.md G2)
+    src/bin/win32-probe.rs  CI entry point for that probe; console bin, same RT_MANIFEST as the app
+    windows-app-manifest.xml  explicit application manifest, embedded by build.rs (acceptance.md G1)
 ```
 
 ---
