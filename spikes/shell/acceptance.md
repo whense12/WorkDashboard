@@ -323,25 +323,47 @@ Linux 에서 검증한 것 (실측):
 
 | # | 항목 | 결과 | 근거 |
 |---|---|---|---|
-| G4-1 | windows-latest 에서 Tauri build · WPF build | `PASS` (배선) / `NOT TESTED` (실행) | 기존 두 job 유지 |
-| G4-2 | Tauri tests (`cargo test --lib`) | `PASS` (배선) / `NOT TESTED` (Windows 실행) | 기존 step. Linux 에서는 13 passed |
-| G4-3 | Tauri/Win32 probe step (GATE) | `PASS` (배선) / `NOT TESTED` (실행) | `continue-on-error` 없음 → 실패 시 job 실패 |
-| G4-4 | WPF/Win32 probe build + step (GATE) | `PASS` (배선) / `NOT TESTED` (실행) | 동일 |
-| G4-5 | RT_MANIFEST 리소스 검사 step ×4 (GATE) | `PASS` (배선) / `NOT TESTED` (실행) | 앱 exe 2개 + probe exe 2개 |
-| G4-6 | artifact 업로드 | `PASS` (배선) / `NOT TESTED` (실행) | probe report · manifest report · 양쪽 exe 추가 |
-| G4-7 | 대화형 데스크톱 항목이 PASS 로 올라가지 않는다 | `PASS` (배선) | smoke / `repeat-stability.ps1` 은 `continue-on-error` 유지, probe 는 해당 항목을 `NOT TESTED` 로만 출력한다 |
+| G4-1 | windows-latest 에서 Tauri build · WPF build | `NOT TESTED` | 배선만 확인: 기존 두 job 유지 |
+| G4-2 | Tauri tests (`cargo test --lib`) | `NOT TESTED` | 배선만 확인: 기존 step. (별개로 Linux 에서 `cargo test --lib` 13 passed — 이것은 G4 가 아니라 G1 의 근거다) |
+| G4-3 | Tauri/Win32 probe step (GATE) | `NOT TESTED` | 배선만 확인: `continue-on-error` 없음 → 실패 시 job 실패 |
+| G4-4 | WPF/Win32 probe build + step (GATE) | `NOT TESTED` | 배선만 확인: 동일 |
+| G4-5 | RT_MANIFEST 리소스 검사 step ×4 (GATE) | `NOT TESTED` | 배선만 확인: 앱 exe 2개 + probe exe 2개 |
+| G4-6 | artifact 업로드 | `NOT TESTED` | 배선만 확인: probe report · manifest report · 양쪽 exe 추가 |
+| G4-7 | 대화형 데스크톱 항목이 PASS 로 올라가지 않는다 | `NOT TESTED` | 배선만 확인: smoke / `repeat-stability.ps1` 은 `continue-on-error` 유지, probe 는 해당 항목을 `NOT TESTED` 로만 출력한다 |
 
-`PASS (배선)` 은 **YAML/스크립트가 검증됐다**는 뜻이고 job 이 초록이었다는 뜻이 아니다.
-이 컨테이너에서 검증한 것:
+**G4 는 전부 `NOT TESTED` 다.** 이 workflow 는 아직 한 번도 돌지 않았다 — 초록이었던 job 도,
+빨간 job 도 없다. 정적으로 확인한 것은 "배선이 그렇게 돼 있다" 까지이고, 그것은
+`PASS` 가 아니다. 근거 column 의 "배선만 확인" 은 아래 항목들을 뜻한다:
 
 - `windows-shell-spike.yml` → PyYAML `safe_load` 파싱 성공, job/step 구조 출력 확인.
 - workflow 의 `run:` 블록 **20개 전부** 를 추출해 PowerShell 7.4 파서로 파싱 → 0 failures.
-- `scripts/*.ps1` 5개 전부 파싱 → 0 failures.
-- `inspect-exe-manifest.ps1` 의 C# `Add-Type` 블록이 컴파일되고, 보고서 스캐폴딩 ·
-  요구 항목 매칭 표 · 실패 시 exit 1 경로가 Linux 에서 실제로 동작하는 것을 확인
-  (Win32 호출 자체는 Linux 에서 당연히 실패 → 그 경로가 FAIL 로 보고되는 것까지 확인).
+- `scripts/*.ps1` 6개 전부 파싱 → 0 failures.
 - YAML block scalar 안에 PowerShell here-string 을 넣지 않았다. C# 인터롭은 `.ps1` 파일로
   분리했고, 여러 줄 텍스트는 전부 배열 + `Set-Content` 다.
+
+`inspect-exe-manifest.ps1` 에 대해 Linux 에서 **실제로 실행한** 것과 못 한 것:
+
+- 실행함 → `PASS`: C# `Add-Type` 블록이 컴파일된다.
+- 실행함 → `PASS`: 매니페스트를 못 읽는 경로. 방금 빌드한 `Win32Probe.exe` 를 상대로
+  스크립트를 그대로 돌리면 `RESULT: FAIL - no RT_MANIFEST resource could be read from this
+  executable.` 에서 `exit 1` 한다. Linux 에 `LoadLibraryExW`/`FindResourceW` 가 없으니
+  Linux 에서 실제 exe 를 넣어 도달할 수 있는 경로는 **이것 하나뿐이다.**
+- **이전 판의 오기 정정.** 그 실행에서는 `## required declarations` 매칭 표가 찍히지
+  않는다. 표는 위 `exit 1` **뒤** 에 있어서 그 경로에서는 도달 자체가 불가능하다.
+  이전 판이 "요구 항목 매칭 표 · 실패 시 exit 1 경로가 Linux 에서 실제로 동작" 이라고
+  쓴 것은 **틀렸다.** exit 1 경로만 동작했다.
+- 그래서 `scripts/selftest-inspect-exe-manifest.ps1` 을 추가했고, 이것으로 매칭 표 쪽을
+  실제로 실행했다 → `PASS` (26/26 checks). 이 self-test 는 스크립트를 고치지 않는다:
+  `inspect-exe-manifest.ps1` 이 이미 자기 `Add-Type` 을
+  `if (-not ('SpikeA.ManifestReader' -as [type]))` 로 감싸고 있어서, 같은 이름의 stub 타입을
+  먼저 등록해 두면 나머지 스크립트가 **원문 그대로** 실행된다. 확인한 것:
+  요구 항목 매칭 표 렌더링, 리소스 hit / raw-byte miss 구분, well-formed XML 검사,
+  `RESULT: PASS` 와 `RESULT: FAIL` 각각의 exit code, `::error::` 주석, `-OutFile` 보고서.
+  self-test 가 실제로 회귀를 잡는지도 확인했다 — XML 검사 한 줄을 지우면 26 중 2개가
+  FAIL 로 뒤집히고 self-test 가 `exit 1` 한다 (변이 후 원상복구).
+- **실행 못 함 → `NOT TESTED`:** Win32 인터롭 본체. 실제 PE 파일에서 RT_MANIFEST 를
+  꺼내오는 것이 정말 되는지는 Windows CI job 이 돌기 전까지 모른다. self-test 의 `PASS` 는
+  보고/매칭 로직에 대한 것이지, **어떤 exe 에도 매니페스트가 박혀 있다는 증거가 아니다.**
 
 ---
 
@@ -368,6 +390,7 @@ Linux 에서 검증한 것 (실측):
 | `tauri/src-tauri/src/win32_probe.rs` | headless Win32 primitive probe (lib 모듈 + 순수 산술 unit test) | Linux: 타입검사 · 13 tests PASS. Windows 실행: `NOT TESTED` |
 | `tauri/src-tauri/src/bin/win32-probe.rs` | 위 probe 의 CI 진입점 (console bin, 앱과 같은 RT_MANIFEST) | 동일 |
 | `wpf-probe/**` | WPF 측 probe (`Win32Probe.exe`) + 자기 `app.manifest` | Linux: build PASS · exe 산출 확인. 실행: `NOT TESTED` |
-| `scripts/inspect-exe-manifest.ps1` | exe 의 RT_MANIFEST 리소스를 읽어 선언 검사 | 파서 · `Add-Type` · 실패 경로 확인. Windows 실행: `NOT TESTED` |
+| `scripts/inspect-exe-manifest.ps1` | exe 의 RT_MANIFEST 리소스를 읽어 선언 검사 | 파서 · `Add-Type` · 매니페스트를 못 읽는 `exit 1` 경로 실행 확인. 보고/매칭 로직은 self-test 로 실행 확인. **Win32 인터롭 실행: `NOT TESTED`** |
+| `scripts/selftest-inspect-exe-manifest.ps1` | 위 스크립트의 보고·매칭·exit code 절반을 host 무관하게 실행하는 self-test (stub 타입 주입, 스크립트 원문 무수정) | Linux 에서 실행 → 26/26 `PASS`. 변이 주입으로 회귀 탐지력도 확인 |
 
 **B~F 의 판정은 이번에도 하나도 바뀌지 않았다. 전부 `NOT TESTED` 그대로다.**
